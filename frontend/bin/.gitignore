@@ -1,0 +1,10 @@
+*
+!.gitignore
+
+# This directory will contain platform-specific binaries for the Riana IDE
+# Binaries should be named:
+# - riana-ide-linux-x64
+# - riana-ide-linux-arm64
+# - riana-ide-macos-x64
+# - riana-ide-macos-arm64
+# - riana-ide-windows-x64.exe

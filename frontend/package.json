@@ -1,0 +1,43 @@
+{
+  "name": "riana",
+  "version": "0.1.0",
+  "description": "Riana IDE - A modern development environment",
+  "main": "src/cli.js",
+  "bin": {
+    "riana": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-tauri": "cd tauri-app && npm run build",
+    "dev-tauri": "cd tauri-app && npm run tauri dev",
+    "postinstall": "node src/cli.js install",
+    "build:windows": "powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1",
+    "build:linux": "powershell -ExecutionPolicy Bypass -File scripts/build_linux.ps1",
+    "build:macos": "sh ./scripts/build_macos.sh",
+    "build:all": "npm run build:windows && npm run build:linux && npm run build:macos"
+  },
+  "keywords": ["ide", "development", "tauri"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "commander": "^11.0.0",
+    "dotenv": "^16.0.0",
+    "inquirer": "^9.0.0",
+    "node-fetch": "^3.3.0",
+    "os-homedir": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "type": "module",
+  "files": [
+    "src",
+    "bin",
+    "bin/riana-ide-linux-x64",
+    "bin/riana-ide-linux-arm64", 
+    "bin/riana-ide-macos-x64",
+    "bin/riana-ide-macos-arm64",
+    "bin/riana-ide-windows-x64.exe"
+  ]
+}
