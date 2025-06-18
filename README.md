@@ -1,14 +1,10 @@
-# ariana IDE v0.1
+# Ariana IDE v0.1
 
-A modern development environment with CLI authentication and Tauri-based desktop app.
+The IDE of the future.
 
 ## Features
 
-- 🔐 Email-based authentication with verification codes
-- 💻 Cross-platform CLI tool installable via npm
-- 🖥️ Native desktop application powered by Tauri + React
-- 🌙 Dark theme interface
-- 📧 Email integration for secure login
+The future doesn't wait for a feature list. It unfolds as every second passes.
 
 ## Installation
 
@@ -94,29 +90,7 @@ node src/cli.js
 - `ariana logout` - Clear stored credentials
 - `ariana status` - Check authentication status
 
-### Authentication Flow
-
-1. User runs `ariana`
-2. If not logged in, prompts for email
-3. Backend creates/finds account and sends verification code via email
-4. User enters 6-digit code
-5. CLI stores JWT token for 3 months
-6. Launches Tauri desktop application
-
-### Configuration
-
-Credentials are stored in `~/.ariana/config.json` with the following structure:
-
-```json
-{
-  "token": "jwt_token_here",
-  "email": "user@example.com",
-  "accountId": "uuid",
-  "expiresAt": "2024-09-17T10:30:00.000Z"
-}
-```
-
-## Email Configuration
+## Server Configuration
 
 Configure your email service in `backend/.env`:
 
