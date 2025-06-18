@@ -130,4 +130,4 @@ SENDER_EMAIL=your-email@gmail.com
 
 ## License
 
-MIT
+GNU Affero General Public License v3.0
