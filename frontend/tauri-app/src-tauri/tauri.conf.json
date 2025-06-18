@@ -39,7 +39,7 @@
         "removeFile": true,
         "renameFile": true,
         "exists": true,
-        "scope": ["$HOME/.ariana/*", "$HOME/.ariana", "$APPCONFIG/*", "$APPDATA/*"]
+        "scope": ["$RESOURCE/**", "$HOME/.ariana/*", "$HOME/.ariana", "$APPCONFIG/*", "$APPDATA/*"]
       },
       "path": {
         "all": true
@@ -55,6 +55,9 @@
         "icons/128x128@2x.png",
         "icons/icon.icns",
         "icons/icon.ico"
+      ],
+      "resources": [
+        "../src/scripting/baseScript.ts"
       ]
     },
     "security": {
