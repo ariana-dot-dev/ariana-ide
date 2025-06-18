@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Event, UnlistenFn, listen } from '@tauri-apps/api/event';
 import { readTextFile } from '@tauri-apps/api/fs';
 import { homeDir } from '@tauri-apps/api/path';
 import { appWindow } from '@tauri-apps/api/window';
@@ -23,19 +24,43 @@ function App() {
     const [error, setError] = useState('');
     const [isMaximized, setIsMaximized] = useState(false);
     const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
+    const [script, setScript] = useState('');
+    const [commandInput, setCommandInput] = useState('');
+    const [isScriptContainerVisible, setIsScriptContainerVisible] = useState(false);
 
     useEffect(() => {
         loadUserConfig();
 
         async function importAndRunSwcOnMount() {
             await initSwc('/wasm_bg.wasm');
-            const interpreter = new Interpreter();
-            const commands = await interpreter.init();
-            commands.forEach(command => state.processCommand(command));
+            const interpreter = new Interpreter(state);
+            await interpreter.init();
             setInterpreter(interpreter);
         }
         importAndRunSwcOnMount();
 
+        state.currentInterpreterScript.subscribe((value) => {
+            setScript(value);
+        });
+
+        const unlistenUserEmail = listen<string>('user-email-changed', (event: Event<string>) => {
+            setUserEmail(event.payload);
+        });
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'p') {
+                setIsScriptContainerVisible(prevState => !prevState);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            unlistenUserEmail.then((unlisten) => unlisten());
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
+    useEffect(() => {
         // Check if window is maximized
         appWindow.isMaximized().then(setIsMaximized);
     }, []);
@@ -88,7 +113,7 @@ function App() {
     return (
         <StateContext value={state}>
         <InterpreterContext value={interpreter}>
-        <div className="font-mono h-screen w-screen bg-gradient-to-b from-sky-300 to-sky-200 flex flex-col rounded-lg overflow-hidden">
+        <div className="relative font-mono h-screen w-screen bg-gradient-to-b from-sky-300 to-sky-200 flex flex-col rounded-lg overflow-hidden">
             <div className="h-full w-full text-sky-200 bg-gradient-to-b from-sky-600 to-sky-400 flex flex-col rounded-lg">
                 {/* Custom Titlebar */}
                 <div data-tauri-drag-region className="h-10 flex items-center justify-center px-4 select-none relative">
@@ -112,6 +137,33 @@ function App() {
                 {/* Main Content */}
                 <div className="flex-1 font-mono flex items-center justify-center ">
                     <Onboarding userEmail={userEmail} />
+                    {isScriptContainerVisible && (
+                        <div id="scriptContainer" className='absolute left-2 bottom-2 flex flex-col z-10 p-3 rounded-md backdrop-blur-sm font-mono bg-blue-800/10 w-[42ch] min-h-[40ch]'>
+                            <div className='px-3 py-2 flex-1'>
+                                <code style={{ whiteSpace: 'pre-wrap' }}>{script}</code>
+                            </div>
+                            <div className='w-full rounded-md overflow-hidden max-w-full h-fit bg-blue-800/10 flex justify-between'>
+                                <input className="flex-1 px-2 py-2 decoration-0 outline-none" type="text" value={commandInput} onChange={(e) => setCommandInput(e.target.value)} onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        try {
+                                            interpreter?.tryRunInstruction(commandInput);
+                                            setCommandInput('');
+                                        } catch (e) {
+                                            alert(e);
+                                        }
+                                    }
+                                }} />
+                                <button className="px-4 py-1 hover:bg-blue-600 cursor-pointer" onClick={() => {
+                                    try {
+                                        interpreter?.tryRunInstruction(commandInput);
+                                        setCommandInput('');
+                                    } catch (e) {
+                                        alert(e);
+                                    }
+                                }}>Run</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -34,6 +34,7 @@ export class Subscribeable<T> {
 
 export class State {
     public showOnboarding: Subscribeable<boolean> = new Subscribeable(false);
+    public currentInterpreterScript: Subscribeable<string> = new Subscribeable("");
 
     processedCommandsStack: Command[] = [];
 

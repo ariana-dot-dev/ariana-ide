@@ -20,14 +20,11 @@ const Onboarding = ({ userEmail }: { userEmail: string }) => {
     }
 
     return (
-        <div id="onboarding" className="group relative text-center p-8 hover:border-2 border-sky-200/20 border-dashed">
+        <div id="onboarding" className="group relative text-center p-8 border-2 border-sky-200/0 hover:border-sky-200/20 border-dashed">
             <button 
                 className="group/closebutton absolute right-0 top-0 group-hover:flex hidden p-1 items-center justify-center cursor-pointer border-b-2 border-l-2 border-sky-200/20 border-dashed rounded-bl-md"
                 onClick={async () => {
-                    const commands = await interpreter?.tryRunInstruction("Onboarding.hide()");
-                    if (commands) {
-                        commands.forEach(command => state.processCommand(command));
-                    }
+                    await interpreter?.tryRunInstruction("Onboarding.hide()");
                 }}
             >
                 <div className='group-hover/closebutton:opacity-100 opacity-50'>

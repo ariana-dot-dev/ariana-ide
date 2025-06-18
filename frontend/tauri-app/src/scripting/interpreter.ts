@@ -3,35 +3,58 @@ import { readTextFile } from '@tauri-apps/api/fs';
 import { resolveResource } from '@tauri-apps/api/path';
 import { Command } from "./baseScript";
 import React from "react";
+import { State } from "../state";
 
 class Script {
     baseScript: string = "";
-    notHiddenTopScript: string = "";
     appendix: string[] = [];
 
-    constructor(baseScript: string, notHiddenTopScript: string, appendix: string[]) {
+    constructor(baseScript: string, appendix: string[]) {
         this.baseScript = baseScript;
-        this.notHiddenTopScript = notHiddenTopScript;
         this.appendix = appendix;
     }
 
     clone(): Script {
-        return new Script(this.baseScript, this.notHiddenTopScript, [...this.appendix]);
+        return new Script(this.baseScript, [...this.appendix]);
     }
 }
 
 export class Interpreter {
     script: Script;
     lastResult: Command[] = [];
+    state: State;
+    notHiddenTopScript: string = "";
+    initialContent: string = "";
     
-    constructor() {
-        this.script = new Script("", "", []);
+    constructor(state: State) {
+        this.script = new Script("", []);
+        this.state = state;
     }
 
-    async init(): Promise<Command[]> {
+    async init() {
         const resourcePath = await resolveResource('../src/scripting/baseScript.ts');
         this.script.baseScript = await readTextFile(resourcePath);
-        this.script.notHiddenTopScript = this.script.baseScript.replace(/\/\/ <hide>[\s\S]*?\/\/ <\/hide>/g, '').trim();
+        
+        // --- Populate this.notHiddenTopScript and this.initialContent ---
+        const baseScriptContent = this.script.baseScript;
+
+        const initialTagStart = "// <initial>";
+        const initialTagEnd = "// </initial>";
+        const initialBlockStartIndex = baseScriptContent.indexOf(initialTagStart);
+        
+        if (initialBlockStartIndex !== -1) {
+            const initialBlockEndIndex = baseScriptContent.indexOf(initialTagEnd, initialBlockStartIndex + initialTagStart.length);
+            if (initialBlockEndIndex !== -1) {
+                this.initialContent = baseScriptContent.substring(initialBlockStartIndex + initialTagStart.length, initialBlockEndIndex).trim();
+            }
+        }
+
+        const scriptPortionForNotHidden = (initialBlockStartIndex !== -1) 
+            ? baseScriptContent.substring(0, initialBlockStartIndex)
+            : baseScriptContent;
+        
+        this.notHiddenTopScript = scriptPortionForNotHidden.replace(/\/\/ <hide>[\s\S]*?\/\/ <\/hide>/g, "").trim();
+        // --- End population ---
         const script = this.script.baseScript + '\n' + this.script.appendix.join('\n');
 
         // try to compile the script
@@ -53,10 +76,14 @@ export class Interpreter {
 
         this.lastResult = result;
 
-        return result;
+        result.forEach(command => this.state.processCommand(command));
+
+        const rawScriptForFormatting = this.notHiddenTopScript + '\n' + this.initialContent + '\n' + this.script.appendix.join('\n');
+        const nicelyFormattedCurrentScript = this._formatScriptForDisplay(rawScriptForFormatting);
+        this.state.currentInterpreterScript.value = nicelyFormattedCurrentScript;
     }
 
-    async tryRunInstruction(instruction: string): Promise<Command[]> {
+    async tryRunInstruction(instruction: string) {
         // create a new version of the script
         const newScript = this.script.clone();
         newScript.appendix.push(instruction);
@@ -89,33 +116,29 @@ export class Interpreter {
 
         this.lastResult = result;
 
+        newCommands.forEach(command => this.state.processCommand(command));
 
-        return newCommands;
+        
+        const rawScriptForFormatting = this.notHiddenTopScript + '\n' + this.initialContent + '\n' + this.script.appendix.join('\n');
+        const nicelyFormattedCurrentScript = this._formatScriptForDisplay(rawScriptForFormatting);
+        this.state.currentInterpreterScript.value = nicelyFormattedCurrentScript;
+    }
+
+    private _formatScriptForDisplay(scriptContent: string): string {
+        const initialLines = scriptContent.split('\n');
+        const nonBlankLines = initialLines.filter(line => line.trim() !== "");
+
+        if (nonBlankLines.length === 0) return ""; // Handle empty or all-whitespace input
+
+        const finalLines: string[] = [];
+        for (let i = 0; i < nonBlankLines.length; i++) {
+            const line = nonBlankLines[i];
+            finalLines.push(line);
+            // Add an empty line if the current line is '}' and it's not the last non-blank line
+            if (line.trim() === "}" && i < nonBlankLines.length - 1) {
+                finalLines.push("");
+            }
+        }
+        return finalLines.join('\n');
     }
 }
-
-// export async function readBaseScript() {
-//     try {
-//         const resourcePath = await resolveResource('../src/scripting/baseScript.ts');
-//         const fullContent = await readTextFile(resourcePath);
-
-//         console.log("Full content of baseScript.ts:");
-//         console.log(fullContent);
-
-//         const notHiddenContent = fullContent.replace(/\/\/ <hide>[\s\S]*?\/\/ <\/hide>/g, '').trim();
-//         const initialContent = notHiddenContent.replace(/\/\/ <initial>[\s\S]*?\/\/ <\/initial>/g, '').trim();
-//         console.log("Public content of baseScript.ts:");
-//         console.log(notHiddenContent + initialContent);
-
-//         const codeToTransform = fullContent.replace('export type', 'type');
-//         const jsCode = transformSync(codeToTransform, { jsc: { parser: { syntax: 'typescript' } } });
-//         console.log("JS code:");
-//         console.log(jsCode);
-
-//         // eval the code and get the __result var by making it the last expression
-//         const result = eval(`${jsCode.code}; __result`) as Command[];
-//         console.log("Result:", result);
-//     } catch (e) {
-//         console.error("Error in readBaseScript:", e);
-//     }
-// }
