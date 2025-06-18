@@ -9,9 +9,13 @@
   </div>
 </p>
 
-## Features
+## Short term Roadmap
 
-The future doesn't wait for a feature list. It unfolds as every second passes.
+- [ ] TS Scripting engine + Boot script
+- [ ] Machine setup system with [mise](https://mise.jdx.dev/getting-started.html)
+- [ ] Machine UI + fs UI
+- [ ] Text editing UI
+- [ ] Terminal UI
 
 ## Installation
 
