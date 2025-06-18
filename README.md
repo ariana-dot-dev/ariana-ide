@@ -1,6 +1,13 @@
-# Ariana IDE v0.1
-
-The IDE of the future.
+<p align="center">
+  <h1 align="center">Ariana IDE</h1>
+  <img src="assets/screenshot.jpg" width="1024" alt="Ariana IDE screenshot" />
+  <br />
+  <p align="center"><i>The IDE of the future.</i></p>
+  <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+    <a href="https://discord.gg/Y3TFTmE89g"><img src="https://img.shields.io/discord/1312017605955162133?style=for-the-badge&color=7289da&label=Discord&logo=discord&logoColor=ffffff&size=10" alt="Join our Discord" /></a>
+    <a href="https://twitter.com/anic_dev"><img src="https://img.shields.io/badge/Follow-@anic_dev-black?style=for-the-badge&logo=x&logoColor=white&size=10" alt="Follow us on X" /></a>
+  </div>
+</p>
 
 ## Features
 
