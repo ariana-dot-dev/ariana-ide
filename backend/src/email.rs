@@ -39,9 +39,9 @@ impl EmailService {
         let email = Message::builder()
             .from(self.sender_email.parse()?)
             .to(to_email.parse()?)
-            .subject("Your Riana Login Code")
+            .subject("Your ariana Login Code")
             .body(format!(
-                "Hello!\n\nYour one-time login code for Riana IDE is: {}\n\nThis code will expire in 24 hours.\n\nIf you did not request this code, please ignore this email.",
+                "Hello!\n\nYour one-time login code for ariana IDE is: {}\n\nThis code will expire in 24 hours.\n\nIf you did not request this code, please ignore this email.",
                 login_code
             ))?;
 

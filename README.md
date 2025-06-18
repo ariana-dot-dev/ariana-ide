@@ -1,4 +1,4 @@
-# Riana IDE v0.1
+# ariana IDE v0.1
 
 A modern development environment with CLI authentication and Tauri-based desktop app.
 
@@ -14,10 +14,10 @@ A modern development environment with CLI authentication and Tauri-based desktop
 
 ```bash
 # Install globally via npm
-npm install -g riana
+npm install -g ariana
 
 # Login and launch IDE
-riana
+ariana
 ```
 
 ## Architecture
@@ -29,7 +29,7 @@ riana
 ## Project Structure
 
 ```
-riana/
+ariana/
 ├── backend/          # Rust backend server
 │   ├── src/
 │   │   ├── main.rs
@@ -89,14 +89,14 @@ node src/cli.js
 
 ### CLI Commands
 
-- `riana` - Main command (login if not authenticated, launch IDE if authenticated)
-- `riana login` - Force login flow
-- `riana logout` - Clear stored credentials
-- `riana status` - Check authentication status
+- `ariana` - Main command (login if not authenticated, launch IDE if authenticated)
+- `ariana login` - Force login flow
+- `ariana logout` - Clear stored credentials
+- `ariana status` - Check authentication status
 
 ### Authentication Flow
 
-1. User runs `riana`
+1. User runs `ariana`
 2. If not logged in, prompts for email
 3. Backend creates/finds account and sends verification code via email
 4. User enters 6-digit code
@@ -105,7 +105,7 @@ node src/cli.js
 
 ### Configuration
 
-Credentials are stored in `~/.riana/config.json` with the following structure:
+Credentials are stored in `~/.ariana/config.json` with the following structure:
 
 ```json
 {

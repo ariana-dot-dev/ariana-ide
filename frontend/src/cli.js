@@ -19,7 +19,7 @@ if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.riana');
+const CONFIG_DIR = path.join(os.homedir(), '.ariana');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 // Check if running in development mode
@@ -29,7 +29,7 @@ function isDevelopmentMode() {
     if (fs.existsSync(packageJsonPath)) {
         try {
             const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            return packageJson.name === 'riana';
+            return packageJson.name === 'ariana';
         } catch {
             return false;
         }
@@ -51,7 +51,7 @@ function getBackendUrl() {
     }
     
     // Smart default based on development/production mode
-    return isDevelopmentMode() ? 'http://localhost:8080' : 'https://api.riana.dev';
+    return isDevelopmentMode() ? 'http://localhost:8080' : 'https://api.ariana.dev';
 }
 
 const BACKEND_URL = getBackendUrl();
@@ -148,7 +148,7 @@ async function validateLoginCode(email, code) {
 
 // Login flow
 async function login() {
-    console.log('Welcome to Riana IDE!');
+    console.log('Welcome to ariana IDE!');
     
     try {
         // Get email
@@ -215,18 +215,18 @@ function getBinaryName() {
     
     if (platform === 'linux') {
         if (arch === 'arm64') {
-            return 'riana-ide-linux-arm64';
+            return 'ariana-ide-linux-arm64';
         } else if (arch === 'x64') {
-            return 'riana-ide-linux-x64';
+            return 'ariana-ide-linux-x64';
         }
     } else if (platform === 'darwin') {
         if (arch === 'arm64') {
-            return 'riana-ide-macos-arm64';
+            return 'ariana-ide-macos-arm64';
         } else if (arch === 'x64') {
-            return 'riana-ide-macos-x64';
+            return 'ariana-ide-macos-x64';
         }
     } else if (platform === 'win32' && arch === 'x64') {
-        return 'riana-ide-windows-x64.exe';
+        return 'ariana-ide-windows-x64.exe';
     }
     
     return null;
@@ -243,7 +243,7 @@ function getBundledBinaryPath() {
 
 // Launch Tauri IDE
 function launchIDE() {
-    console.log('🚀 Launching Riana IDE...');
+    console.log('🚀 Launching ariana IDE...');
     
     if (isDevelopmentMode()) {
         // Development mode - launch with npm run tauri:dev
@@ -282,14 +282,14 @@ function launchIDE() {
         }
         
         if (!fs.existsSync(binaryPath)) {
-            console.error('❌ Riana IDE binary not found!');
+            console.error('❌ ariana IDE binary not found!');
             console.log('Binary path:', binaryPath);
             console.log('\nThis might be a package installation issue.');
-            console.log('Try reinstalling: npm install -g riana');
+            console.log('Try reinstalling: npm install -g ariana');
             return;
         }
         
-        console.log('Starting Riana IDE...');
+        console.log('Starting ariana IDE...');
         const child = spawn(binaryPath, [], {
             stdio: 'inherit',
             shell: process.platform !== 'win32',
@@ -317,18 +317,18 @@ async function main() {
 
 // CLI commands
 program
-    .name('riana')
-    .description('Riana IDE - A modern development environment')
+    .name('ariana')
+    .description('ariana IDE - A modern development environment')
     .version('0.1.0');
 
 program
     .command('login')
-    .description('Login to Riana IDE')
+    .description('Login to ariana IDE')
     .action(login);
 
 program
     .command('install')
-    .description('Set up Riana IDE binary permissions')
+    .description('Set up ariana IDE binary permissions')
     .action(() => {
         const binaryPath = getBundledBinaryPath();
         
@@ -352,12 +352,12 @@ program
             }
         }
         
-        console.log('✅ Riana IDE binary setup complete');
+        console.log('✅ ariana IDE binary setup complete');
     });
 
 program
     .command('logout')
-    .description('Logout from Riana IDE')
+    .description('Logout from ariana IDE')
     .action(() => {
         saveConfig({});
         console.log('✅ Successfully logged out!');
@@ -379,7 +379,7 @@ program
 
 program
     .command('config')
-    .description('Configure Riana settings')
+    .description('Configure ariana settings')
     .option('--backend-url <url>', 'Set backend URL')
     .action((options) => {
         if (options.backendUrl) {
@@ -390,7 +390,7 @@ program
         } else {
             const config = loadConfig();
             console.log('Current configuration:');
-            const defaultUrl = isDevelopmentMode() ? 'http://localhost:8080 (dev)' : 'https://api.riana.dev (prod)';
+            const defaultUrl = isDevelopmentMode() ? 'http://localhost:8080 (dev)' : 'https://api.ariana.dev (prod)';
             console.log('Backend URL:', config.backendUrl || `${defaultUrl} (default)`);
             console.log('\nYou can also set RIANA_BACKEND_URL environment variable');
         }

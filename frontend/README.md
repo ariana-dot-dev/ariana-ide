@@ -1,30 +1,30 @@
-# Riana IDE CLI
+# ariana IDE CLI
 
-A modern development environment CLI that manages authentication and launches the Riana IDE.
+A modern development environment CLI that manages authentication and launches the ariana IDE.
 
 ## Installation
 
 ```bash
-npm install -g riana
+npm install -g ariana
 ```
 
 ## Usage
 
 ```bash
-# Launch Riana IDE (will prompt for login if needed)
-riana
+# Launch ariana IDE (will prompt for login if needed)
+ariana
 
 # Explicit login
-riana login
+ariana login
 
 # Check status
-riana status
+ariana status
 
 # Configure backend URL
-riana config --backend-url https://api.example.com
+ariana config --backend-url https://api.example.com
 
 # Logout
-riana logout
+ariana logout
 ```
 
 ## Development
@@ -61,11 +61,11 @@ npm run build:all
 - **Windows**: Native compilation
 
 Binaries are placed in `bin/` directory with platform-specific names:
-- `riana-ide-windows-x64.exe`
-- `riana-ide-linux-x64`
-- `riana-ide-linux-arm64`
-- `riana-ide-macos-x64`
-- `riana-ide-macos-arm64`
+- `ariana-ide-windows-x64.exe`
+- `ariana-ide-linux-x64`
+- `ariana-ide-linux-arm64`
+- `ariana-ide-macos-x64`
+- `ariana-ide-macos-arm64`
 
 ### Development vs Production
 

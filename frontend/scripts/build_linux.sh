@@ -1,7 +1,7 @@
 #!/bin/bash
 # Simple Linux build script for WSL
 
-echo "Building Riana IDE for Linux..."
+echo "Building ariana IDE for Linux..."
 
 # Check if Rust is installed
 if ! command -v cargo &> /dev/null; then
@@ -30,8 +30,8 @@ fi
 # Build Linux x64 first (simpler)
 echo "Building Linux x64..."
 if cross build --release --target x86_64-unknown-linux-gnu; then
-    cp target/x86_64-unknown-linux-gnu/release/riana-ide ../../bin/riana-ide-linux-x64
-    chmod +x ../../bin/riana-ide-linux-x64
+    cp target/x86_64-unknown-linux-gnu/release/ariana-ide ../../bin/ariana-ide-linux-x64
+    chmod +x ../../bin/ariana-ide-linux-x64
     echo "✅ Linux x64 done"
 else
     echo "❌ Linux x64 failed"
@@ -41,8 +41,8 @@ fi
 echo "Building Linux ARM64..."
 echo "This may take a while as it needs to set up the cross-compilation environment..."
 if cross build --release --target aarch64-unknown-linux-gnu; then
-    cp target/aarch64-unknown-linux-gnu/release/riana-ide ../../bin/riana-ide-linux-arm64
-    chmod +x ../../bin/riana-ide-linux-arm64
+    cp target/aarch64-unknown-linux-gnu/release/ariana-ide ../../bin/ariana-ide-linux-arm64
+    chmod +x ../../bin/ariana-ide-linux-arm64
     echo "✅ Linux ARM64 done"
 else
     echo "❌ Linux ARM64 failed - this is common due to webkit dependencies"
