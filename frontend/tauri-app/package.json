@@ -2,7 +2,7 @@
   "name": "ariana-ide",
   "version": "0.1.0",
   "description": "ariana IDE - Desktop Application",
-  "main": "src/main.jsx",
+  "main": "src/main.tsx",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,7 +18,7 @@
     "ide"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@hugeicons-pro/core-bulk-rounded": "^1.0.14",
     "@hugeicons/react": "^1.0.5",

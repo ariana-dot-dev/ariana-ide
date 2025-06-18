@@ -1,24 +1,31 @@
 {
-  "name": "ariana",
+  "name": "ariana-ide",
   "version": "0.1.0",
   "description": "ariana IDE - A modern development environment",
-  "main": "src/cli.js",
+  "main": "dist/cli.js",
   "bin": {
-    "ariana": "./src/cli.js"
+    "ariana-ide": "./dist/cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "dev": "npm run build && node dist/cli.js",
+    "prepublishOnly": "npm run build",
     "build-tauri": "cd tauri-app && npm run build",
     "dev-tauri": "cd tauri-app && npm run tauri dev",
-    "postinstall": "node src/cli.js install",
+    "postinstall": "node dist/cli.js install",
     "build:windows": "powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1",
     "build:linux": "powershell -ExecutionPolicy Bypass -File scripts/build_linux.ps1",
     "build:macos": "sh ./scripts/build_macos.sh",
     "build:all": "npm run build:windows && npm run build:linux && npm run build:macos"
   },
-  "keywords": ["ide", "development", "tauri"],
+  "keywords": [
+    "ide",
+    "development",
+    "tauri"
+  ],
   "author": "",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "axios": "^1.6.0",
     "commander": "^11.0.0",
@@ -32,12 +39,18 @@
   },
   "type": "module",
   "files": [
+    "dist",
     "src",
     "bin",
     "bin/ariana-ide-linux-x64",
-    "bin/ariana-ide-linux-arm64", 
+    "bin/ariana-ide-linux-arm64",
     "bin/ariana-ide-macos-x64",
     "bin/ariana-ide-macos-arm64",
     "bin/ariana-ide-windows-x64.exe"
-  ]
+  ],
+  "devDependencies": {
+    "@types/inquirer": "^9.0.8",
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3"
+  }
 }
