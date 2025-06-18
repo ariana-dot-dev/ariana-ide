@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { readTextFile } from '@tauri-apps/api/fs';
 import { homeDir } from '@tauri-apps/api/path';
 import { appWindow } from '@tauri-apps/api/window';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CancelSquareIcon } from '@hugeicons-pro/core-bulk-rounded';
 
 interface UserConfig {
   email: string;
@@ -134,7 +136,12 @@ function App(): JSX.Element {
 
       {/* Main Content */}
       <div className="flex-1 font-mono flex items-center justify-center ">
-        <div className="text-center p-8 hover:border-2 border-sky-200/20 border-dashed">
+        <div className="group relative text-center p-8 hover:border-2 border-sky-200/20 border-dashed">
+          <button className="group/closebutton absolute right-0 top-0 group-hover:flex hidden p-1 items-center justify-center cursor-pointer border-b-2 border-l-2 border-sky-200/20 border-dashed rounded-bl-md">
+            <div className='group-hover/closebutton:opacity-100 opacity-50'>
+              <HugeiconsIcon icon={CancelSquareIcon} />
+            </div>
+          </button>
           <div className='flex flex-col items-center gap-0.5'>
             <img src="./assets/app-icon-grad.png" className=' w-56'/>
             <h1 className="text-5xl font-mono font-bold mb-8">Ariana IDE</h1>
