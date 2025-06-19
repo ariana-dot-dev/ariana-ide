@@ -19,7 +19,7 @@ const createDemoElements = (): Rectangle[] => {
 const createRandomElement = (): Rectangle => {
   const sizes: SizeTarget[] = ['small', 'medium', 'large'];
   const areas: AreaTarget[] = ['center', 'left', 'top', 'right', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
-  const aspectRatios = [1, 4/3, 16/9, 2/1, 1/2, 3/2];
+  const aspectRatios = [1/2, 2/1, 1/2, 2/1, 1/1];
   
   return new Rectangle({
     size: sizes[Math.floor(Math.random() * sizes.length)],

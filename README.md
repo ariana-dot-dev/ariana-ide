@@ -11,21 +11,17 @@
 
 ## Short term Roadmap
 
-- [ ] TS Scripting engine + Boot script
-- [ ] Machine setup system with [mise](https://mise.jdx.dev/getting-started.html)
-- [ ] Machine UI + fs UI
-- [ ] Text editing UI
+- [x] TS Scripting engine + Boot script
+- [wip] Auto Layout
+- [ ] Small Agent for UI control
+- [ ] Machine/Env setup system with [mise](https://mise.jdx.dev/getting-started.html)
 - [ ] Terminal UI
+- [ ] Machine/Env UI + fs UI
+- [ ] Text editing UI
 
 ## Installation
 
-```bash
-# Install globally via npm
-npm install -g ariana
-
-# Login and launch IDE
-ariana
-```
+Ariana IDE is not ready for usage yet. Come back in a few days/weeks!
 
 ## Architecture
 
