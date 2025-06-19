@@ -1,10 +1,10 @@
 import { GridOptimizer } from './gridOptimizer';
-import { Element, ElementLayout, OptimizationOptions } from './types';
+import { CanvasElement, ElementLayout, OptimizationOptions } from './types';
 
 export interface WorkerMessage {
   type: 'OPTIMIZE_GRID';
   payload: {
-    elements: Element[];
+    elements: CanvasElement[];
     canvasWidth: number;
     canvasHeight: number;
     previousLayouts?: ElementLayout[];

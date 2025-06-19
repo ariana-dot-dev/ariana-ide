@@ -15,24 +15,26 @@ export interface GridCell {
 }
 
 export interface ElementLayout {
-  element: Element;
+  element: CanvasElement;
   cell: GridCell;
   score: number;
   previousCell?: GridCell;
 }
 
-export abstract class Element {
+export abstract class CanvasElement {
   public weight: number;
+  public id: string;
 
   constructor(weight: number = 1) {
     this.weight = weight;
+    this.id = Math.random().toString(36).substr(2, 9); // Generate unique ID
   }
 
   abstract targets(): ElementTargets;
 }
 
 export interface CanvasState {
-  elements: Element[];
+  elements: CanvasElement[];
   layouts: ElementLayout[];
   canvasWidth: number;
   canvasHeight: number;

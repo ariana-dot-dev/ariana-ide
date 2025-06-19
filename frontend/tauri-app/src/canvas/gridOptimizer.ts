@@ -1,11 +1,11 @@
-import { Element, ElementTargets, GridCell, ElementLayout, SizeTarget, AreaTarget, OptimizationOptions } from './types';
+import { CanvasElement, ElementTargets, GridCell, ElementLayout, SizeTarget, AreaTarget, OptimizationOptions } from './types';
 
 export class GridOptimizer {
   private canvasWidth: number;
   private canvasHeight: number;
   private totalArea: number;
   private stabilityWeight: number;
-  private previousLayouts: Map<Element, GridCell>;
+  private previousLayouts: Map<CanvasElement, GridCell>;
 
   constructor(canvasWidth: number, canvasHeight: number, options: OptimizationOptions = { stabilityWeight: 0.3 }) {
     this.canvasWidth = canvasWidth;
@@ -59,7 +59,7 @@ export class GridOptimizer {
     return 1 - Math.min(distance / Math.sqrt(2), 1);
   }
 
-  private getStabilityScore(element: Element, cell: GridCell): number {
+  private getStabilityScore(element: CanvasElement, cell: GridCell): number {
     const previousCell = this.previousLayouts.get(element);
     if (!previousCell) return 1; // No previous position, no penalty
 
@@ -83,7 +83,7 @@ export class GridOptimizer {
     return 1 - Math.min(normalizedDistance, 1);
   }
 
-  private scoreElementInCell(element: Element, cell: GridCell): number {
+  private scoreElementInCell(element: CanvasElement, cell: GridCell): number {
     const targets = element.targets();
     const cellArea = cell.width * cell.height;
     const cellRatio = cell.width / cell.height;
@@ -100,7 +100,7 @@ export class GridOptimizer {
     return finalScore;
   }
 
-  private partitionSpace(bounds: GridCell, elements: Element[]): ElementLayout[] {
+  private partitionSpace(bounds: GridCell, elements: CanvasElement[]): ElementLayout[] {
     if (elements.length === 0) return [];
     if (elements.length === 1) {
       const element = elements[0];
@@ -177,7 +177,7 @@ export class GridOptimizer {
     return options;
   }
 
-  private evaluateSplit(bounds: GridCell, elements: Element[], split: {
+  private evaluateSplit(bounds: GridCell, elements: CanvasElement[], split: {
     direction: 'horizontal' | 'vertical';
     position: number;
     leftCount: number;
@@ -229,8 +229,8 @@ export class GridOptimizer {
       Math.abs(b.leftScore - b.rightScore) - Math.abs(a.leftScore - a.rightScore)
     );
 
-    const leftElements: Element[] = [];
-    const rightElements: Element[] = [];
+    const leftElements: CanvasElement[] = [];
+    const rightElements: CanvasElement[] = [];
 
     // Assign elements to partitions
     for (let i = 0; i < elementScores.length; i++) {
@@ -251,7 +251,7 @@ export class GridOptimizer {
     return [...leftLayouts, ...rightLayouts];
   }
 
-  optimize(elements: Element[]): ElementLayout[] {
+  optimize(elements: CanvasElement[]): ElementLayout[] {
     if (elements.length === 0) return [];
 
     const canvasBounds: GridCell = {

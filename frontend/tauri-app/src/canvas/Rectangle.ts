@@ -1,13 +1,11 @@
-import { Element, ElementTargets } from './types';
+import { CanvasElement, ElementTargets } from './types';
 
-export class Rectangle extends Element {
+export class Rectangle extends CanvasElement {
   private _targets: ElementTargets;
-  public id: string;
 
   constructor(targets: ElementTargets, weight: number = 1) {
     super(weight);
     this._targets = targets;
-    this.id = Math.random().toString(36).substr(2, 9); // Generate unique ID
   }
 
   targets(): ElementTargets {

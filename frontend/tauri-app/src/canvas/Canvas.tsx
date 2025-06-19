@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Element, ElementLayout, OptimizationOptions, ElementTargets } from './types';
+import { PanInfo } from 'framer-motion';
+import { CanvasElement, ElementLayout, OptimizationOptions, ElementTargets } from './types';
 import { createGridWorker, WorkerMessage, WorkerResponse } from './gridWorker';
 import { Rectangle } from './Rectangle';
 import RectangleOnCanvas from './RectangleOnCanvas';
@@ -14,8 +15,8 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
   const [layouts, setLayouts] = useState<ElementLayout[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [colors, setColors] = useState<string[]>([]);
-  const [draggedElement, setDraggedElement] = useState<Rectangle | null>(null);
-  const [dragTarget, setDragTarget] = useState<Rectangle | null>(null);
+  const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(null);
+  const [dragTarget, setDragTarget] = useState<CanvasElement | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const previousLayoutsRef = useRef<ElementLayout[]>([]);
@@ -93,41 +94,51 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
   }, [elements.length, generateColors]);
 
   // Drag and drop handlers
-  const handleDragStart = useCallback((element: Rectangle) => {
-    console.log('Canvas handleDragStart called', element);
+  const handleDragStart = useCallback((element: CanvasElement) => {
+    console.log('Drag start 2:', element);
     setDraggedElement(element);
   }, []);
 
-  const handleDragEnd = useCallback(() => {
-    setDraggedElement(null);
-    setDragTarget(null);
-  }, []);
+  const handleDrag = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    console.log('Drag event:', event);
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect || !draggedElement) return;
 
-  const handleDrop = useCallback((targetElement: Rectangle) => {
-    console.log('Canvas handleDrop called', { draggedElement, targetElement });
-    if (draggedElement && targetElement && draggedElement.id !== targetElement.id) {
+    const localX = info.point.x - canvasRect.left;
+    const localY = info.point.y - canvasRect.top;
+
+    const targetLayout = layouts.find(layout => {
+      if (layout.element.id === draggedElement.id) return false; // Can't drop on itself
+
+      const { x, y, width, height } = layout.cell;
+      return localX >= x && localX <= x + width && localY >= y && localY <= y + height;
+    });
+
+    console.log('Target layout:', targetLayout);
+
+    const newTarget = targetLayout ? targetLayout.element : null;
+    if (newTarget?.id !== dragTarget?.id) {
+      setDragTarget(newTarget);
+    }
+  }, [layouts, draggedElement, dragTarget]);
+
+  const handleDragEnd = useCallback(() => {
+    console.log('Drag end:', draggedElement, dragTarget, draggedElement?.id, dragTarget?.id);
+    if (draggedElement && dragTarget && draggedElement.id !== dragTarget.id) {
       // Swap the elements
       const newElements = [...elements];
       const draggedIndex = newElements.findIndex(el => el.id === draggedElement.id);
-      const targetIndex = newElements.findIndex(el => el.id === targetElement.id);
-
-      console.log('Swap indices:', { draggedIndex, targetIndex });
+      const targetIndex = newElements.findIndex(el => el.id === dragTarget.id);
 
       if (draggedIndex !== -1 && targetIndex !== -1) {
-        // Swap elements in array
+        console.log('Swapping elements:', draggedElement.id, dragTarget.id);
         [newElements[draggedIndex], newElements[targetIndex]] = [newElements[targetIndex], newElements[draggedIndex]];
         onElementsChange(newElements);
-        console.log('Elements swapped successfully');
       }
     }
-  }, [draggedElement, elements, onElementsChange]);
-
-  // Set drag target when dragging over
-  const handleDragOver = useCallback((targetElement: Rectangle) => {
-    if (draggedElement && targetElement.id !== draggedElement.id) {
-      setDragTarget(targetElement);
-    }
-  }, [draggedElement]);
+    setDraggedElement(null);
+    setDragTarget(null);
+  }, [draggedElement, dragTarget, elements, onElementsChange]);
 
   // Element update handler
   const handleElementUpdate = useCallback((element: Rectangle, newTargets: ElementTargets) => {
@@ -135,6 +146,8 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
     // Trigger re-optimization by updating the elements array
     onElementsChange([...elements]);
   }, [elements, onElementsChange]);
+
+  const sortedIds = layouts.map(layout => layout.element.id).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="flex w-full h-full p-2">
@@ -146,14 +159,15 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
         >
           {layouts.map((layout, index) => (
             <RectangleOnCanvas
-              key={layout.element instanceof Rectangle ? layout.element.id : `rect-${index}`}
+              key={`${layout.element.id}`}
               layout={layout}
-              color={colors[index] || '#ccc'}
+              color={colors[sortedIds.indexOf(layout.element.id)] || '#ccc'}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onElementUpdate={handleElementUpdate}
+              onDrag={layout.element === draggedElement ? handleDrag : () => {
+                console.log("No drag")
+              }}
+              onRectangleUpdate={handleElementUpdate}
               isDragTarget={layout.element === dragTarget}
               isDragging={layout.element === draggedElement}
             />
