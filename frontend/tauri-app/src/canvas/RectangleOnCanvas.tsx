@@ -28,6 +28,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
   const { cell, element } = layout;
   const [isHovered, setIsHovered] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   if (isDragging) {
     console.log(`RectangleOnCanvas for ${element.id} IS DRAGGING. Received propOnDrag type: ${typeof propOnDrag}`);
@@ -58,21 +59,34 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         width: cell.width,
         height: cell.height,
       }}
-      animate={{
+      animate={ !dragging ? {
         x: cell.x,
         y: cell.y,
         width: cell.width,
         height: cell.height,
-      }}
+      } : undefined}
       transition={{
         type: "tween",
         duration: 0.2,
       }}
       layout
+      // draggable={!dragging}
+      // drag={dragging}
       drag
       dragMomentum={false}
-      onDragStart={handleDragStartInternal}
-      onDragEnd={handleDragEndInternal}
+      onMouseDown={() => {
+        if (!dragging) {
+          setDragging(true);
+        }
+      }}
+      onDragStart={() => {
+        setDragging(true);
+        handleDragStartInternal();
+      }}
+      onDragEnd={() => {
+        setDragging(false);
+        handleDragEndInternal();
+      }}
       onDrag={(event, info) => {
         console.log(`MOTION.DIV onDrag FIRED for ${element.id}. isDragging: ${isDragging}. Type of propOnDrag: ${typeof propOnDrag}`);
         if (typeof propOnDrag === 'function') {
@@ -104,7 +118,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
       )}
 
       <img src="./assets/app-icon-grad.png" style={{ width: cell.width/4, }} />
-      <div className="absolute bottom-1 left-1 text-xs text-white">ID: {element.id.substring(0,4)}</div>
+      <div className="absolute bottom-1 left-1 text-xs text-white">ID: {element.id.substring(0,4)}. Score: {layout.score.toFixed(2)}. Target: {JSON.stringify(layout.element)}</div>
       
       {showOverlay && element instanceof Rectangle && (
         <ElementOverlay

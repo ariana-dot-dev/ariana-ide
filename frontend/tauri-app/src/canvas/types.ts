@@ -27,7 +27,7 @@ export abstract class CanvasElement {
 
   constructor(weight: number = 1) {
     this.weight = weight;
-    this.id = Math.random().toString(36).substr(2, 9); // Generate unique ID
+    this.id = Math.random().toString(36).substring(2, 9); // Generate unique ID
   }
 
   abstract targets(): ElementTargets;

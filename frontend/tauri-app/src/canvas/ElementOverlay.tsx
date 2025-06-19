@@ -38,7 +38,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({ element, onConfirm, onC
 
   return (
     <div 
-      className="absolute top-0 right-0 bg-gray-900 text-white p-3 rounded-bl-lg shadow-lg z-20 min-w-48"
+      className="absolute top-0 right-0 bg-gray-900 text-white p-3 rounded-bl-lg shadow-lg z-30 min-w-48"
       onClick={(e) => e.stopPropagation()}
       onMouseEnter={(e) => e.stopPropagation()}
       onMouseLeave={(e) => e.stopPropagation()}

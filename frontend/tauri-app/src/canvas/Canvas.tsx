@@ -70,13 +70,19 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
     };
   }, [updateCanvasSize]);
 
-  // Optimize grid when elements or canvas size changes
-  useEffect(() => {
+  function optimizeElements() {
     if (elements.length > 0 && canvasSize.width > 0 && canvasSize.height > 0 && workerRef.current) {
+      // Serialize elements for worker - convert methods to data
+      const serializedElements = elements.map(element => ({
+        weight: element.weight,
+        id: element.id,
+        targets: element.targets()
+      }));
+
       const message: WorkerMessage = {
         type: 'OPTIMIZE_GRID',
         payload: {
-          elements,
+          elements: serializedElements,
           canvasWidth: canvasSize.width,
           canvasHeight: canvasSize.height,
           previousLayouts: previousLayoutsRef.current,
@@ -86,7 +92,12 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
       
       workerRef.current.postMessage(message);
     }
-  }, [elements, canvasSize, stabilityWeight]);
+  }
+
+  // Optimize grid when elements or canvas size changes
+  useEffect(() => {
+    optimizeElements();
+  }, [canvasSize, stabilityWeight]);
 
   // Update colors when elements change
   useEffect(() => {
@@ -134,6 +145,20 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
         console.log('Swapping elements:', draggedElement.id, dragTarget.id);
         [newElements[draggedIndex], newElements[targetIndex]] = [newElements[targetIndex], newElements[draggedIndex]];
         onElementsChange(newElements);
+        setLayouts(layouts.map(layout => {
+          if (layout.element.id === draggedElement.id) {
+            return {
+              ...layout,
+              element: newElements[draggedIndex]
+            };
+          } else if (layout.element.id === dragTarget.id) {
+            return {
+              ...layout,
+              element: newElements[targetIndex]
+            };
+          }
+          return layout;
+        }));
       }
     }
     setDraggedElement(null);
@@ -145,6 +170,7 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
     element.updateTargets(newTargets);
     // Trigger re-optimization by updating the elements array
     onElementsChange([...elements]);
+    optimizeElements();
   }, [elements, onElementsChange]);
 
   const sortedIds = layouts.map(layout => layout.element.id).sort((a, b) => a.localeCompare(b));
