@@ -35,5 +35,4 @@ class Onboarding {
 }
 
 // <initial>
-Onboarding.show()
 // </initial>

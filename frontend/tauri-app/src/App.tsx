@@ -1,36 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Event, UnlistenFn, listen } from '@tauri-apps/api/event';
-import { readTextFile } from '@tauri-apps/api/fs';
-import { homeDir } from '@tauri-apps/api/path';
+import { Event, listen } from '@tauri-apps/api/event';
+import { useUserConfig } from './hooks/useUserConfig';
 import { appWindow } from '@tauri-apps/api/window';
 import initSwc from "@swc/wasm-web";
 import { Interpreter } from './scripting/interpreter';
 import { State } from './state';
 import Onboarding from './Onboarding';
+import Repl from './Repl';
 
-interface UserConfig {
-    email: string;
-    token: string;
-    expiresAt: string;
-}
+
 
 const state = new State();
 export const StateContext = React.createContext(state);
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
 function App() {
-    const [userEmail, setUserEmail] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { userEmail, loading, error, setUserEmail } = useUserConfig();
     const [isMaximized, setIsMaximized] = useState(false);
     const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
-    const [script, setScript] = useState('');
-    const [commandInput, setCommandInput] = useState('');
-    const [isScriptContainerVisible, setIsScriptContainerVisible] = useState(false);
 
     useEffect(() => {
-        loadUserConfig();
-
         async function importAndRunSwcOnMount() {
             await initSwc('/wasm_bg.wasm');
             const interpreter = new Interpreter(state);
@@ -39,24 +28,12 @@ function App() {
         }
         importAndRunSwcOnMount();
 
-        state.currentInterpreterScript.subscribe((value) => {
-            setScript(value);
-        });
-
         const unlistenUserEmail = listen<string>('user-email-changed', (event: Event<string>) => {
             setUserEmail(event.payload);
         });
 
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'p') {
-                setIsScriptContainerVisible(prevState => !prevState);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-
         return () => {
             unlistenUserEmail.then((unlisten) => unlisten());
-            window.removeEventListener('keydown', handleKeyDown);
         };
     }, []);
 
@@ -65,33 +42,7 @@ function App() {
         appWindow.isMaximized().then(setIsMaximized);
     }, []);
 
-    const loadUserConfig = async () => {
-        try {
-            const homePath = await homeDir();
-            const configPath = `${homePath}.ariana${homePath.includes('\\') ? '\\' : '/'}config.json`;
 
-            const configContent = await readTextFile(configPath);
-            const config: UserConfig = JSON.parse(configContent);
-
-            if (config.email && config.token) {
-                const now = new Date();
-                const expiry = new Date(config.expiresAt);
-
-                if (now >= expiry) {
-                    setError('Authentication token has expired. Please run ariana login again.');
-                } else {
-                    setUserEmail(config.email);
-                }
-            } else {
-                setError('Invalid configuration. Missing email or token.');
-            }
-        } catch (err) {
-            console.error('Failed to load user config:', err);
-            setError('Failed to load user configuration. Please ensure you are logged in via the CLI.');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleMinimize = () => appWindow.minimize();
     const handleMaximize = () => {
@@ -137,33 +88,7 @@ function App() {
                 {/* Main Content */}
                 <div className="flex-1 font-mono flex items-center justify-center ">
                     <Onboarding userEmail={userEmail} />
-                    {isScriptContainerVisible && (
-                        <div id="scriptContainer" className='absolute left-2 bottom-2 flex flex-col z-10 p-3 rounded-md backdrop-blur-sm font-mono bg-blue-800/10 w-[42ch] min-h-[40ch]'>
-                            <div className='px-3 py-2 flex-1'>
-                                <code style={{ whiteSpace: 'pre-wrap' }}>{script}</code>
-                            </div>
-                            <div className='w-full rounded-md overflow-hidden max-w-full h-fit bg-blue-800/10 flex justify-between'>
-                                <input className="flex-1 px-2 py-2 decoration-0 outline-none" type="text" value={commandInput} onChange={(e) => setCommandInput(e.target.value)} onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        try {
-                                            interpreter?.tryRunInstruction(commandInput);
-                                            setCommandInput('');
-                                        } catch (e) {
-                                            alert(e);
-                                        }
-                                    }
-                                }} />
-                                <button className="px-4 py-1 hover:bg-blue-600 cursor-pointer" onClick={() => {
-                                    try {
-                                        interpreter?.tryRunInstruction(commandInput);
-                                        setCommandInput('');
-                                    } catch (e) {
-                                        alert(e);
-                                    }
-                                }}>Run</button>
-                            </div>
-                        </div>
-                    )}
+                    <Repl />
                 </div>
             </div>
         </div>
