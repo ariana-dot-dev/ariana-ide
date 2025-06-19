@@ -1,7 +1,3 @@
-#!/usr/bin/env node
-'use server';
-'use strict';
-
 import { program } from 'commander';
 import inquirer from 'inquirer';
 import axios, { AxiosError } from 'axios';
