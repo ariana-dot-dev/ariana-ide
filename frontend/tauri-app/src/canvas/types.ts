@@ -18,6 +18,7 @@ export interface ElementLayout {
   element: Element;
   cell: GridCell;
   score: number;
+  previousCell?: GridCell;
 }
 
 export abstract class Element {
@@ -35,4 +36,8 @@ export interface CanvasState {
   layouts: ElementLayout[];
   canvasWidth: number;
   canvasHeight: number;
+}
+
+export interface OptimizationOptions {
+  stabilityWeight: number; // 0-1, how much to favor stability vs optimization
 }

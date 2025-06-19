@@ -1,25 +1,32 @@
-import { Element, ElementTargets, GridCell, ElementLayout, SizeTarget, AreaTarget } from './types';
-
-interface GridConfiguration {
-  rows: number;
-  cols: number;
-  cells: GridCell[];
-}
+import { Element, ElementTargets, GridCell, ElementLayout, SizeTarget, AreaTarget, OptimizationOptions } from './types';
 
 export class GridOptimizer {
   private canvasWidth: number;
   private canvasHeight: number;
+  private totalArea: number;
+  private stabilityWeight: number;
+  private previousLayouts: Map<Element, GridCell>;
 
-  constructor(canvasWidth: number, canvasHeight: number) {
+  constructor(canvasWidth: number, canvasHeight: number, options: OptimizationOptions = { stabilityWeight: 0.3 }) {
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
+    this.totalArea = canvasWidth * canvasHeight;
+    this.stabilityWeight = options.stabilityWeight;
+    this.previousLayouts = new Map();
   }
 
-  private getSizeScore(target: SizeTarget, cellArea: number, totalArea: number): number {
-    const relativeArea = cellArea / totalArea;
+  setPreviousLayouts(layouts: ElementLayout[]) {
+    this.previousLayouts.clear();
+    layouts.forEach(layout => {
+      this.previousLayouts.set(layout.element, layout.cell);
+    });
+  }
+
+  private getSizeScore(target: SizeTarget, cellArea: number): number {
+    const relativeArea = cellArea / this.totalArea;
     const targetAreas = { small: 0.15, medium: 0.3, large: 0.5 };
     const targetArea = targetAreas[target];
-    return 1 - Math.abs(relativeArea - targetArea) / targetArea;
+    return 1 - Math.abs(relativeArea - targetArea) / Math.max(targetArea, 0.1);
   }
 
   private getAspectRatioScore(targetRatio: number, cellRatio: number): number {
@@ -27,11 +34,11 @@ export class GridOptimizer {
     return 1 - Math.min(diff, 1);
   }
 
-  private getAreaScore(target: AreaTarget, cell: GridCell, canvas: { width: number; height: number }): number {
+  private getAreaScore(target: AreaTarget, cell: GridCell): number {
     const centerX = cell.x + cell.width / 2;
     const centerY = cell.y + cell.height / 2;
-    const normalizedX = centerX / canvas.width;
-    const normalizedY = centerY / canvas.height;
+    const normalizedX = centerX / this.canvasWidth;
+    const normalizedY = centerY / this.canvasHeight;
 
     const targetPositions: Record<AreaTarget, { x: number; y: number }> = {
       'center': { x: 0.5, y: 0.5 },
@@ -52,112 +59,208 @@ export class GridOptimizer {
     return 1 - Math.min(distance / Math.sqrt(2), 1);
   }
 
+  private getStabilityScore(element: Element, cell: GridCell): number {
+    const previousCell = this.previousLayouts.get(element);
+    if (!previousCell) return 1; // No previous position, no penalty
+
+    // Calculate distance between cell centers
+    const prevCenterX = previousCell.x + previousCell.width / 2;
+    const prevCenterY = previousCell.y + previousCell.height / 2;
+    const newCenterX = cell.x + cell.width / 2;
+    const newCenterY = cell.y + cell.height / 2;
+
+    const distance = Math.sqrt(
+      Math.pow(newCenterX - prevCenterX, 2) + Math.pow(newCenterY - prevCenterY, 2)
+    );
+
+    // Normalize by canvas diagonal
+    const maxDistance = Math.sqrt(
+      Math.pow(this.canvasWidth, 2) + Math.pow(this.canvasHeight, 2)
+    );
+    const normalizedDistance = distance / maxDistance;
+
+    // Return inverted score (closer to previous position = higher score)
+    return 1 - Math.min(normalizedDistance, 1);
+  }
+
   private scoreElementInCell(element: Element, cell: GridCell): number {
     const targets = element.targets();
-    const totalArea = this.canvasWidth * this.canvasHeight;
     const cellArea = cell.width * cell.height;
     const cellRatio = cell.width / cell.height;
 
-    const sizeScore = this.getSizeScore(targets.size, cellArea, totalArea);
+    const sizeScore = this.getSizeScore(targets.size, cellArea);
     const aspectScore = this.getAspectRatioScore(targets.aspectRatio, cellRatio);
-    const areaScore = this.getAreaScore(targets.area, cell, { 
-      width: this.canvasWidth, 
-      height: this.canvasHeight 
-    });
+    const areaScore = this.getAreaScore(targets.area, cell);
+    const stabilityScore = this.getStabilityScore(element, cell);
 
-    return (sizeScore + aspectScore + areaScore) / 3;
+    // Combine scores with stability weight
+    const optimizationScore = (sizeScore + aspectScore + areaScore) / 3;
+    const finalScore = (1 - this.stabilityWeight) * optimizationScore + this.stabilityWeight * stabilityScore;
+
+    return finalScore;
   }
 
-  private generateGridConfigurations(numElements: number): GridConfiguration[] {
-    const configs: GridConfiguration[] = [];
-    const canvasRatio = this.canvasWidth / this.canvasHeight;
-
-    // Generate different row/col combinations that multiply to numElements
-    for (let rows = 1; rows <= numElements; rows++) {
-      if (numElements % rows === 0) {
-        const cols = numElements / rows;
-        const cellWidth = this.canvasWidth / cols;
-        const cellHeight = this.canvasHeight / rows;
-        
-        const cells: GridCell[] = [];
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            cells.push({
-              x: c * cellWidth,
-              y: r * cellHeight,
-              width: cellWidth,
-              height: cellHeight
-            });
-          }
-        }
-
-        configs.push({ rows, cols, cells });
-      }
-    }
-
-    return configs;
-  }
-
-  private optimizeAssignment(elements: Element[], cells: GridCell[]): ElementLayout[] {
-    // Use Hungarian algorithm approximation for optimal assignment
-    const layouts: ElementLayout[] = [];
-    const usedCells = new Set<number>();
-    const remainingElements = [...elements];
-
-    // Greedy assignment based on scores
-    while (remainingElements.length > 0) {
-      let bestScore = -1;
-      let bestElementIndex = -1;
-      let bestCellIndex = -1;
-
-      for (let i = 0; i < remainingElements.length; i++) {
-        const element = remainingElements[i];
-        for (let j = 0; j < cells.length; j++) {
-          if (usedCells.has(j)) continue;
-          
-          const score = this.scoreElementInCell(element, cells[j]) * element.weight;
-          if (score > bestScore) {
-            bestScore = score;
-            bestElementIndex = i;
-            bestCellIndex = j;
-          }
-        }
-      }
-
-      if (bestElementIndex >= 0 && bestCellIndex >= 0) {
-        const element = remainingElements[bestElementIndex];
-        layouts.push({
-          element,
-          cell: cells[bestCellIndex],
-          score: bestScore
-        });
-        usedCells.add(bestCellIndex);
-        remainingElements.splice(bestElementIndex, 1);
-      } else {
-        break;
-      }
-    }
-
-    return layouts;
-  }
-
-  optimize(elements: Element[]): ElementLayout[] {
+  private partitionSpace(bounds: GridCell, elements: Element[]): ElementLayout[] {
     if (elements.length === 0) return [];
+    if (elements.length === 1) {
+      const element = elements[0];
+      const previousCell = this.previousLayouts.get(element);
+      return [{
+        element,
+        cell: bounds,
+        score: this.scoreElementInCell(element, bounds),
+        previousCell
+      }];
+    }
 
-    const configurations = this.generateGridConfigurations(elements.length);
     let bestLayouts: ElementLayout[] = [];
-    let bestTotalScore = -1;
+    let bestScore = -1;
 
-    for (const config of configurations) {
-      const layouts = this.optimizeAssignment(elements, config.cells);
-      const totalScore = layouts.reduce((sum, layout) => sum + layout.score * layout.element.weight, 0);
-      
-      if (totalScore > bestTotalScore) {
-        bestTotalScore = totalScore;
+    // Try different ways to split the space
+    const splitOptions = this.generateSplitOptions(bounds, elements.length);
+
+    for (const split of splitOptions) {
+      const layouts = this.evaluateSplit(bounds, elements, split);
+      const totalScore = layouts.reduce((sum, layout) => 
+        sum + layout.score * layout.element.weight, 0
+      );
+
+      if (totalScore > bestScore) {
+        bestScore = totalScore;
         bestLayouts = layouts;
       }
     }
 
     return bestLayouts;
+  }
+
+  private generateSplitOptions(bounds: GridCell, numElements: number): Array<{
+    direction: 'horizontal' | 'vertical';
+    position: number;
+    leftCount: number;
+    rightCount: number;
+  }> {
+    const options: Array<{
+      direction: 'horizontal' | 'vertical';
+      position: number;
+      leftCount: number;
+      rightCount: number;
+    }> = [];
+
+    // Try different element distributions
+    for (let leftCount = 1; leftCount < numElements; leftCount++) {
+      const rightCount = numElements - leftCount;
+
+      // Vertical splits (left/right)
+      const verticalRatio = leftCount / numElements;
+      const verticalPosition = bounds.x + bounds.width * verticalRatio;
+      
+      options.push({
+        direction: 'vertical',
+        position: verticalPosition,
+        leftCount,
+        rightCount
+      });
+
+      // Horizontal splits (top/bottom)
+      const horizontalRatio = leftCount / numElements;
+      const horizontalPosition = bounds.y + bounds.height * horizontalRatio;
+      
+      options.push({
+        direction: 'horizontal',
+        position: horizontalPosition,
+        leftCount,
+        rightCount
+      });
+    }
+
+    return options;
+  }
+
+  private evaluateSplit(bounds: GridCell, elements: Element[], split: {
+    direction: 'horizontal' | 'vertical';
+    position: number;
+    leftCount: number;
+    rightCount: number;
+  }): ElementLayout[] {
+    const { direction, position, leftCount, rightCount } = split;
+
+    let leftBounds: GridCell;
+    let rightBounds: GridCell;
+
+    if (direction === 'vertical') {
+      leftBounds = {
+        x: bounds.x,
+        y: bounds.y,
+        width: position - bounds.x,
+        height: bounds.height
+      };
+      rightBounds = {
+        x: position,
+        y: bounds.y,
+        width: bounds.x + bounds.width - position,
+        height: bounds.height
+      };
+    } else {
+      leftBounds = {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: position - bounds.y
+      };
+      rightBounds = {
+        x: bounds.x,
+        y: position,
+        width: bounds.width,
+        height: bounds.y + bounds.height - position
+      };
+    }
+
+    // Assign elements to left and right partitions based on their preferences
+    const elementScores = elements.map((element, index) => ({
+      element,
+      index,
+      leftScore: this.scoreElementInCell(element, leftBounds),
+      rightScore: this.scoreElementInCell(element, rightBounds)
+    }));
+
+    // Sort by preference difference to make optimal assignments
+    elementScores.sort((a, b) => 
+      Math.abs(b.leftScore - b.rightScore) - Math.abs(a.leftScore - a.rightScore)
+    );
+
+    const leftElements: Element[] = [];
+    const rightElements: Element[] = [];
+
+    // Assign elements to partitions
+    for (let i = 0; i < elementScores.length; i++) {
+      const { element, leftScore, rightScore } = elementScores[i];
+      
+      if (leftElements.length < leftCount && 
+          (rightElements.length >= rightCount || leftScore >= rightScore)) {
+        leftElements.push(element);
+      } else {
+        rightElements.push(element);
+      }
+    }
+
+    // Recursively partition
+    const leftLayouts = this.partitionSpace(leftBounds, leftElements);
+    const rightLayouts = this.partitionSpace(rightBounds, rightElements);
+
+    return [...leftLayouts, ...rightLayouts];
+  }
+
+  optimize(elements: Element[]): ElementLayout[] {
+    if (elements.length === 0) return [];
+
+    const canvasBounds: GridCell = {
+      x: 0,
+      y: 0,
+      width: this.canvasWidth,
+      height: this.canvasHeight
+    };
+
+    return this.partitionSpace(canvasBounds, elements);
   }
 }

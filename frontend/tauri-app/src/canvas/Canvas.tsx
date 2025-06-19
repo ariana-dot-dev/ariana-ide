@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Element, ElementLayout } from './types';
+import { Element, ElementLayout, OptimizationOptions } from './types';
 import { createGridWorker, WorkerMessage, WorkerResponse } from './gridWorker';
 import RectangleOnCanvas from './RectangleOnCanvas';
 
 interface CanvasProps {
   elements: Element[];
+  stabilityWeight?: number;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ elements }) => {
+const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3 }) => {
   const [layouts, setLayouts] = useState<ElementLayout[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [colors, setColors] = useState<string[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const workerRef = useRef<Worker | null>(null);
+  const previousLayoutsRef = useRef<ElementLayout[]>([]);
 
   // Generate random colors for rectangles
   const generateColors = useCallback((count: number) => {
@@ -38,7 +40,9 @@ const Canvas: React.FC<CanvasProps> = ({ elements }) => {
     
     const handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
       if (event.data.type === 'GRID_OPTIMIZED') {
-        setLayouts(event.data.payload.layouts);
+        const newLayouts = event.data.payload.layouts;
+        setLayouts(newLayouts);
+        previousLayoutsRef.current = newLayouts;
       }
     };
 
@@ -70,12 +74,14 @@ const Canvas: React.FC<CanvasProps> = ({ elements }) => {
           elements,
           canvasWidth: canvasSize.width,
           canvasHeight: canvasSize.height,
+          previousLayouts: previousLayoutsRef.current,
+          options: { stabilityWeight },
         },
       };
       
       workerRef.current.postMessage(message);
     }
-  }, [elements, canvasSize]);
+  }, [elements, canvasSize, stabilityWeight]);
 
   // Update colors when elements change
   useEffect(() => {
