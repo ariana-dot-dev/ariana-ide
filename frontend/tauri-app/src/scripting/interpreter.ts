@@ -2,7 +2,6 @@ import { Output, transformSync } from "@swc/wasm-web";
 import { readTextFile } from '@tauri-apps/api/fs';
 import { resolveResource } from '@tauri-apps/api/path';
 import { Command } from "./baseScript";
-import React from "react";
 import { State } from "../state";
 
 class Script {
@@ -31,7 +30,7 @@ export class Interpreter {
         this.state = state;
     }
 
-    async init() {
+    async init() {        
         const resourcePath = await resolveResource('../src/scripting/baseScript.ts');
         this.script.baseScript = await readTextFile(resourcePath);
         
