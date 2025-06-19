@@ -11,25 +11,37 @@ interface CanvasProps {
   onElementsChange: (elements: Rectangle[]) => void;
 }
 
+// Simple string hash function
+const simpleHash = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+};
+
+// Generate a stable color based on element ID
+const getColorForId = (id: string): string => {
+  const hash = simpleHash(id);
+  const hue = (hash % 120) + 180; // Blueish colors (180-300)
+  const saturation = 60 + (hash % 20); // 60-80%
+  const lightness = 50 + (hash % 20); // 50-70%
+  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
+};
+
 const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElementsChange }) => {
   const [layouts, setLayouts] = useState<ElementLayout[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  const [colors, setColors] = useState<string[]>([]);
+  // const [colors, setColors] = useState<string[]>([]); // Removed colors state
   const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(null);
   const [dragTarget, setDragTarget] = useState<CanvasElement | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const previousLayoutsRef = useRef<ElementLayout[]>([]);
 
-  // Generate random colors for rectangles
-  const generateColors = useCallback((count: number) => {
-    const newColors: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const hue = 210 + (i * 30) % 120; // Only blueish colors
-      newColors.push(`hsla(${hue}, 70%, 60%, 0.5)`);
-    }
-    return newColors;
-  }, []);
+  // Removed generateColors function
 
   // Update canvas size when window resizes
   const updateCanvasSize = useCallback(() => {
@@ -97,12 +109,9 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
   // Optimize grid when elements or canvas size changes
   useEffect(() => {
     optimizeElements();
-  }, [canvasSize, stabilityWeight]);
+  }, [elements, canvasSize, stabilityWeight]);
 
-  // Update colors when elements change
-  useEffect(() => {
-    setColors(generateColors(elements.length));
-  }, [elements.length, generateColors]);
+  // Colors are now generated directly in the render based on ID, so this useEffect is no longer needed.
 
   // Drag and drop handlers
   const handleDragStart = useCallback((element: CanvasElement) => {
@@ -144,7 +153,7 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
       if (draggedIndex !== -1 && targetIndex !== -1) {
         console.log('Swapping elements:', draggedElement.id, dragTarget.id);
         [newElements[draggedIndex], newElements[targetIndex]] = [newElements[targetIndex], newElements[draggedIndex]];
-        onElementsChange(newElements);
+        // onElementsChange(newElements);
         setLayouts(layouts.map(layout => {
           if (layout.element.id === draggedElement.id) {
             return {
@@ -170,7 +179,6 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
     element.updateTargets(newTargets);
     // Trigger re-optimization by updating the elements array
     onElementsChange([...elements]);
-    optimizeElements();
   }, [elements, onElementsChange]);
 
   const sortedIds = layouts.map(layout => layout.element.id).sort((a, b) => a.localeCompare(b));
@@ -187,7 +195,7 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
             <RectangleOnCanvas
               key={`${layout.element.id}`}
               layout={layout}
-              color={colors[sortedIds.indexOf(layout.element.id)] || '#ccc'}
+              color={getColorForId(layout.element.id)}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               onDrag={layout.element === draggedElement ? handleDrag : () => {

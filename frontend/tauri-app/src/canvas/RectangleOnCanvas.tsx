@@ -3,6 +3,7 @@ import { motion, PanInfo } from 'framer-motion';
 import { CanvasElement, ElementLayout, ElementTargets } from './types';
 import { Rectangle } from './Rectangle';
 import ElementOverlay from './ElementOverlay';
+import { cn } from '../utils';
 
 interface RectangleOnCanvasProps {
   layout: ElementLayout;
@@ -52,7 +53,10 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 
   return (
     <motion.div
-      className={`absolute p-1 cursor-move select-none ${isDragTarget ? 'ring-2 ring-yellow-400' : ''} ${isDragging ? 'opacity-50' : ''}`}
+      className={cn(
+        `absolute p-1 cursor-move select-none`,
+        isDragging ? 'z-30' : 'z-10'
+      )}
       initial={{
         x: cell.x,
         y: cell.y,
@@ -70,8 +74,6 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         duration: 0.2,
       }}
       layout
-      // draggable={!dragging}
-      // drag={dragging}
       drag
       dragMomentum={false}
       onMouseDown={() => {
@@ -103,7 +105,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
       <div style={{
         backgroundColor: color,
       }} className="w-full h-full flex items-center justify-center rounded-md backdrop-blur-md">
-      {(isHovered || showOverlay) && !showOverlay && (
+      {/* {(isHovered || showOverlay) && !showOverlay && (
         <button
           className="absolute top-1 right-1 w-6 h-6 bg-gray-800 text-white rounded text-xs hover:bg-gray-700 z-10 border border-gray-600"
           onClick={(e) => {
@@ -112,15 +114,14 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
             console.log('Gear button clicked for', element.id);
             setShowOverlay(true);
           }}
->
+        >
           ⚙
         </button>
-      )}
+      )} */}
 
-      <img src="./assets/app-icon-grad.png" style={{ width: cell.width/4, }} />
-      <div className="absolute bottom-1 left-1 text-xs text-white">ID: {element.id.substring(0,4)}. Score: {layout.score.toFixed(2)}. Target: {JSON.stringify(layout.element)}</div>
+      <img src="./assets/app-icon-grad.png" className="select-none" style={{ width: cell.width/4, }} />
       
-      {showOverlay && element instanceof Rectangle && (
+      {/* {showOverlay && element instanceof Rectangle && (
         <ElementOverlay
           element={element}
           onConfirm={handleElementUpdate}
@@ -129,7 +130,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
             setShowOverlay(false);
           }}
         />
-      )}
+      )} */}
       </div>
     </motion.div>
   );
