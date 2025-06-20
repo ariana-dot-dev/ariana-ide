@@ -1,3 +1,6 @@
+import { Rectangle } from "./Rectangle";
+import { Terminal } from "./Terminal";
+
 export type SizeTarget = 'small' | 'medium' | 'large';
 export type AreaTarget = 'center' | 'left' | 'top' | 'right' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
@@ -22,16 +25,32 @@ export interface ElementLayout {
   previousCell?: GridCell;
 }
 
-export abstract class CanvasElement {
+export type CanvasElementKind = 
+  | RectangleKind
+  | TerminalKind;
+
+export type RectangleKind = { rectangle: Rectangle };
+export type TerminalKind = { terminal: Terminal };
+
+export class CanvasElement {
   public weight: number;
   public id: string;
+  public kind: CanvasElementKind;
 
-  constructor(weight: number = 1) {
+  constructor(kind: CanvasElementKind, weight: number = 1) {
     this.weight = weight;
     this.id = Math.random().toString(36).substring(2, 9); // Generate unique ID
+    this.kind = kind;
   }
 
-  abstract targets(): ElementTargets;
+  get targets(): ElementTargets {
+    if ("rectangle" in this.kind) {
+      return this.kind.rectangle.targets();
+    } else if ("terminal" in this.kind) {
+      return this.kind.terminal.targets();
+    }
+    throw new Error("Invalid kind");
+  }
 }
 
 export interface CanvasState {

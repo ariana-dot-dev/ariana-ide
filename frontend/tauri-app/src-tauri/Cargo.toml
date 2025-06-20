@@ -17,6 +17,11 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.5", features = [ "window-hide", "window-start-dragging", "window-maximize", "window-close", "window-unmaximize", "window-unminimize", "window-minimize", "window-show", "fs-all", "path-all", "shell-open"] }
 window-vibrancy = "0.6.0"
+tokio = { version = "1.0", features = ["full"] }
+portable-pty = "0.8"
+uuid = { version = "1.0", features = ["v4"] }
+anyhow = "1.0"
+async-trait = "0.1"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

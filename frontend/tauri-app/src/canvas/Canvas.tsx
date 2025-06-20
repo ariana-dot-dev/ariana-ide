@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PanInfo } from 'framer-motion';
-import { CanvasElement, ElementLayout, OptimizationOptions, ElementTargets } from './types';
+import { CanvasElement, ElementLayout, ElementTargets } from './types';
 import { createGridWorker, WorkerMessage, WorkerResponse } from './gridWorker';
 import { Rectangle } from './Rectangle';
+import { Terminal, TerminalConfig } from './Terminal';
 import RectangleOnCanvas from './RectangleOnCanvas';
+import TerminalOnCanvas from './TerminalOnCanvas';
 
 interface CanvasProps {
-  elements: Rectangle[];
+  elements: CanvasElement[];
   stabilityWeight?: number;
-  onElementsChange: (elements: Rectangle[]) => void;
+  onElementsChange: (elements: CanvasElement[]) => void;
 }
 
 // Simple string hash function
@@ -31,17 +33,14 @@ const getColorForId = (id: string): string => {
   return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`;
 };
 
-const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElementsChange }) => {
+const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.1, onElementsChange }) => {
   const [layouts, setLayouts] = useState<ElementLayout[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  // const [colors, setColors] = useState<string[]>([]); // Removed colors state
   const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(null);
   const [dragTarget, setDragTarget] = useState<CanvasElement | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const previousLayoutsRef = useRef<ElementLayout[]>([]);
-
-  // Removed generateColors function
 
   // Update canvas size when window resizes
   const updateCanvasSize = useCallback(() => {
@@ -54,10 +53,21 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
   // Initialize worker and resize observer
   useEffect(() => {
     workerRef.current = createGridWorker();
-    
+
     const handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
       if (event.data.type === 'GRID_OPTIMIZED') {
-        const newLayouts = event.data.payload.layouts;
+        const newWorkerLayouts = event.data.payload.layouts;
+        const newLayouts = newWorkerLayouts.map(layout => {
+          let element = elements.find(e => e.id === layout.element.id);
+          if (!element) return null;
+          return {
+            element,
+            cell: layout.cell,
+            score: layout.score,
+            previousCell: layout.previousCell
+          } satisfies ElementLayout;
+        }).filter((l) => l !== null);
+
         setLayouts(newLayouts);
         previousLayoutsRef.current = newLayouts;
       }
@@ -84,24 +94,21 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
 
   function optimizeElements() {
     if (elements.length > 0 && canvasSize.width > 0 && canvasSize.height > 0 && workerRef.current) {
-      // Serialize elements for worker - convert methods to data
-      const serializedElements = elements.map(element => ({
-        weight: element.weight,
-        id: element.id,
-        targets: element.targets()
-      }));
-
       const message: WorkerMessage = {
         type: 'OPTIMIZE_GRID',
         payload: {
-          elements: serializedElements,
+          elements: elements.map(e => ({
+            id: e.id,
+            targets: e.targets,
+            weight: e.weight,
+          })),
           canvasWidth: canvasSize.width,
           canvasHeight: canvasSize.height,
           previousLayouts: previousLayoutsRef.current,
           options: { stabilityWeight },
         },
       };
-      
+
       workerRef.current.postMessage(message);
     }
   }
@@ -174,9 +181,15 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
     setDragTarget(null);
   }, [draggedElement, dragTarget, elements, onElementsChange]);
 
-  // Element update handler
-  const handleElementUpdate = useCallback((element: Rectangle, newTargets: ElementTargets) => {
+  // Element update handlers
+  const handleRectangleUpdate = useCallback((element: Rectangle, newTargets: ElementTargets) => {
     element.updateTargets(newTargets);
+    // Trigger re-optimization by updating the elements array
+    onElementsChange([...elements]);
+  }, [elements, onElementsChange]);
+
+  const handleTerminalUpdate = useCallback((element: Terminal, newConfig: TerminalConfig) => {
+    element.updateConfig(newConfig);
     // Trigger re-optimization by updating the elements array
     onElementsChange([...elements]);
   }, [elements, onElementsChange]);
@@ -186,26 +199,48 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.3, onElem
   return (
     <div className="flex w-full h-full p-2">
       <div className="relative w-full h-full rounded-md overflow-hidden">
-        <div 
+        <div
           ref={canvasRef}
           className="absolute top-0 left-0 w-full h-full overflow-hidden"
           style={{ margin: 0, padding: 0 }}
         >
-          {layouts.map((layout, index) => (
-            <RectangleOnCanvas
-              key={`${layout.element.id}`}
-              layout={layout}
-              color={getColorForId(layout.element.id)}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDrag={layout.element === draggedElement ? handleDrag : () => {
-                console.log("No drag")
-              }}
-              onRectangleUpdate={handleElementUpdate}
-              isDragTarget={layout.element === dragTarget}
-              isDragging={layout.element === draggedElement}
-            />
-          ))}
+          {layouts.map((layout, index) => {
+            if ("rectangle" in layout.element.kind) {
+              return (
+                <RectangleOnCanvas
+                  key={`${layout.element.id}`}
+                  layout={layout}
+                  color={getColorForId(layout.element.id)}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDrag={layout.element === draggedElement ? handleDrag : () => {
+                    console.log("No drag")
+                  }}
+                  onRectangleUpdate={handleRectangleUpdate}
+                  isDragTarget={layout.element === dragTarget}
+                  isDragging={layout.element === draggedElement}
+                />
+              );
+            } else if ("terminal" in layout.element.kind) {
+              return (
+                <TerminalOnCanvas
+                  key={`${layout.element.id}`}
+                  layout={layout}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDrag={layout.element === draggedElement ? handleDrag : () => {
+                    console.log("No drag")
+                  }}
+                  onTerminalUpdate={handleTerminalUpdate}
+                  isDragTarget={layout.element === dragTarget}
+                  isDragging={layout.element === draggedElement}
+                />
+              );
+            }
+            return (
+              <div key={`${layout.element.id}`}>None: {(JSON.stringify(layout.element))}</div>
+            );
+          })}
         </div>
       </div>
     </div>

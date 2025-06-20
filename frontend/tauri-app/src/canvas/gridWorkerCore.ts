@@ -4,14 +4,18 @@
 export interface WorkerElement {
   weight: number;
   id: string;
-  targets: {
-    size: 'small' | 'medium' | 'large';
-    aspectRatio: number;
-    area: 'center' | 'left' | 'right' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  };
+  targets: WorkerElementTargets;
 }
 
+export interface WorkerElementTargets {
+  size: 'small' | 'medium' | 'large';
+  aspectRatio: number;
+  area: 'center' | 'left' | 'right' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+}
+
+
 export interface GridCell {
+  id: string;
   x: number;
   y: number;
   width: number;
@@ -159,12 +163,14 @@ class WorkerGridOptimizer {
         if (isWide) {
             const splitX = bounds.x + bounds.width * ratio;
             leftBounds = {
+                id: `left-${bounds.id}`,
                 x: bounds.x,
                 y: bounds.y,
                 width: splitX - bounds.x,
                 height: bounds.height
             };
             rightBounds = {
+                id: `right-${bounds.id}`,
                 x: splitX,
                 y: bounds.y,
                 width: bounds.x + bounds.width - splitX,
@@ -173,12 +179,14 @@ class WorkerGridOptimizer {
         } else {
             const splitY = bounds.y + bounds.height * ratio;
             leftBounds = {
+                id: `top-${bounds.id}`,
                 x: bounds.x,
                 y: bounds.y,
                 width: bounds.width,
                 height: splitY - bounds.y
             };
             rightBounds = {
+                id: `bottom-${bounds.id}`,
                 x: bounds.x,
                 y: splitY,
                 width: bounds.width,
@@ -228,6 +236,7 @@ self.onmessage = function(event) {
     });
     
     const canvasBounds: GridCell = {
+      id: 'root',
       x: 0,
       y: 0,
       width: canvasWidth,

@@ -1,20 +1,57 @@
 import React, { useState } from 'react';
 import Canvas from './canvas/Canvas';
 import { Rectangle } from './canvas/Rectangle';
-import { SizeTarget, AreaTarget } from './canvas/types';
+import { Terminal } from './canvas/Terminal';
+import { CanvasElement, SizeTarget, AreaTarget } from './canvas/types';
 
 // Demo elements for testing
-const createDemoElements = (): Rectangle[] => {
+const createDemoElements = (): CanvasElement[] => {
   return [
-    new Rectangle({ size: 'large', aspectRatio: 16/9, area: 'center' }),
+    Rectangle.canvasElement({ size: 'large', aspectRatio: 1/1, area: 'center' }, 1),
+    Terminal.canvasElement({
+        kind: { 
+          $type: 'git-bash',
+          workingDirectory: 'C:\\Users\\mr003\\riana'
+        },
+        environment: {},
+        shellCommand: '',
+        colorScheme: 'default',
+        fontSize: 16,
+        fontFamily: 'Space Mono'
+    }, 1),
+    Terminal.canvasElement({
+      kind: { 
+        $type: 'wsl',
+        distribution: 'Ubuntu'
+      },
+      environment: {},
+      shellCommand: '',
+      colorScheme: 'default',
+      fontSize: 16,
+      fontFamily: 'Space Mono'
+  }, 1)
+    // new Terminal({
+    //   kind: {
+    //     $type: 'ssh',
+    //     host: 'example.com',
+    //     username: 'user',
+    //     port: 22
+    //   }
+    // }),
+    // new Terminal({
+    //   kind: {
+    //     $type: 'git-bash',
+    //     workingDirectory: 'C:\\Users\\mr003\\riana'
+    //   }
+    // }),
   ];
 };
 
 const CanvasView: React.FC = () => {
-  const [elements, setElements] = useState<Rectangle[]>(() => createDemoElements());
+  const [elements, setElements] = useState<CanvasElement[]>(() => createDemoElements());
   const [stabilityWeight, setStabilityWeight] = useState(0.3);
 
-  const handleElementsChange = (newElements: Rectangle[]) => {
+  const handleElementsChange = (newElements: CanvasElement[]) => {
     setElements(newElements);
   };
 

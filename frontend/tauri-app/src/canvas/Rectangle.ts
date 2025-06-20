@@ -1,10 +1,9 @@
 import { CanvasElement, ElementTargets } from './types';
 
-export class Rectangle extends CanvasElement {
+export class Rectangle {
   private _targets: ElementTargets;
 
-  constructor(targets: ElementTargets, weight: number = 1) {
-    super(weight);
+  constructor(targets: ElementTargets) {
     this._targets = targets;
   }
 
@@ -14,5 +13,9 @@ export class Rectangle extends CanvasElement {
 
   updateTargets(newTargets: Partial<ElementTargets>): void {
     this._targets = { ...this._targets, ...newTargets };
+  }
+
+  static canvasElement(targets: ElementTargets, weight: number = 1): CanvasElement {
+    return new CanvasElement({ rectangle: new Rectangle(targets) }, weight);
   }
 }
