@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { COLOR_VARS } from '../generated/colors';
 import { motion, PanInfo } from 'framer-motion';
 import { Terminal as XTerm } from '@xterm/xterm';
+import type { IDisposable } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from '@xterm/addon-search';
@@ -33,6 +35,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const dataDisposableRef = useRef<IDisposable | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -54,35 +57,43 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
       return;
     }
 
+    // Resolve CSS variables -> solid colors for xterm (it cannot understand CSS vars)
+    const cssVars = getComputedStyle(document.documentElement);
+    const uglyPurple = '#ff00ff';
+    const resolveColor = (name: string) => {
+      const cssVal = cssVars.getPropertyValue(name).trim();
+      return cssVal || COLOR_VARS[name] || uglyPurple;
+    };
+    const theme = {
+      background: resolveColor('--bg-500'),
+      foreground: resolveColor('--fg-500'),
+      cursor: resolveColor('--fg-900'),
+      selectionBackground: resolveColor('--fg-900'),
+      selectionForeground: resolveColor('--fg-200'),
+      black: resolveColor('--blackest'),
+      red: resolveColor('--negative-500'),
+      green: resolveColor('--positive-500'),
+      yellow: resolveColor('--fg-600'),
+      blue: resolveColor('--fg-600'),
+      magenta: resolveColor('--fg-600'),
+      cyan: resolveColor('--fg-600'),
+      white: resolveColor('--whitest'),
+      brightBlack: resolveColor('--fg-800'),
+      brightRed: resolveColor('--negative-500'),
+      brightGreen: resolveColor('--positive-500'),
+      brightYellow: resolveColor('--fg-200'),
+      brightBlue: resolveColor('--fg-200'),
+      brightMagenta: resolveColor('--fg-200'),
+      brightCyan: resolveColor('--fg-200'),
+      brightWhite: resolveColor('--fg-100'),
+    } as const;
+
     const xterm = new XTerm({
-      theme: {
-        background: '#7dd3fc00',    // Tailwind's sky-300 (or lightBlue-300)
-        foreground: '#1e293b',    // Tailwind's slate-800 (or blueGray-800)
-        cursor: '#ec4899',        // Tailwind's pink-500
-        selectionBackground: '#94a3b8',      // Tailwind's slate-400 (or blueGray-400)
-        selectionForeground: '#1e293b',    // Tailwind's slate-800 (or blueGray-800)
-        black: '#334155',        // Tailwind's slate-700 (or blueGray-700)
-        red: '#ef4444',          // Tailwind's red-500
-        green: '#22c55e',        // Tailwind's green-500
-        yellow: '#f59e0b',        // Tailwind's amber-500
-        blue: '#3b82f6',          // Tailwind's blue-500
-        magenta: '#d946ef',      // Tailwind's fuchsia-500
-        cyan: '#06b6d4',          // Tailwind's cyan-500
-        white: '#e2e8f0',        // Tailwind's slate-200 (or blueGray-200)
-        brightBlack: '#64748b',    // Tailwind's slate-500 (or blueGray-500)
-        brightRed: '#f87171',      // Tailwind's red-400
-        brightGreen: '#4ade80',    // Tailwind's green-400
-        brightYellow: '#fbbf24',    // Tailwind's amber-400
-        brightBlue: '#60a5fa',      // Tailwind's blue-400
-        brightMagenta: '#e879f9',  // Tailwind's fuchsia-400
-        brightCyan: '#22d3ee',      // Tailwind's cyan-400
-        brightWhite: '#f8fafc',      // Tailwind's slate-50 (or blueGray-50)
-      },
+      theme,
       fontSize: terminal.config.fontSize || 14,
-      fontFamily: `"${terminal.config.fontFamily}"` || 'Monaco, Menlo, "Ubuntu Mono", monospace',
+      fontFamily: terminal.config.fontFamily ? `"${terminal.config.fontFamily}"` : 'Monaco, Menlo, "Ubuntu Mono", monospace',
       cursorBlink: true,
       allowTransparency: true,
-      convertEol: true,
     });
 
     const fitAddon = new FitAddon();
@@ -113,6 +124,15 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
             TerminalService.sendData(connectionId, data);
           }
         });
+        dataDisposableRef.current = dataDisposable;
+
+        // Keep backend size in sync when xterm itself resizes (e.g., font change)
+        xtermRef.current.onResize(({ cols, rows }) => {
+          if (terminal.isConnected && terminal.connectionId) {
+            console.log('Resizing terminal:', cols, rows);
+            TerminalService.resizeTerminal(terminal.connectionId, cols, rows);
+          }
+        });
 
         // Listen for data from backend
         const handleData = (data: string) => {
@@ -124,7 +144,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
           terminal.setConnection('', false);
           setIsConnected(false);
           xtermRef.current?.write('\r\n\x1b[31mConnection lost\x1b[0m\r\n');
-          dataDisposable.dispose(); // Clean up the data handler
+          dataDisposableRef.current?.dispose(); // Clean up the data handler
           
           // Cleanup dead connections when this one disconnects
           setTimeout(() => {
@@ -153,25 +173,26 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
         xtermRef.current = null;
       }
 
-      // Close active terminal connection to prevent duplicate IO loops on remount
-      if (terminal.isConnected && terminal.connectionId) {
-        TerminalService.closeConnection(terminal.connectionId);
-        terminal.setConnection('', false);
-      }
+      // Dispose data listener if still active
+      dataDisposableRef.current?.dispose();
+      dataDisposableRef.current = null;
 
-      // Fallback cleanup of any zombie connections
-      TerminalService.cleanupDeadConnections();
+      // We intentionally keep the PTY alive to avoid connection loss on drag swaps
     };
   }, []);
 
   // Fit terminal when size changes
   useEffect(() => {
-    if (fitAddonRef.current && !dragging) {
+    if (fitAddonRef.current) {
       setTimeout(() => {
         fitAddonRef.current?.fit();
-      }, 100);
+        // Inform backend of new size
+        if (terminal.isConnected && terminal.connectionId && xtermRef.current) {
+          TerminalService.resizeTerminal(terminal.connectionId, xtermRef.current.cols, xtermRef.current.rows);
+        }
+      }, 500);
     }
-  }, [cell.width, cell.height, dragging]);
+  }, [cell.width, cell.height]);
 
 
 
@@ -232,7 +253,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
       // }}
     >
       <div 
-        className="w-full h-full rounded-md bg-blue-100/100 backdrop-blur-md relative"
+        className="w-full h-full rounded-md bg-gradient-to-b from-blue-900/30 to-sky-600/30 backdrop-blur-md relative  p-4 pt-2.5"
       >
         {/* Connection status indicator */}
         {/* <div className="absolute top-2 right-2 z-10">
@@ -253,10 +274,8 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
         <div 
           ref={terminalRef}
           data-terminal-id={element.id}
-          className="w-full h-full p-2 pt-8"
-          style={{ 
-            width: '100%', 
-            height: '100%',
+          className="w-full h-full"
+          style={{
             // Prevent terminal from interfering with drag
             pointerEvents: 'auto'
           }}

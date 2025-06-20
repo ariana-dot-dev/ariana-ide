@@ -212,7 +212,7 @@ pub struct TerminalManager {
     writers: Arc<Mutex<HashMap<String, Box<dyn Write + Send>>>>,
 }
 
-const MAX_CONNECTIONS: usize = 8; // Conservative limit to avoid resource exhaustion
+const MAX_CONNECTIONS: usize = 24;
 
 impl TerminalManager {
     pub fn new() -> Self {

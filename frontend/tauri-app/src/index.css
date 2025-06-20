@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./generated/colors.css";
+@import "./xterm-tweaks.css";
 
 @font-face {
   font-family: "Commit Mono";

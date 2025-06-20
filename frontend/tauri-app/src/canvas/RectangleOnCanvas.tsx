@@ -7,7 +7,6 @@ import { cn } from '../utils';
 
 interface RectangleOnCanvasProps {
   layout: ElementLayout;
-  color: string;
   onDragStart: (element: CanvasElement) => void;
   onDragEnd: (element: CanvasElement) => void;
   onDrag: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
@@ -18,7 +17,6 @@ interface RectangleOnCanvasProps {
 
 const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
   layout,
-  color,
   onDragStart: propOnDragStart,
   onDragEnd: propOnDragEnd,
   onDrag: propOnDrag,
@@ -102,9 +100,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         setIsHovered(false);
       }}
     >
-      <div style={{
-        backgroundColor: color,
-      }} className="w-full h-full flex items-center justify-center rounded-md backdrop-blur-md">
+      <div className="w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-gradient-to-b from-blue-900/30 to-sky-600/30">
       {/* {(isHovered || showOverlay) && !showOverlay && (
         <button
           className="absolute top-1 right-1 w-6 h-6 bg-gray-800 text-white rounded text-xs hover:bg-gray-700 z-10 border border-gray-600"

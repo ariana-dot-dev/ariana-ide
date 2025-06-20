@@ -210,7 +210,6 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.1, onElem
                 <RectangleOnCanvas
                   key={`${layout.element.id}`}
                   layout={layout}
-                  color={getColorForId(layout.element.id)}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   onDrag={layout.element === draggedElement ? handleDrag : () => {
