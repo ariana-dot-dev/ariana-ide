@@ -8,6 +8,7 @@ export interface ElementTargets {
 }
 
 export interface GridCell {
+  id: string;
   x: number;
   y: number;
   width: number;

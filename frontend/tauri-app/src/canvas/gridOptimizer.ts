@@ -190,12 +190,14 @@ export class GridOptimizer {
 
     if (direction === 'vertical') {
       leftBounds = {
+        id: `left-${bounds.id}`,
         x: bounds.x,
         y: bounds.y,
         width: position - bounds.x,
         height: bounds.height
       };
       rightBounds = {
+        id: `right-${bounds.id}`,
         x: position,
         y: bounds.y,
         width: bounds.x + bounds.width - position,
@@ -203,12 +205,14 @@ export class GridOptimizer {
       };
     } else {
       leftBounds = {
+        id: `top-${bounds.id}`,
         x: bounds.x,
         y: bounds.y,
         width: bounds.width,
         height: position - bounds.y
       };
       rightBounds = {
+        id: `bottom-${bounds.id}`,
         x: bounds.x,
         y: position,
         width: bounds.width,
@@ -255,6 +259,7 @@ export class GridOptimizer {
     if (elements.length === 0) return [];
 
     const canvasBounds: GridCell = {
+      id: 'canvas',
       x: 0,
       y: 0,
       width: this.canvasWidth,

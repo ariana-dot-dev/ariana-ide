@@ -7,7 +7,7 @@ import { Interpreter } from './scripting/interpreter';
 import { State } from './state';
 import Onboarding from './Onboarding';
 import Repl from './Repl';
-import CanvasView from './Canvas';
+import CanvasView from './CanvasView';
 
 
 
@@ -73,22 +73,22 @@ function App() {
                             onMouseEnter={() => setShowTitlebar(true)} 
                             onClick={() => setShowTitlebar(true)} 
                             onMouseLeave={() => setShowTitlebar(false)} 
-                            className="h-10 flex items-center justify-center px-4 select-none relative z-10"
+                            className="h-10 flex items-center justify-center px-4 select-none relative z-50"
                         >
                             {showTitlebar && (<>
-                                <span data-tauri-drag-region className=" transition-opacity starting:opacity-0 opacity-100 text-sm font-medium font-sans w-full text-center">Ariana IDE</span>
+                                <span data-tauri-drag-region className="starting:opacity-0 opacity-100 text-sm font-medium font-sans w-full text-center">Ariana IDE</span>
                                 <div className="absolute right-4 gap-2 flex items-center">
                                     <button
                                         onClick={handleMinimize}
-                                        className=" transition-opacity starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-yellow-400 hover:opacity-100 transition-colors cursor-pointer"
+                                        className="starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-yellow-400 hover:opacity-100 transition-colors cursor-pointer"
                                     ></button>
                                     <button
                                         onClick={handleMaximize}
-                                        className=" transition-opacity starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-green-400 hover:opacity-100 transition-colors cursor-pointer"
+                                        className="starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-green-400 hover:opacity-100 transition-colors cursor-pointer"
                                     ></button>
                                     <button
                                         onClick={handleClose}
-                                        className=" transition-opacity starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-red-400 hover:opacity-100 transition-colors cursor-pointer"
+                                        className="starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-red-400 hover:opacity-100 transition-colors cursor-pointer"
                                     ></button>
                                 </div>
                             </>)}
