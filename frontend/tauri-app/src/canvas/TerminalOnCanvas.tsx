@@ -46,6 +46,13 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
   // Initialize terminal
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
+    
+    // Prevent multiple terminals for the same ID
+    const existingTerminal = document.querySelector(`[data-terminal-id="${element.id}"]`);
+    if (existingTerminal && existingTerminal !== terminalRef.current) {
+      console.warn(`Terminal ${element.id} already exists, skipping duplicate`);
+      return;
+    }
 
     const xterm = new XTerm({
       theme: {
@@ -92,13 +99,68 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
     fitAddonRef.current = fitAddon;
 
     // Connect to terminal service
+    const connectTerminal = async () => {
+      if (!xtermRef.current || terminal.isConnected) return;
+
+      try {
+        const connectionId = await TerminalService.createConnection(terminal.config, element.id);
+        terminal.setConnection(connectionId, true);
+        setIsConnected(true);
+
+        // Set up data handler - use disposable to prevent multiple handlers
+        const dataDisposable = xtermRef.current.onData(data => {
+          if (terminal.isConnected) {
+            TerminalService.sendData(connectionId, data);
+          }
+        });
+
+        // Listen for data from backend
+        const handleData = (data: string) => {
+          console.log('Received data from backend:', JSON.stringify(data));
+          xtermRef.current?.write(data);
+        };
+
+        const handleDisconnect = () => {
+          terminal.setConnection('', false);
+          setIsConnected(false);
+          xtermRef.current?.write('\r\n\x1b[31mConnection lost\x1b[0m\r\n');
+          dataDisposable.dispose(); // Clean up the data handler
+          
+          // Cleanup dead connections when this one disconnects
+          setTimeout(() => {
+            TerminalService.cleanupDeadConnections();
+          }, 1000);
+        };
+
+        TerminalService.onData(connectionId, handleData);
+        TerminalService.onDisconnect(connectionId, handleDisconnect);
+
+        // Show connection info
+        xtermRef.current.write(`\x1b[32mConnected to ${terminal.getConnectionString()}\x1b[0m\r\n`);
+
+      } catch (error) {
+        console.error('Failed to connect terminal:', error);
+        xtermRef.current?.write(`\x1b[31mFailed to connect: ${error}\x1b[0m\r\n`);
+      }
+    };
+
     connectTerminal();
 
     return () => {
+      // Dispose xterm instance
       if (xtermRef.current) {
         xtermRef.current.dispose();
         xtermRef.current = null;
       }
+
+      // Close active terminal connection to prevent duplicate IO loops on remount
+      if (terminal.isConnected && terminal.connectionId) {
+        TerminalService.closeConnection(terminal.connectionId);
+        terminal.setConnection('', false);
+      }
+
+      // Fallback cleanup of any zombie connections
+      TerminalService.cleanupDeadConnections();
     };
   }, []);
 
@@ -111,41 +173,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
     }
   }, [cell.width, cell.height, dragging]);
 
-  const connectTerminal = async () => {
-    if (!xtermRef.current) return;
 
-    try {
-      const connectionId = await TerminalService.createConnection(terminal.config);
-      terminal.setConnection(connectionId, true);
-      setIsConnected(true);
-
-      // Set up data handlers
-      xtermRef.current.onData(data => {
-        TerminalService.sendData(connectionId, data);
-      });
-
-      // Listen for data from backend
-      const handleData = (data: string) => {
-        xtermRef.current?.write(data);
-      };
-
-      const handleDisconnect = () => {
-        terminal.setConnection('', false);
-        setIsConnected(false);
-        xtermRef.current?.write('\r\n\x1b[31mConnection lost\x1b[0m\r\n');
-      };
-
-      TerminalService.onData(connectionId, handleData);
-      TerminalService.onDisconnect(connectionId, handleDisconnect);
-
-      // Show connection info
-      xtermRef.current.write(`\x1b[32mConnected to ${terminal.getConnectionString()}\x1b[0m\r\n`);
-
-    } catch (error) {
-      console.error('Failed to connect terminal:', error);
-      xtermRef.current?.write(`\x1b[31mFailed to connect: ${error}\x1b[0m\r\n`);
-    }
-  };
 
   const handleDragStartInternal = () => {
     propOnDragStart(element);
@@ -224,6 +252,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
         {/* Terminal container */}
         <div 
           ref={terminalRef}
+          data-terminal-id={element.id}
           className="w-full h-full p-2 pt-8"
           style={{ 
             width: '100%', 

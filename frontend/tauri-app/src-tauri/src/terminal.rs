@@ -75,6 +75,14 @@ impl TerminalConnection {
             app_handle,
         })
     }
+    
+    pub fn is_alive(&mut self) -> bool {
+        match self.child.try_wait() {
+            Ok(Some(_)) => false, // Process has exited
+            Ok(None) => true,     // Process is still running
+            Err(_) => false,      // Error checking status, assume dead
+        }
+    }
 
     fn build_command(config: &TerminalConfig) -> Result<CommandBuilder> {
         let mut cmd = match &config.kind {
@@ -82,6 +90,7 @@ impl TerminalConnection {
                 let mut cmd = CommandBuilder::new("ssh");
                 cmd.arg("-p");
                 cmd.arg(port.unwrap_or(22).to_string());
+                cmd.arg("-t"); // Force pseudo-terminal allocation
                 cmd.arg(format!("{}@{}", username, host));
                 cmd
             },
@@ -105,6 +114,7 @@ impl TerminalConnection {
                     
                     let mut cmd = cmd.ok_or_else(|| anyhow!("Git Bash not found"))?;
                     cmd.arg("--login");
+                    cmd.arg("-i"); // Force interactive mode
                     
                     if let Some(working_dir) = working_directory {
                         cmd.cwd(working_dir);
@@ -164,6 +174,7 @@ impl TerminalConnection {
                     Ok(0) => break, // EOF
                     Ok(n) => {
                         let data = String::from_utf8_lossy(&buffer[..n]).to_string();
+                        println!("Backend received from PTY: {:?}", data);
                         if let Err(e) = app_handle.emit_all(&format!("terminal-data-{}", connection_id), &data) {
                             eprintln!("Failed to emit terminal data: {}", e);
                             break;
@@ -201,6 +212,8 @@ pub struct TerminalManager {
     writers: Arc<Mutex<HashMap<String, Box<dyn Write + Send>>>>,
 }
 
+const MAX_CONNECTIONS: usize = 8; // Conservative limit to avoid resource exhaustion
+
 impl TerminalManager {
     pub fn new() -> Self {
         Self {
@@ -210,6 +223,14 @@ impl TerminalManager {
     }
 
     pub fn create_connection(&self, config: TerminalConfig, app_handle: AppHandle) -> Result<String> {
+        // Check connection limit first
+        {
+            let connections = self.connections.lock().unwrap();
+            if connections.len() >= MAX_CONNECTIONS {
+                return Err(anyhow!("Maximum number of terminal connections ({}) reached. Please close some terminals before creating new ones.", MAX_CONNECTIONS));
+            }
+        }
+        
         let connection_id = Uuid::new_v4().to_string();
         let connection = TerminalConnection::new(connection_id.clone(), config, app_handle)?;
         
@@ -228,6 +249,7 @@ impl TerminalManager {
     }
 
     pub fn send_data(&self, connection_id: &str, data: &str) -> Result<()> {
+        println!("Backend sending data: {:?}", data);
         let mut writers = self.writers.lock().unwrap();
         if let Some(writer) = writers.get_mut(connection_id) {
             writer.write_all(data.as_bytes())?;
@@ -252,15 +274,55 @@ impl TerminalManager {
         let mut connections = self.connections.lock().unwrap();
         let mut writers = self.writers.lock().unwrap();
         
+        // Remove and properly cleanup the writer first
+        if let Some(mut writer) = writers.remove(connection_id) {
+            let _ = writer.flush();
+            drop(writer);
+        }
+        
         if let Some(mut connection) = connections.remove(connection_id) {
-            // Kill the child process
+            // Forcefully kill the child process
             if let Err(e) = connection.child.kill() {
                 eprintln!("Failed to kill child process: {}", e);
             }
+            
+            // Wait for the child to actually terminate
+            let _ = connection.child.wait();
+            
+            // Explicitly drop the PTY pair to release file descriptors
+            drop(connection.pty_pair);
         }
         
-        // Remove the writer as well
-        writers.remove(connection_id);
+        Ok(())
+    }
+
+    pub fn cleanup_dead_connections(&self) -> Result<()> {
+        let mut connections = self.connections.lock().unwrap();
+        let mut writers = self.writers.lock().unwrap();
+        let mut dead_connections = Vec::new();
+        
+        // Find dead connections
+        for (id, connection) in connections.iter_mut() {
+            if !connection.is_alive() {
+                dead_connections.push(id.clone());
+            }
+        }
+        
+        // Remove dead connections
+        for id in dead_connections {
+            println!("Cleaning up dead terminal connection: {}", id);
+            
+            // Cleanup writer
+            if let Some(mut writer) = writers.remove(&id) {
+                let _ = writer.flush();
+                drop(writer);
+            }
+            
+            // Cleanup connection
+            if let Some(connection) = connections.remove(&id) {
+                drop(connection.pty_pair);
+            }
+        }
         
         Ok(())
     }

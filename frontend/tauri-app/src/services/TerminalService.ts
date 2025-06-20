@@ -12,25 +12,65 @@ interface TerminalConnection {
 class TerminalServiceImpl {
   private connections: Map<string, TerminalConnection> = new Map();
   private listeners: Map<string, () => void> = new Map();
+  private terminalConnections: Map<string, string> = new Map(); // terminal element ID -> connection ID
+  private pendingConnections: Map<string, Promise<string>> = new Map(); // terminal element ID -> in-flight promise
+  private lastSentTime: Map<string, number> = new Map(); // key -> timestamp for debouncing
 
-  async createConnection(config: TerminalConfig): Promise<string> {
+  async createConnection(config: TerminalConfig, terminalElementId?: string): Promise<string> {
     try {
-      // Create connection through Tauri backend
-      const connectionId = await invoke<string>('create_terminal_connection', { config });
-      
-      const connection: TerminalConnection = {
-        id: connectionId,
-        config,
-      };
+      // ----- Handle duplicate / in-flight requests -----
+      if (terminalElementId) {
+        // Reuse existing finished connection
+        if (this.terminalConnections.has(terminalElementId)) {
+          const existingConnectionId = this.terminalConnections.get(terminalElementId)!;
+          console.log(`Terminal ${terminalElementId} already has connection ${existingConnectionId}, reusing`);
+          return existingConnectionId;
+        }
+        // Await any in-flight promise
+        if (this.pendingConnections.has(terminalElementId)) {
+          console.log(`Terminal ${terminalElementId} connection is still pending, awaiting…`);
+          return this.pendingConnections.get(terminalElementId)!;
+        }
+      }
 
-      this.connections.set(connectionId, connection);
+      // Actually create the connection (and track promise early to avoid a race)
+      const creationPromise = (async () => {
+        const connectionId = await invoke<string>('create_terminal_connection', { config });
 
-      // Set up event listeners for this connection
-      await this.setupEventListeners(connectionId);
+        const connection: TerminalConnection = {
+          id: connectionId,
+          config,
+        };
+        this.connections.set(connectionId, connection);
+
+        // Map terminal element ID to connection ID
+        if (terminalElementId) {
+          this.terminalConnections.set(terminalElementId, connectionId);
+        }
+
+        // Set up event listeners exactly once
+        await this.setupEventListeners(connectionId);
+
+        return connectionId;
+      })();
+
+      if (terminalElementId) {
+        this.pendingConnections.set(terminalElementId, creationPromise);
+      }
+
+      const connectionId = await creationPromise;
+
+      if (terminalElementId) {
+        // connection resolved — no longer pending
+        this.pendingConnections.delete(terminalElementId);
+      }
 
       return connectionId;
     } catch (error) {
       console.error('Failed to create terminal connection:', error);
+      if (terminalElementId) {
+        this.pendingConnections.delete(terminalElementId);
+      }
       throw error;
     }
   }
@@ -46,6 +86,14 @@ class TerminalServiceImpl {
         this.listeners.delete(connectionId);
       }
 
+      // Remove from terminal connections map
+      for (const [terminalId, connId] of this.terminalConnections) {
+        if (connId === connectionId) {
+          this.terminalConnections.delete(terminalId);
+          break;
+        }
+      }
+
       this.connections.delete(connectionId);
     } catch (error) {
       console.error('Failed to close terminal connection:', error);
@@ -54,6 +102,17 @@ class TerminalServiceImpl {
 
   async sendData(connectionId: string, data: string): Promise<void> {
     try {
+      // Prevent rapid duplicate sends
+      const key = `${connectionId}-${data}`;
+      const now = Date.now();
+      const lastSent = this.lastSentTime.get(key) || 0;
+      
+      if (now - lastSent < 50) { // 50ms debounce
+        console.log(`Debouncing duplicate send for ${connectionId}: ${JSON.stringify(data)}`);
+        return;
+      }
+      
+      this.lastSentTime.set(key, now);
       await invoke('send_terminal_data', { connectionId, data });
     } catch (error) {
       console.error('Failed to send terminal data:', error);
@@ -122,6 +181,14 @@ class TerminalServiceImpl {
     } catch (error) {
       console.error('Failed to validate terminal config:', error);
       return false;
+    }
+  }
+
+  async cleanupDeadConnections(): Promise<void> {
+    try {
+      await invoke('cleanup_dead_connections');
+    } catch (error) {
+      console.error('Failed to cleanup dead connections:', error);
     }
   }
 }

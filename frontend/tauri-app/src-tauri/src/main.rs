@@ -64,6 +64,15 @@ async fn validate_terminal_config(config: TerminalConfig) -> bool {
     TerminalManager::validate_config(&config)
 }
 
+#[tauri::command]
+async fn cleanup_dead_connections(
+    terminal_manager: State<'_, Arc<TerminalManager>>,
+) -> Result<(), String> {
+    terminal_manager
+        .cleanup_dead_connections()
+        .map_err(|e| e.to_string())
+}
+
 fn main() {
     let terminal_manager = Arc::new(TerminalManager::new());
 
@@ -75,7 +84,8 @@ fn main() {
             resize_terminal,
             close_terminal_connection,
             get_available_terminal_types,
-            validate_terminal_config
+            validate_terminal_config,
+            cleanup_dead_connections
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
