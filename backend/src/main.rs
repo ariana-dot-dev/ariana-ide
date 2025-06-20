@@ -12,6 +12,7 @@ use std::env;
 mod auth;
 mod database;
 mod email;
+mod llm;
 
 #[get("/ping")]
 async fn ping() -> impl Responder {
@@ -64,6 +65,12 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/auth")
                     .service(auth::request_login_code)
                     .service(auth::validate_login_code),
+            )
+            .service(
+                web::scope("/api")
+                    .route("/providers", web::get().to(llm::api::list_providers))
+                    .route("/inference", web::post().to(llm::api::inference))
+                    .route("/inference/stream", web::post().to(llm::api::inference_stream)),
             )
     })
     .bind(("127.0.0.1", port))?
