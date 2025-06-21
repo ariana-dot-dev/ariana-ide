@@ -421,53 +421,179 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   };
 
   const renderScreenLine = (line: LineItem[], lineIndex: number, totalCols: number) => {
-    let lineBeforeCursor: React.ReactNode[] = []
-    let lineAfterCursor: React.ReactNode[] = []
-    let currentCol = 0
-    line.forEach((item, index, array) => {
+    const lineBeforeCursor: React.ReactNode[] = [];
+    const lineAfterCursor: React.ReactNode[] = [];
+    
+    // Helper function to check if two items have the same styling
+    const haveSameStyle = (item1: LineItem, item2: LineItem) => {
+      return (
+        colorToCSS(item1.foreground_color) === colorToCSS(item2.foreground_color) &&
+        colorToCSS(item1.background_color) === colorToCSS(item2.background_color) &&
+        item1.is_bold === item2.is_bold &&
+        item1.is_italic === item2.is_italic &&
+        item1.is_underline === item2.is_underline
+      );
+    };
+
+    // Helper function to create optimized spans for a section
+    const createOptimizedSpans = (items: LineItem[], startCol: number, targetArray: React.ReactNode[], isCursorSection: boolean) => {
+      let i = 0;
+      let colOffset = startCol;
+
+      while (i < items.length) {
+        const currentItem = items[i];
+        let combinedText = currentItem.lexeme;
+        let combinedWidth = currentItem.width || 1;
+        let spanStartCol = colOffset;
+        
+        // Look ahead to combine consecutive items with same styling
+        let j = i + 1;
+        while (j < items.length && haveSameStyle(currentItem, items[j])) {
+          combinedText += items[j].lexeme;
+          combinedWidth += items[j].width || 1;
+          j++;
+        }
+
+        const spanEndCol = spanStartCol + combinedWidth;
+        const hasCursor = isCursorSection && 
+          lineIndex === cursorPosition.line && 
+          spanStartCol <= cursorPosition.col && 
+          cursorPosition.col < spanEndCol;
+
+        if (hasCursor && combinedWidth > 1) {
+          // Split the span at cursor position
+          const cursorRelativePos = cursorPosition.col - spanStartCol;
+          const textBeforeCursor = combinedText.slice(0, cursorRelativePos);
+          const textAtCursor = combinedText.slice(cursorRelativePos, cursorRelativePos + 1);
+          const textAfterCursor = combinedText.slice(cursorRelativePos + 1);
+
+          // Span before cursor (if any)
+          if (textBeforeCursor.length > 0) {
+            targetArray.push(
+              <span
+                key={`${spanStartCol}-before`}
+                style={{
+                  color: colorToCSS(currentItem.foreground_color),
+                  backgroundColor: colorToCSS(currentItem.background_color),
+                  fontWeight: currentItem.is_bold ? 'bold' : 'normal',
+                  fontStyle: currentItem.is_italic ? 'italic' : 'normal',
+                  textDecoration: currentItem.is_underline ? 'underline' : 'none',
+                  whiteSpace: 'pre',
+                  boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
+                }}
+              >
+                {textBeforeCursor}
+              </span>
+            );
+          }
+
+          // Span at cursor position
+          targetArray.push(
+            <span
+              key={`${spanStartCol}-cursor`}
+              style={{
+                color: colorToCSS(currentItem.foreground_color),
+                backgroundColor: 'var(--whitest)',
+                fontWeight: currentItem.is_bold ? 'bold' : 'normal',
+                fontStyle: currentItem.is_italic ? 'italic' : 'normal',
+                textDecoration: currentItem.is_underline ? 'underline' : 'none',
+                whiteSpace: 'pre',
+                boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
+              }}
+            >
+              {textAtCursor}
+            </span>
+          );
+
+          // Span after cursor (if any)
+          if (textAfterCursor.length > 0) {
+            targetArray.push(
+              <span
+                key={`${spanStartCol}-after`}
+                style={{
+                  color: colorToCSS(currentItem.foreground_color),
+                  backgroundColor: colorToCSS(currentItem.background_color),
+                  fontWeight: currentItem.is_bold ? 'bold' : 'normal',
+                  fontStyle: currentItem.is_italic ? 'italic' : 'normal',
+                  textDecoration: currentItem.is_underline ? 'underline' : 'none',
+                  whiteSpace: 'pre',
+                  boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
+                }}
+              >
+                {textAfterCursor}
+              </span>
+            );
+          }
+        } else {
+          targetArray.push(
+            <span
+              key={spanStartCol}
+              style={{
+                color: colorToCSS(currentItem.foreground_color),
+                backgroundColor: hasCursor ? 'var(--whitest)' : colorToCSS(currentItem.background_color),
+                fontWeight: currentItem.is_bold ? 'bold' : 'normal',
+                fontStyle: currentItem.is_italic ? 'italic' : 'normal',
+                textDecoration: currentItem.is_underline ? 'underline' : 'none',
+                whiteSpace: 'pre',
+                boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
+              }}
+            >
+              {combinedText}
+            </span>
+          );
+        }
+
+        i = j;
+        colOffset += combinedWidth;
+      }
+    };
+
+    // Split line items before and after cursor
+    let currentCol = 0;
+    const itemsBeforeCursor: LineItem[] = [];
+    const itemsAfterCursor: LineItem[] = [];
+
+    for (const item of line) {
       if (currentCol < cursorPosition.col) {
-        lineBeforeCursor.push((
-          <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
-            color: colorToCSS(item.foreground_color),
-            backgroundColor: colorToCSS(item.background_color),
-            fontWeight: item.is_bold ? 'bold' : 'normal',
-            fontStyle: item.is_italic ? 'italic' : 'normal',
-            textDecoration: item.is_underline ? 'underline' : 'none',
-            whiteSpace: 'pre',
-          }}>{item.lexeme}</span>
-        ))
+        itemsBeforeCursor.push(item);
       } else {
-        lineAfterCursor.push((
-          <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
-            color: colorToCSS(item.foreground_color),
-            backgroundColor: currentCol == cursorPosition.col && lineIndex == cursorPosition.line ? 'var(--whitest)' : colorToCSS(item.background_color),
-            fontWeight: item.is_bold ? 'bold' : 'normal',
-            fontStyle: item.is_italic ? 'italic' : 'normal',
-            textDecoration: item.is_underline ? 'underline' : 'none',
-            whiteSpace: 'pre',
-          }}>{item.lexeme}</span>
-        ))
+        itemsAfterCursor.push(item);
       }
-      let isLast = array.length - 1 == index;
-      if (isLast && lineIndex == cursorPosition.line && currentCol < cursorPosition.col) {
-        lineAfterCursor.push((
-          <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
-            color: colorToCSS(item.foreground_color),
-            backgroundColor: 'var(--whitest)',
-            fontWeight: item.is_bold ? 'bold' : 'normal',
-            fontStyle: item.is_italic ? 'italic' : 'normal',
-            textDecoration: item.is_underline ? 'underline' : 'none',
-            whiteSpace: 'pre',
-          }}> </span>
-        ))
-      }
-
       currentCol += item.width || 1;
-    })
+    }
 
+    // Create optimized spans for each section
+    createOptimizedSpans(itemsBeforeCursor, 0, lineBeforeCursor, false);
+    createOptimizedSpans(itemsAfterCursor, itemsBeforeCursor.reduce((acc, item) => acc + (item.width || 1), 0), lineAfterCursor, true);
+
+    // Add cursor at end of line if needed
+    if (line.length > 0 && lineIndex === cursorPosition.line && currentCol <= cursorPosition.col) {
+      const lastItem = line[line.length - 1];
+      lineAfterCursor.push(
+        <span
+          key={currentCol}
+          style={{
+            color: colorToCSS(lastItem.foreground_color),
+            backgroundColor: 'var(--whitest)',
+            fontWeight: lastItem.is_bold ? 'bold' : 'normal',
+            fontStyle: lastItem.is_italic ? 'italic' : 'normal',
+            textDecoration: lastItem.is_underline ? 'underline' : 'none',
+            whiteSpace: 'pre',
+            boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
+          }}
+        >
+          {' '}
+        </span>
+      );
+    }
+
+    const isAtCursorLine = lineIndex === cursorPosition.line;
     return (
-      <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap border-b border-[var(--fg-400)]/20 min-h-4")}
-        style={{ width: `${totalCols * 8}px` }}>
+      <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap min-h-4")}
+        style={{ 
+          width: `${totalCols * 8}px`,
+          boxShadow: `inset 0 -0.5px 0 var(--fg-800-30)`,
+        }}>
         {lineBeforeCursor}
         {lineAfterCursor}
       </div>
