@@ -336,7 +336,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     line.forEach((item, index, array) => {
       if (currentCol < cursorPosition.col) {
         lineBeforeCursor.push((
-          <span key={currentCol} className='border-r border-gray-300/20' style={{
+          <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
             color: colorToCSS(item.foreground_color),
             backgroundColor: colorToCSS(item.background_color),
             fontWeight: item.is_bold ? 'bold' : 'normal',
@@ -347,7 +347,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         ))
       } else {
         lineAfterCursor.push((
-          <span key={currentCol} className='border-r border-gray-300/20' style={{
+          <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
             color: colorToCSS(item.foreground_color),
             backgroundColor: currentCol == cursorPosition.col && lineIndex == cursorPosition.line ? 'white' : colorToCSS(item.background_color),
             fontWeight: item.is_bold ? 'bold' : 'normal',
@@ -360,7 +360,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
       let isLast = array.length - 1 == index;
       if (isLast && lineIndex == cursorPosition.line && currentCol < cursorPosition.col) {
         lineAfterCursor.push((
-          <span key={currentCol} className='border-r border-gray-300/20' style={{
+          <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
             color: colorToCSS(item.foreground_color),
             backgroundColor: 'white',
             fontWeight: item.is_bold ? 'bold' : 'normal',
@@ -375,8 +375,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     })
 
     return (
-      <div key={lineIndex} className="font-mono text-xs leading-4 whitespace-nowrap border-b border-gray-400/20"
-        style={{ lineHeight: '16px', minHeight: '16px', width: `${totalCols * 8}px` }}>
+      <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap border-b border-[var(--fg-400)]/20 min-h-4")}
+        style={{ width: `${totalCols * 8}px` }}>
         {lineBeforeCursor}
         {lineAfterCursor}
       </div>
@@ -385,8 +385,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
   if (error) {
     return (
-      <div className={cn("p-4 bg-red-900/20 border border-red-500 rounded-md")}>
-        <div className="text-red-400 font-mono text-sm">
+      <div className={cn("p-4 bg-[var(--bg-900)]/20 border border-[var(--bg-500)] rounded-md")}>
+        <div className={cn("text-[var(--bg-400)] font-mono text-sm")}>
           Terminal Error: {error}
         </div>
       </div>
@@ -397,14 +397,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     <div
       ref={terminalRef}
       className={cn(
-        "bg-sky-800 rounded-lg text-white font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
+        "bg-[var(--bg-800)] rounded-lg text-[var(--fg-50)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
       )}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       // onWheel={handleWheel}
       onClick={() => terminalRef.current?.focus()}
     >
-      <div className="mb-2 text-xs text-gray-400 flex justify-between items-center">
+      <div className={cn("mb-2 text-xs text-[var(--fg-400)] flex justify-between items-center")}>
         <div>
           Status: {isConnected ? 'Connected' : 'Disconnected'}
           {terminalId && ` | ID: ${terminalId.slice(0, 8)}...`}
@@ -412,24 +412,24 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           {` | Size: ${terminalDimensions.cols}x${terminalDimensions.rows}`}
         </div>
 
-        <div className="flex gap-1">
+        <div className={cn("flex gap-1")}>
           <button
             onClick={() => sendRawInput('\x1b[5~')}
-            className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+            className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
             title="Scroll Up (Page Up)"
           >
             ↑
           </button>
           <button
             onClick={() => sendRawInput('\x1b[6~')}
-            className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+            className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
             title="Scroll Down (Page Down)"
           >
             ↓
           </button>
           <button
             onClick={() => sendRawInput('\x0C')}
-            className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+            className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
             title="Clear Screen (Ctrl+L)"
           >
             Clear
@@ -437,9 +437,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         </div>
       </div>
 
-      <div ref={terminalInnerRef} className="terminal-screen relative border border-gray-700 rounded bg-black overflow-hidden max-h-full h-full"
-        style={{ fontFamily: 'monospace' }}>
-        <div className="absolute top-0 left-0 w-full h-fit p-2 bg-red-200/10">
+      <div ref={terminalInnerRef} className={cn("terminal-screen relative border border-[var(--bg-700)] rounded bg-[var(--bg-950)] overflow-hidden max-h-full h-full font-mono")}>
+        <div className={cn("absolute top-0 left-0 w-full h-fit p-2 bg-[var(--bg-200)]/10")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
             const line = screen[rowIndex] || []; // Use empty array if line doesn't exist
             return renderScreenLine(line, rowIndex, terminalDimensions.cols);

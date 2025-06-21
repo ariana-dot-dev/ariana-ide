@@ -82,16 +82,16 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
 
   return (
     <div className={cn("h-full flex flex-col gap-2")}>
-      <div className="p-4 rounded-lg h-fit">
+      <div className={cn("p-4 rounded-lg h-fit")}>
         {/* Terminal Type Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-sky-300 mb-2">
+        <div className={cn("mb-4")}>
+          <label className={cn("block text-sm font-medium text-[var(--fg-300)] mb-2")}>
             Terminal Type
           </label>
           <select
             value={terminalType}
             onChange={(e) => setTerminalType(e.target.value as any)}
-            className="w-full px-3 py-2 bg-sky-800 border border-sky-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={cn("w-full px-3 py-2 bg-[var(--bg-800)] border border-[var(--bg-600)] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[var(--fg-500)]")}
             disabled={isConnected}
           >
             <option value="git-bash">Git Bash (Windows)</option>
@@ -102,9 +102,9 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
 
         {/* Configuration based on terminal type */}
         {terminalType === 'ssh' && (
-          <div className="space-y-3 mb-4">
+          <div className={cn("space-y-3 mb-4")}>
             <div>
-              <label className="block text-sm font-medium text-sky-300 mb-1">
+              <label className={cn("block text-sm font-medium text-[var(--fg-300)] mb-1")}>
                 Host
               </label>
               <input
@@ -112,12 +112,12 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
                 value={sshHost}
                 onChange={(e) => setSshHost(e.target.value)}
                 placeholder="example.com"
-                className="w-full px-3 py-2 bg-sky-800 border border-sky-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={cn("w-full px-3 py-2 bg-[var(--bg-800)] border border-[var(--bg-600)] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[var(--fg-500)]")}
                 disabled={isConnected}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-sky-300 mb-1">
+              <label className={cn("block text-sm font-medium text-[var(--fg-300)] mb-1")}>
                 Username
               </label>
               <input
@@ -125,12 +125,12 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
                 value={sshUsername}
                 onChange={(e) => setSshUsername(e.target.value)}
                 placeholder="user"
-                className="w-full px-3 py-2 bg-sky-800 border border-sky-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={cn("w-full px-3 py-2 bg-[var(--bg-800)] border border-[var(--bg-600)] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[var(--fg-500)]")}
                 disabled={isConnected}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-sky-300 mb-1">
+              <label className={cn("block text-sm font-medium text-[var(--fg-300)] mb-1")}>
                 Port
               </label>
               <input
@@ -138,7 +138,7 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
                 value={sshPort}
                 onChange={(e) => setSshPort(parseInt(e.target.value) || 22)}
                 placeholder="22"
-                className="w-full px-3 py-2 bg-sky-800 border border-sky-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={cn("w-full px-3 py-2 bg-[var(--bg-800)] border border-[var(--bg-600)] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[var(--fg-500)]")}
                 disabled={isConnected}
               />
             </div>
@@ -146,8 +146,8 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
         )}
 
         {terminalType === 'wsl' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-sky-300 mb-1">
+          <div className={cn("mb-4")}>
+            <label className={cn("block text-sm font-medium text-[var(--fg-300)] mb-1")}>
               Distribution (optional)
             </label>
             <input
@@ -155,15 +155,15 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
               value={wslDistribution}
               onChange={(e) => setWslDistribution(e.target.value)}
               placeholder="Ubuntu"
-              className="w-full px-3 py-2 bg-sky-800 border border-sky-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={cn("w-full px-3 py-2 bg-[var(--bg-800)] border border-[var(--bg-600)] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[var(--fg-500)]")}
               disabled={isConnected}
             />
           </div>
         )}
 
         {(terminalType === 'git-bash' || terminalType === 'wsl') && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-sky-300 mb-1">
+          <div className={cn("mb-4")}>
+            <label className={cn("block text-sm font-medium text-[var(--fg-300)] mb-1")}>
               Working Directory (optional)
             </label>
             <input
@@ -171,45 +171,45 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
               value={workingDirectory}
               onChange={(e) => setWorkingDirectory(e.target.value)}
               placeholder="/path/to/directory"
-              className="w-full px-3 py-2 bg-sky-800 border border-sky-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={cn("w-full px-3 py-2 bg-[var(--bg-800)] border border-[var(--bg-600)] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[var(--fg-500)]")}
               disabled={isConnected}
             />
           </div>
         )}
 
         {/* Connection Controls */}
-        <div className="flex space-x-3 mb-4">
+        <div className={cn("flex space-x-3 mb-4")}>
           <button
             onClick={handleConnect}
             disabled={isConnected}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-sky-600 disabled:cursor-not-allowed"
+            className={cn("px-4 py-2 bg-[var(--fg-600)] text-white rounded-md hover:bg-[var(--fg-700)] disabled:bg-[var(--bg-600)] disabled:cursor-not-allowed")}
           >
             Connect
           </button>
           <button
             onClick={handleDisconnect}
             disabled={!isConnected}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-sky-600 disabled:cursor-not-allowed"
+            className={cn("px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-[var(--bg-600)] disabled:cursor-not-allowed")}
           >
             Disconnect
           </button>
         </div>
 
         {/* Status */}
-        <div className="text-sm">
-          <span className="text-sky-300">Status: </span>
-          <span className={isConnected ? 'text-green-400' : 'text-red-400'}>
+        <div className={cn("text-sm")}>
+          <span className={cn("text-[var(--fg-300)]")}>Status: </span>
+          <span className={cn(isConnected ? 'text-green-400' : 'text-red-400')}>
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
           {terminalId && (
-            <span className="text-sky-400 ml-2">
+            <span className={cn("text-[var(--fg-400)] ml-2")}>
               (ID: {terminalId.slice(0, 8)}...)
             </span>
           )}
         </div>
 
         {error && (
-          <div className="mt-2 p-2 bg-red-900/20 border border-red-500 rounded text-red-400 text-sm">
+          <div className={cn("mt-2 p-2 bg-red-900/20 border border-red-500 rounded text-red-400 text-sm")}>
             Error: {error}
           </div>
         )}
@@ -217,7 +217,7 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ })
 
       {/* Terminal Renderer */}
       {terminalSpec && (
-        <div className="p-4 rounded-lg h-full flex flex-col">
+        <div className={cn("p-4 rounded-lg h-full flex flex-col")}>
           <CustomTerminalRenderer
             spec={terminalSpec}
             onTerminalReady={handleTerminalReady}

@@ -100,10 +100,10 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         setIsHovered(false);
       }}
     >
-      <div className="w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-gradient-to-b from-blue-900/30 to-sky-600/30">
+      <div className={cn("w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-gradient-to-b from-[var(--fg-900)]/30 to-[var(--bg-600)]/30")}>
       {/* {(isHovered || showOverlay) && !showOverlay && (
         <button
-          className="absolute top-1 right-1 w-6 h-6 bg-gray-800 text-white rounded text-xs hover:bg-gray-700 z-10 border border-gray-600"
+          className={cn("absolute top-1 right-1 w-6 h-6 bg-[var(--fg-800)] text-[var(--bg-white)] rounded text-xs hover:bg-[var(--fg-700)] z-10 border border-[var(--fg-600)]")}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -115,7 +115,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         </button>
       )} */}
 
-      <img src="./assets/app-icon-grad.png" className="select-none" style={{ width: cell.width/4, }} />
+      <img src="./assets/app-icon-grad.png" className={cn("select-none")} style={{ width: cell.width/4, }} />
       
       {/* {showOverlay && element instanceof Rectangle && (
         <ElementOverlay

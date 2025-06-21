@@ -261,14 +261,16 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
       {/* Hidden measurement element to get accurate character dimensions */}
       <span 
         ref={measureRef}
-        className="absolute invisible font-mono text-xs leading-4 pointer-events-none"
+        className={cn(
+          "absolute invisible font-mono text-xs leading-4 pointer-events-none"
+        )}
         style={{ left: -9999, top: -9999 }}
       >
         M
       </span>
       
       <div
-        className="absolute pointer-events-none"
+        className={cn("absolute pointer-events-none")}
         style={{
           left: position.left,
           top: position.top,
@@ -278,11 +280,10 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
       {/* Visual cursor indicator */}
       <div 
         className={cn(
-          "absolute w-2 h-4 opacity-75 animate-pulse",
-          inputMode === 'interactive' ? "bg-red-400" : "bg-white",
+          "absolute w-2 h-4 opacity-75 animate-pulse left-0 top-0",
+          inputMode === 'interactive' ? "bg-[var(--fg-error)]" : "bg-[var(--fg-primary)]",
           isVisible && inputValue.length > 0 && inputMode === 'shell' ? "hidden" : "block"
         )}
-        style={{ left: 0, top: 0 }}
         title={inputMode === 'interactive' ? 'Interactive Mode' : 'Shell Mode'}
       />
 
@@ -297,14 +298,11 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
         onBlur={handleBlur}
         onPaste={handlePaste}
         className={cn(
-          "pointer-events-auto border-none outline-none bg-transparent",
-          "text-white font-mono text-xs",
+          "pointer-events-auto border-none outline-none bg-transparent absolute left-0 top-0",
+          "text-[var(--fg-primary)] font-mono text-xs",
           inputMode === 'shell' ? "block" : "hidden"
         )}
         style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
           width: Math.max(10, inputValue.length * 7 + 10),
           height: 16,
           zIndex: 1001,
@@ -320,7 +318,7 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
       <div 
         className={cn(
           "absolute text-xs px-1 rounded",
-          inputMode === 'interactive' ? "bg-red-500 text-white" : "bg-blue-500 text-white"
+          inputMode === 'interactive' ? "bg-[var(--fg-error)] text-[var(--bg-primary)]" : "bg-[var(--bg-accent)] text-[var(--fg-primary)]"
         )}
         style={{ left: -15, top: -15, fontSize: '8px' }}
       >

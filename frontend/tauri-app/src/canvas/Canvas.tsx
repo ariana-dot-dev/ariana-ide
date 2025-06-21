@@ -6,6 +6,7 @@ import { Rectangle } from './Rectangle';
 import { Terminal, TerminalConfig } from './Terminal';
 import RectangleOnCanvas from './RectangleOnCanvas';
 import TerminalOnCanvas from './TerminalOnCanvas';
+import { cn } from '../utils';
 
 interface CanvasProps {
   elements: CanvasElement[];
@@ -197,12 +198,11 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.1, onElem
   const sortedIds = layouts.map(layout => layout.element.id).sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="flex w-full h-full p-2">
-      <div className="relative w-full h-full rounded-md overflow-hidden">
+    <div className={cn("flex w-full h-full p-2")}>
+      <div className={cn("relative w-full h-full rounded-md overflow-hidden")}>
         <div
           ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full overflow-hidden"
-          style={{ margin: 0, padding: 0 }}
+          className={cn("absolute top-0 left-0 w-full h-full overflow-hidden m-0 p-0")}
         >
           {layouts.map((layout, index) => {
             if ("rectangle" in layout.element.kind) {

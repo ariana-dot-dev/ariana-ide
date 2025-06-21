@@ -3,6 +3,7 @@ import Canvas from './canvas/Canvas';
 import { Rectangle } from './canvas/Rectangle';
 import { Terminal } from './canvas/Terminal';
 import { CanvasElement, SizeTarget, AreaTarget } from './canvas/types';
+import { cn } from './utils';
 
 // Demo elements for testing
 const createDemoElements = (): CanvasElement[] => {
@@ -56,7 +57,7 @@ const CanvasView: React.FC = () => {
   };
 
   return (
-    <div className="absolute top-0 left-0 w-screen h-screen overflow-hidden">
+    <div className={cn("absolute top-0 left-0 w-screen h-screen overflow-hidden")}>
       <Canvas 
         elements={elements} 
         stabilityWeight={stabilityWeight} 

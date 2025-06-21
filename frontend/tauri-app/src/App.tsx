@@ -9,6 +9,7 @@ import Onboarding from './Onboarding';
 import Repl from './Repl';
 import CanvasView from './CanvasView';
 import CustomTerminalExample from './canvas/CustomTerminalExample';
+import { cn } from './utils';
 
 
 
@@ -59,7 +60,7 @@ function App() {
     const handleClose = () => appWindow.close();
 
     if (loading || error || interpreter === null) {
-        return (<div className="h-screen w-screen items-center justify-center bg-gradient-to-b from-sky-300 to-sky-200 flex flex-col rounded-lg overflow-hidden">
+        return (<div className={cn("h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden")}>
             Loading...
         </div>)
     }
@@ -67,40 +68,40 @@ function App() {
     return (
         <StateContext value={state}>
             <InterpreterContext value={interpreter}>
-                <div className="relative font-mono h-screen w-screen bg-gradient-to-b from-sky-300 to-sky-200 flex flex-col rounded-lg overflow-hidden">
-                    <div className="h-full w-full text-sky-200 bg-gradient-to-b from-sky-600 to-sky-400 flex flex-col rounded-lg">
+                <div className={cn("relative font-mono h-screen w-screen bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden")}>
+                    <div className={cn("h-full w-full text-[var(--bg-200)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg")}>
                         {/* Custom Titlebar */}
                         <div 
                             onMouseEnter={() => setShowTitlebar(true)} 
                             onClick={() => setShowTitlebar(true)} 
                             onMouseLeave={() => setShowTitlebar(false)} 
-                            className="h-10 flex items-center justify-center px-4 select-none relative z-50"
+                            className={cn("h-10 flex items-center justify-center px-4 select-none relative z-50")}
                         >
                             {showTitlebar && (<>
-                                <span data-tauri-drag-region className="starting:opacity-0 opacity-100 text-sm font-medium font-sans w-full text-center">Ariana IDE</span>
-                                <div className="absolute right-4 gap-2 flex items-center">
+                                <span data-tauri-drag-region className={cn("starting:opacity-0 opacity-100 text-sm font-medium font-sans w-full text-center")}>Ariana IDE</span>
+                                <div className={cn("absolute right-4 gap-2 flex items-center")}>
                                     <button
                                         onClick={handleMinimize}
-                                        className="starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-yellow-400 hover:opacity-100 transition-colors cursor-pointer"
+                                        className={cn("starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-yellow-400 hover:opacity-100 transition-colors cursor-pointer")}
                                     ></button>
                                     <button
                                         onClick={handleMaximize}
-                                        className="starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-green-400 hover:opacity-100 transition-colors cursor-pointer"
+                                        className={cn("starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-green-400 hover:opacity-100 transition-colors cursor-pointer")}
                                     ></button>
                                     <button
                                         onClick={handleClose}
-                                        className="starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-blue-600 to-red-400 hover:opacity-100 transition-colors cursor-pointer"
+                                        className={cn("starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-red-400 hover:opacity-100 transition-colors cursor-pointer")}
                                     ></button>
                                 </div>
                             </>)}
                         </div>
 
                         {/* <CanvasView /> */}
-                        <div className="h-full">
+                        <div className={cn("h-full")}>
                             <CustomTerminalExample/>
                         </div>
 
-                        <div className="flex-1 font-mono flex items-center justify-center ">
+                        <div className={cn("flex-1 font-mono flex items-center justify-center")}>
                             <Onboarding userEmail={userEmail} />
                             {/* <Repl /> */}
                         </div>

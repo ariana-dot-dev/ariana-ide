@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ElementTargets, SizeTarget, AreaTarget } from './types';
 import { Rectangle } from './Rectangle';
+import { cn } from '../utils';
 
 interface ElementOverlayProps {
   element: Rectangle;
@@ -38,28 +39,28 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({ element, onConfirm, onC
 
   return (
     <div 
-      className="absolute top-0 right-0 bg-gray-900 text-white p-3 rounded-bl-lg shadow-lg z-30 min-w-48"
+      className={cn("absolute top-0 right-0 bg-[var(--bg-900)] text-[var(--fg-100)] p-3 rounded-bl-lg shadow-lg z-30 min-w-48")}
       onClick={(e) => e.stopPropagation()}
       onMouseEnter={(e) => e.stopPropagation()}
       onMouseLeave={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-col gap-3">
-        <div className="flex justify-between items-center">
-          <h3 className="text-sm font-medium">Edit Element</h3>
+      <div className={cn("flex flex-col gap-3")}>
+        <div className={cn("flex justify-between items-center")}>
+          <h3 className={cn("text-sm font-medium")}>Edit Element</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-sm"
+            className={cn("text-[var(--bg-400)] hover:text-[var(--fg-100)] text-sm")}
           >
             ×
           </button>
         </div>
 
         <div>
-          <label className="block text-xs mb-1">Aspect Ratio</label>
+          <label className={cn("block text-xs mb-1")}>Aspect Ratio</label>
           <select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(parseFloat(e.target.value))}
-            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs"
+            className={cn("w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs")}
           >
             {commonAspectRatios.map(ratio => (
               <option key={ratio.value} value={ratio.value}>
@@ -74,17 +75,17 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({ element, onConfirm, onC
             max="5"
             value={aspectRatio}
             onChange={(e) => setAspectRatio(parseFloat(e.target.value))}
-            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs mt-1"
+            className={cn("w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs mt-1")}
             placeholder="Custom ratio"
           />
         </div>
 
         <div>
-          <label className="block text-xs mb-1">Size</label>
+          <label className={cn("block text-xs mb-1")}>Size</label>
           <select
             value={size}
             onChange={(e) => setSize(e.target.value as SizeTarget)}
-            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs"
+            className={cn("w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs")}
           >
             {sizeOptions.map(sizeOption => (
               <option key={sizeOption} value={sizeOption}>
@@ -95,11 +96,11 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({ element, onConfirm, onC
         </div>
 
         <div>
-          <label className="block text-xs mb-1">Preferred Area</label>
+          <label className={cn("block text-xs mb-1")}>Preferred Area</label>
           <select
             value={area}
             onChange={(e) => setArea(e.target.value as AreaTarget)}
-            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs"
+            className={cn("w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs")}
           >
             {areaOptions.map(areaOption => (
               <option key={areaOption} value={areaOption}>
@@ -111,16 +112,16 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({ element, onConfirm, onC
           </select>
         </div>
 
-        <div className="flex gap-2 pt-2">
+        <div className={cn("flex gap-2 pt-2")}>
           <button
             onClick={handleConfirm}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs"
+            className={cn("flex-1 bg-[var(--fg-600)] hover:bg-[var(--fg-700)] text-[var(--fg-100)] px-3 py-1 rounded text-xs")}
           >
             Confirm
           </button>
           <button
             onClick={onClose}
-            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs"
+            className={cn("flex-1 bg-[var(--bg-600)] hover:bg-[var(--bg-700)] text-[var(--fg-100)] px-3 py-1 rounded text-xs")}
           >
             Cancel
           </button>
