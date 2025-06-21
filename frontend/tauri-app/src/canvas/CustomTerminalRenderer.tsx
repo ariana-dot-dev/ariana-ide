@@ -3,12 +3,35 @@ import { customTerminalAPI, TerminalEvent, TerminalSpec, LineItem, Colors } from
 import { cn } from '../utils';
 
 interface CustomTerminalRendererProps {
+  elementId: string;
   spec: TerminalSpec;
   onTerminalReady?: (terminalId: string) => void;
   onTerminalError?: (error: string) => void;
 }
 
+// Simple connection manager to reuse connections
+class TerminalConnectionManager {
+  private static connections = new Map<string, string>(); // elementId -> terminalId
+  
+  static getConnection(elementId: string): string | undefined {
+    return this.connections.get(elementId);
+  }
+  
+  static setConnection(elementId: string, terminalId: string): void {
+    this.connections.set(elementId, terminalId);
+  }
+  
+  static removeConnection(elementId: string): void {
+    this.connections.delete(elementId);
+  }
+  
+  static hasConnection(elementId: string): boolean {
+    return this.connections.has(elementId);
+  }
+}
+
 export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
+  elementId,
   spec,
   onTerminalReady,
   onTerminalError,
@@ -21,18 +44,46 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   const [terminalDimensions, setTerminalDimensions] = useState({ rows: 24, cols: 80 });
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInnerRef = useRef<HTMLDivElement>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isResizingRef = useRef<boolean>(false);
 
   // Initialize terminal connection
   useEffect(() => {
     let mounted = true;
 
     const connectTerminal = async () => {
-      console.log("Connecting to terminal... : ", spec);
+      // Check if we already have a connection for this element
+      const existingTerminalId = TerminalConnectionManager.getConnection(elementId);
+      
+      if (existingTerminalId && !terminalId) {
+        console.log(`Reusing existing terminal connection ${existingTerminalId} for element ${elementId}`);
+        setTerminalId(existingTerminalId);
+        setIsConnected(true);
+        setError(null);
+
+        // Set up event listeners for existing connection
+        await customTerminalAPI.onTerminalEvent(existingTerminalId, handleTerminalEvent);
+        await customTerminalAPI.onTerminalDisconnect(existingTerminalId, handleTerminalDisconnect);
+
+        onTerminalReady?.(existingTerminalId);
+        return;
+      }
+
+      // Don't create new connection if we already have one
+      if (terminalId && isConnected) {
+        console.log("Terminal already connected, skipping reconnection");
+        return;
+      }
+
+      console.log(`Creating new terminal connection for element ${elementId}:`, spec);
 
       try {
         const id = await customTerminalAPI.connectTerminal(spec);
         if (!mounted) return;
 
+        // Store the connection mapping
+        TerminalConnectionManager.setConnection(elementId, id);
+        
         setTerminalId(id);
         setIsConnected(true);
         setError(null);
@@ -54,21 +105,24 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
     return () => {
       mounted = false;
-      if (terminalId) {
-        customTerminalAPI.killTerminal(terminalId).catch(console.error);
-      }
+      // Don't kill terminals on unmount - keep connections alive for reuse
     };
-  }, [spec]);
+  }, [elementId]);
+
+  // Cleanup on unmount (when component is actually destroyed)
+  useEffect(() => {
+    return () => {
+      // This runs when the component is actually unmounted
+      // We keep the terminal connection alive for potential reuse
+      console.log(`CustomTerminalRenderer unmounting for element ${elementId}`);
+    };
+  }, []);
 
   const handleTerminalEvent = useCallback((event: TerminalEvent) => {
     switch (event.type) {
       case 'screenUpdate':
         if (event.screen && event.cursor_line !== undefined && event.cursor_col !== undefined) {
           setScreen(event.screen);
-
-          // print size of screen
-          console.log("Screen size: ", event.screen.length, event.screen[0].length);
-          
           setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
         }
         break;
@@ -76,9 +130,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   }, []);
 
   const handleTerminalDisconnect = useCallback(() => {
+    console.log(`Terminal disconnected for element ${elementId}`);
+    TerminalConnectionManager.removeConnection(elementId);
     setIsConnected(false);
     setTerminalId(null);
-  }, []);
+  }, [elementId]);
 
   // Send raw input directly
   const sendRawInput = useCallback(async (input: string) => {
@@ -181,18 +237,18 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   const handleWheel = useCallback(async (event: React.WheelEvent) => {
     if (!terminalId || !isConnected) return;
 
-    // Use Page Up/Down for better scrolling behavior
+    // Use proper scroll API methods
     const lines = Math.ceil(Math.abs(event.deltaY) / 120); // Adjust sensitivity
     try {
       if (event.deltaY > 0) {
-        // Scroll down - send Page Down
+        // Scroll down
         for (let i = 0; i < lines; i++) {
-          await sendRawInput('\x1b[6~'); // Page Down
+          await customTerminalAPI.sendScrollDown(terminalId);
         }
       } else {
-        // Scroll up - send Page Up
+        // Scroll up
         for (let i = 0; i < lines; i++) {
-          await sendRawInput('\x1b[5~'); // Page Up
+          await customTerminalAPI.sendScrollUp(terminalId);
         }
       }
     } catch (err) {
@@ -200,45 +256,99 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     }
 
     event.preventDefault();
-  }, [terminalId, isConnected, sendRawInput]);
+  }, [terminalId, isConnected]);
 
-  const handleResize = useCallback(async () => {
-    if (!terminalId || !terminalInnerRef.current) return;
-
-    const containerRect = terminalInnerRef.current.getBoundingClientRect();
-
-    const charWidth = 8.2;
-    const charHeight = 17;
-
-    const cols = Math.max(1, Math.floor(containerRect.width / charWidth));
-    const lines = Math.max(1, Math.floor(containerRect.height / charHeight));
-
-    console.log(`Terminal resize: ${cols}x${lines} (container: ${containerRect.width}x${containerRect.height})`);
-
-    // Update our tracked dimensions
-    setTerminalDimensions({ rows: lines, cols });
-
-    try {
-      await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
-    } catch (err) {
-      console.error('Error resizing terminal:', err);
+  const debouncedResize = useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
     }
-  }, [terminalId]);
+    
+    resizeTimeoutRef.current = setTimeout(async () => {
+      if (!terminalId || !terminalInnerRef.current || !isConnected) return;
+      
+      // Prevent concurrent resizes
+      if (isResizingRef.current) {
+        console.log('Resize skipped: already resizing');
+        return;
+      }
 
-  // Handle window resize
+      const containerRect = terminalInnerRef.current.getBoundingClientRect();
+
+      // Don't resize if container doesn't have proper dimensions yet
+      if (containerRect.width < 100 || containerRect.height < 80) {
+        console.log('Terminal resize skipped: container too small', containerRect);
+        return;
+      }
+
+      const charWidth = 8.2;
+      const charHeight = 17;
+
+      const cols = Math.max(20, Math.floor(containerRect.width / charWidth));
+      const lines = Math.max(5, Math.floor(containerRect.height / charHeight));
+
+      // Only resize if dimensions actually changed
+      if (terminalDimensions.cols === cols && terminalDimensions.rows === lines) {
+        return;
+      }
+
+      console.log(`Terminal resize: ${cols}x${lines} (container: ${containerRect.width}x${containerRect.height})`);
+
+      isResizingRef.current = true;
+      try {
+        await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
+        // Update our tracked dimensions only after successful resize
+        setTerminalDimensions({ rows: lines, cols });
+        console.log(`Terminal resize successful: ${cols}x${lines}`);
+      } catch (err) {
+        console.error('Error resizing terminal:', err);
+        // Don't update dimensions on error
+      } finally {
+        isResizingRef.current = false;
+      }
+    }, 150); // 150ms debounce
+  }, [terminalId, terminalDimensions.cols, terminalDimensions.rows, isConnected]);
+
+  const handleResize = debouncedResize;
+
+  // Handle container and window resize
   useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    
+    // Watch for container size changes
+    if (terminalInnerRef.current) {
+      resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(terminalInnerRef.current);
+    }
+    
+    // Also listen for window resize
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [handleResize]);
+    
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [handleResize, isConnected]);
 
   // Auto-focus the terminal and set initial size
   useEffect(() => {
     if (terminalRef.current && isConnected) {
       terminalRef.current.focus();
-      // Set initial terminal size
-      setTimeout(() => {
+      // Set initial terminal size with multiple attempts
+      const scheduleResize = () => {
         handleResize();
-      }, 500);
+        // Additional resize after a bit more time in case layout is still settling
+        setTimeout(handleResize, 200);
+      };
+      
+      // Immediate resize attempt
+      scheduleResize();
+      // Fallback resize after layout should be settled
+      setTimeout(scheduleResize, 500);
     }
   }, [isConnected, handleResize]);
 
@@ -395,16 +505,16 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
         <div className={cn("flex gap-1")}>
           <button
-            onClick={() => sendRawInput('\x1b[5~')}
+            onClick={() => customTerminalAPI.sendScrollUp(terminalId!)}
             className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
-            title="Scroll Up (Page Up)"
+            title="Scroll Up"
           >
             ↑
           </button>
           <button
-            onClick={() => sendRawInput('\x1b[6~')}
+            onClick={() => customTerminalAPI.sendScrollDown(terminalId!)}
             className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
-            title="Scroll Down (Page Down)"
+            title="Scroll Down"
           >
             ↓
           </button>
@@ -418,7 +528,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         </div>
       </div>
 
-      <div ref={terminalInnerRef} className={cn("terminal-screen relative border border-[var(--bg-700)] rounded bg-[var(--blackest)] overflow-hidden max-h-full h-full font-mono")}>
+      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--blackest)] overflow-hidden max-h-full h-full font-mono")}>
         <div className={cn("absolute top-0 left-0 w-full h-fit p-2")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
             const line = screen[rowIndex] || []; // Use empty array if line doesn't exist

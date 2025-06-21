@@ -39,7 +39,16 @@ const createDemoElements = (): CanvasElement[] => {
         workingDir: '$HOME',
         lines: 5,
         cols: 10,
-    }, 1)
+    }, 1),
+    CustomTerminal.canvasElement({
+      kind: {
+        $type: 'wsl',
+        distribution: 'Ubuntu',
+        workingDirectory: '~'
+      },
+      lines: 5,
+      cols: 10,
+  }, 1)
     // new Terminal({
     //   kind: {
     //     $type: 'ssh',

@@ -115,6 +115,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
         {/* Custom Terminal Renderer */}
         <div className={cn("w-full h-full pointer-events-auto")}>
           <CustomTerminalRenderer
+            elementId={element.id}
             spec={spec}
             onTerminalReady={handleTerminalReady}
             onTerminalError={handleTerminalError}

@@ -317,6 +317,7 @@ pub struct TerminalState {
     alternate_screen: Option<Vec<Vec<LineItem>>>,
     parser_state: ParserState,
     escape_buffer: String,
+    scroll_offset: u16, // How many lines we're scrolled back from the bottom
 }
 
 #[derive(Debug, Clone)]
@@ -370,6 +371,7 @@ impl TerminalState {
             alternate_screen: None,
             parser_state: ParserState::Ground,
             escape_buffer: String::new(),
+            scroll_offset: 0,
         };
         
         // Ensure buffer is properly sized from the start
@@ -379,6 +381,11 @@ impl TerminalState {
 
     pub fn process_input(&mut self, data: &[u8]) -> Vec<TerminalEvent> {
         let mut events = Vec::new();
+        
+        // Reset scroll when new input comes in (return to live view)
+        if !data.is_empty() {
+            self.scroll_offset = 0;
+        }
         
         // Convert bytes to string, handling partial UTF-8 sequences
         let text = String::from_utf8_lossy(data);
@@ -818,16 +825,50 @@ impl TerminalState {
     fn get_screen_lines(&self) -> Vec<Vec<LineItem>> {
         let mut result = Vec::with_capacity(self.screen_rows as usize);
         
-        // Always return exactly screen_rows lines
-        for row in 0..self.screen_rows {
-            if let Some(line) = self.screen_buffer.get(row as usize) {
-                result.push(line.clone());
-            } else {
-                result.push(Vec::new());
+        if self.scroll_offset == 0 {
+            // Not scrolled - show current screen buffer
+            for row in 0..self.screen_rows {
+                if let Some(line) = self.screen_buffer.get(row as usize) {
+                    result.push(line.clone());
+                } else {
+                    result.push(Vec::new());
+                }
+            }
+        } else {
+            // Scrolled back - show combination of scrollback and screen buffer
+            let total_history_lines = self.scrollback_buffer.len();
+            let lines_from_scrollback = self.scroll_offset.min(total_history_lines as u16);
+            let lines_from_screen = self.screen_rows.saturating_sub(lines_from_scrollback);
+            
+            // Start from the appropriate position in scrollback
+            let scrollback_start = total_history_lines.saturating_sub(self.scroll_offset as usize);
+            
+            // Add lines from scrollback buffer
+            for i in 0..lines_from_scrollback {
+                let scrollback_idx = scrollback_start + i as usize;
+                if let Some(line) = self.scrollback_buffer.get(scrollback_idx) {
+                    result.push(line.clone());
+                } else {
+                    result.push(Vec::new());
+                }
+            }
+            
+            // Add lines from current screen buffer
+            for i in 0..lines_from_screen {
+                if let Some(line) = self.screen_buffer.get(i as usize) {
+                    result.push(line.clone());
+                } else {
+                    result.push(Vec::new());
+                }
             }
         }
         
-        // Assert that we always return the correct number of lines
+        // Ensure we always return exactly screen_rows lines
+        while result.len() < self.screen_rows as usize {
+            result.push(Vec::new());
+        }
+        result.truncate(self.screen_rows as usize);
+        
         debug_assert_eq!(result.len(), self.screen_rows as usize, 
             "Screen lines mismatch: expected {}, got {}", self.screen_rows, result.len());
         
@@ -881,6 +922,29 @@ impl TerminalState {
         // Final verification
         debug_assert_eq!(self.screen_buffer.len(), self.screen_rows as usize,
             "Screen buffer size verification failed: {} != {}", self.screen_buffer.len(), self.screen_rows);
+    }
+    
+    /// Scroll up in the scrollback buffer (view older content)
+    pub fn scroll_history_up(&mut self, lines: u16) -> Vec<TerminalEvent> {
+        let max_scroll = self.scrollback_buffer.len() as u16;
+        self.scroll_offset = (self.scroll_offset + lines).min(max_scroll);
+        
+        vec![TerminalEvent::ScreenUpdate {
+            screen: self.get_screen_lines(),
+            cursor_line: self.cursor_line,
+            cursor_col: self.cursor_col,
+        }]
+    }
+    
+    /// Scroll down in the scrollback buffer (towards current content)
+    pub fn scroll_history_down(&mut self, lines: u16) -> Vec<TerminalEvent> {
+        self.scroll_offset = self.scroll_offset.saturating_sub(lines);
+        
+        vec![TerminalEvent::ScreenUpdate {
+            screen: self.get_screen_lines(),
+            cursor_line: self.cursor_line,
+            cursor_col: self.cursor_col,
+        }]
     }
 }
 
@@ -980,10 +1044,26 @@ impl CustomTerminalManager {
     }
 
     pub fn send_scroll(&self, connection_id: &str, direction: ScrollDirection) -> Result<()> {
-        // Send scroll commands as ANSI sequences
-        match direction {
-            ScrollDirection::Up => self.send_raw_input(connection_id, "\x1b[5~"), // Page Up
-            ScrollDirection::Down => self.send_raw_input(connection_id, "\x1b[6~"), // Page Down
+        let mut connections = self.connections.lock().unwrap();
+        if let Some(connection) = connections.get_mut(connection_id) {
+            let events = {
+                let mut state = connection.terminal_state.lock().unwrap();
+                match direction {
+                    ScrollDirection::Up => state.scroll_history_up(3), // Scroll 3 lines at a time
+                    ScrollDirection::Down => state.scroll_history_down(3),
+                }
+            };
+            
+            // Emit the scroll events
+            for event in events {
+                if let Err(e) = connection.app_handle.emit_all(&format!("custom-terminal-event-{}", connection_id), &event) {
+                    eprintln!("Failed to emit scroll event: {}", e);
+                }
+            }
+            
+            Ok(())
+        } else {
+            Err(anyhow!("Terminal connection not found"))
         }
     }
 
