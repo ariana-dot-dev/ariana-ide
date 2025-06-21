@@ -8,6 +8,7 @@ import { State } from './state';
 import Onboarding from './Onboarding';
 import Repl from './Repl';
 import CanvasView from './CanvasView';
+import CustomTerminalExample from './canvas/CustomTerminalExample';
 
 
 
@@ -94,7 +95,10 @@ function App() {
                             </>)}
                         </div>
 
-                        <CanvasView />
+                        {/* <CanvasView /> */}
+                        <div className="p-6">
+                            <CustomTerminalExample/>
+                        </div>
 
                         <div className="flex-1 font-mono flex items-center justify-center ">
                             <Onboarding userEmail={userEmail} />

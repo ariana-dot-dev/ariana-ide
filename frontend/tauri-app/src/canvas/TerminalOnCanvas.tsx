@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { COLOR_VARS } from '../generated/colors';
+import { resolveColor } from '../utils/colors';
 import { motion, PanInfo } from 'framer-motion';
 import { Terminal as XTerm } from '@xterm/xterm';
 import type { IDisposable } from '@xterm/xterm';
@@ -60,33 +60,28 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 
     // Resolve CSS variables -> solid colors for xterm (it cannot understand CSS vars)
     const cssVars = getComputedStyle(document.documentElement);
-    const uglyPurple = '#ff00ff';
-    const resolveColor = (name: string) => {
-      const cssVal = cssVars.getPropertyValue(name).trim();
-      return cssVal || COLOR_VARS[name] || uglyPurple;
-    };
     const theme = {
-      background: resolveColor('--bg-500'),
-      foreground: resolveColor('--fg-500'),
-      cursor: resolveColor('--fg-900'),
-      selectionBackground: resolveColor('--fg-900'),
-      selectionForeground: resolveColor('--fg-200'),
-      black: resolveColor('--blackest'),
-      red: resolveColor('--negative-500'),
-      green: resolveColor('--positive-500'),
-      yellow: resolveColor('--fg-600'),
-      blue: resolveColor('--fg-600'),
-      magenta: resolveColor('--fg-600'),
-      cyan: resolveColor('--fg-600'),
-      white: resolveColor('--whitest'),
-      brightBlack: resolveColor('--fg-800'),
-      brightRed: resolveColor('--negative-500'),
-      brightGreen: resolveColor('--positive-500'),
-      brightYellow: resolveColor('--fg-200'),
-      brightBlue: resolveColor('--fg-200'),
-      brightMagenta: resolveColor('--fg-200'),
-      brightCyan: resolveColor('--fg-200'),
-      brightWhite: resolveColor('--fg-100'),
+      background: resolveColor('--bg-500', cssVars),
+      foreground: resolveColor('--fg-500', cssVars),
+      cursor: resolveColor('--fg-900', cssVars),
+      selectionBackground: resolveColor('--fg-900', cssVars),
+      selectionForeground: resolveColor('--fg-200', cssVars),
+      black: resolveColor('--blackest', cssVars),
+      red: resolveColor('--negative-500', cssVars),
+      green: resolveColor('--positive-500', cssVars),
+      yellow: resolveColor('--fg-600', cssVars),
+      blue: resolveColor('--fg-600', cssVars),
+      magenta: resolveColor('--fg-600', cssVars),
+      cyan: resolveColor('--fg-600', cssVars),
+      white: resolveColor('--whitest', cssVars),
+      brightBlack: resolveColor('--fg-800', cssVars),
+      brightRed: resolveColor('--negative-500', cssVars),
+      brightGreen: resolveColor('--positive-500', cssVars),
+      brightYellow: resolveColor('--fg-200', cssVars),
+      brightBlue: resolveColor('--fg-200', cssVars),
+      brightMagenta: resolveColor('--fg-200', cssVars),
+      brightCyan: resolveColor('--fg-200', cssVars),
+      brightWhite: resolveColor('--fg-100', cssVars),
     } as const;
 
     const xterm = new XTerm({

@@ -10,6 +10,21 @@ use tauri::State;
 mod terminal;
 use terminal::{TerminalManager, TerminalConfig};
 
+mod custom_terminal;
+mod custom_terminal_commands;
+use custom_terminal_commands::{
+    AppState,
+    custom_connect_terminal,
+    custom_reconnect_terminal,
+    custom_kill_terminal,
+    custom_send_input_lines,
+    custom_send_ctrl_c,
+    custom_send_ctrl_d,
+    custom_send_scroll_up,
+    custom_send_scroll_down,
+    custom_resize_terminal,
+};
+
 #[tauri::command]
 async fn create_terminal_connection(
     config: TerminalConfig,
@@ -75,17 +90,30 @@ async fn cleanup_dead_connections(
 
 fn main() {
     let terminal_manager = Arc::new(TerminalManager::new());
+    let custom_terminal_state = AppState::new();
 
     tauri::Builder::default()
         .manage(terminal_manager)
+        .manage(custom_terminal_state)
         .invoke_handler(tauri::generate_handler![
+            // Original terminal commands
             create_terminal_connection,
             send_terminal_data,
             resize_terminal,
             close_terminal_connection,
             get_available_terminal_types,
             validate_terminal_config,
-            cleanup_dead_connections
+            cleanup_dead_connections,
+            // New custom terminal commands
+            custom_connect_terminal,
+            custom_reconnect_terminal,
+            custom_kill_terminal,
+            custom_send_input_lines,
+            custom_send_ctrl_c,
+            custom_send_ctrl_d,
+            custom_send_scroll_up,
+            custom_send_scroll_down,
+            custom_resize_terminal
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
