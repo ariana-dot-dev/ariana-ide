@@ -96,13 +96,13 @@ function App() {
                         </div>
 
                         {/* <CanvasView /> */}
-                        <div className="p-6">
+                        <div className="h-full">
                             <CustomTerminalExample/>
                         </div>
 
                         <div className="flex-1 font-mono flex items-center justify-center ">
                             <Onboarding userEmail={userEmail} />
-                            <Repl />
+                            {/* <Repl /> */}
                         </div>
                     </div>
                 </div>

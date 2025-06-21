@@ -52,7 +52,7 @@ export interface LineItem {
 export type ScrollDirection = 'Up' | 'Down';
 
 export interface TerminalEvent {
-  type: 'newLines' | 'patch' | 'cursorMove' | 'scroll' | 'screenUpdate';
+  type: 'screenUpdate';
   lines?: LineItem[][];
   line?: number;
   col?: number;
