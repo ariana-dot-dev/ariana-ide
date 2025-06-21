@@ -138,17 +138,25 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 
     // Connect to terminal service
     const connectTerminal = async () => {
-      if (!xtermRef.current || terminal.isConnected) return;
+      if (!xtermRef.current) return;
 
+      // Reuse existing backend connection if still alive, otherwise create a new one
+      let connectionId = terminal.connectionId;
       try {
-        const connectionId = await TerminalService.createConnection(terminal.config, element.id);
-        terminal.setConnection(connectionId, true);
+        if (!terminal.isConnected || !connectionId) {
+          connectionId = await TerminalService.createConnection(terminal.config, element.id);
+          terminal.setConnection(connectionId, true);
+        }
+
         setIsConnected(true);
 
-        // Set up data handler - use disposable to prevent multiple handlers
+        // Ensure we do not attach duplicate data handler if component remounts quickly
+        dataDisposableRef.current?.dispose();
         const dataDisposable = xtermRef.current.onData(data => {
           if (terminal.isConnected) {
-            TerminalService.sendData(connectionId, data);
+            if (connectionId) {
+              TerminalService.sendData(connectionId, data);
+            }
           }
         });
         dataDisposableRef.current = dataDisposable;
@@ -179,6 +187,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
           }, 1000);
         };
 
+        // Re-register backend listeners (safe even if they already exist)
         TerminalService.onData(connectionId, handleData);
         TerminalService.onDisconnect(connectionId, handleDisconnect);
 
@@ -186,8 +195,8 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
         xtermRef.current.write(`\x1b[32mConnected to ${terminal.getConnectionString()}\x1b[0m\r\n`);
 
       } catch (error) {
-        console.error('Failed to connect terminal:', error);
-        xtermRef.current?.write(`\x1b[31mFailed to connect: ${error}\x1b[0m\r\n`);
+        console.error('Failed to set up terminal:', error);
+        xtermRef.current?.write(`\x1b[31mTerminal error: ${error}\x1b[0m\r\n`);
       }
     };
 
