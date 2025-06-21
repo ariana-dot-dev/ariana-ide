@@ -60,8 +60,6 @@ function App() {
         appWindow.isMaximized().then(setIsMaximized);
     }, []);
 
-
-
     const handleMinimize = () => appWindow.minimize();
     const handleMaximize = () => {
         if (isMaximized) {
@@ -82,7 +80,10 @@ function App() {
     return (
         <StateContext value={state}>
             <InterpreterContext value={interpreter}>
-                <div className={cn("relative font-mono h-screen w-screen bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden")}>
+                <div className={cn(
+                    "relative font-mono h-screen w-screen bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col overflow-hidden",
+                    isMaximized ? 'rounded-none' : 'rounded-lg'
+                )}>
                     <div className={cn("h-full w-full text-[var(--bg-200)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg")}>
                         {/* Custom Titlebar */}
                         <div 

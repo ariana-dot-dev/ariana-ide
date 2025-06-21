@@ -357,24 +357,28 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
     if (typeof color === 'string') {
       switch (color) {
-        case 'Default': return 'var(--fg-500)';
-        case 'Black': return 'var(--fg-800)';
-        case 'Red': return 'var(--negative-500)';
-        case 'Green': return 'var(--positive-500)';
-        case 'Yellow': return 'var(--fg-600)';
-        case 'Blue': return 'var(--fg-600)';
-        case 'Magenta': return 'var(--fg-600)';
-        case 'Cyan': return 'var(--fg-600)';
-        case 'White': return 'var(--fg-300)';
-        case 'BrightBlack': return 'var(--fg-400)';
-        case 'BrightRed': return 'var(--fg-400)';
-        case 'BrightGreen': return 'var(--fg-400)';
-        case 'BrightYellow': return 'var(--fg-400)';
-        case 'BrightBlue': return 'var(--fg-400)';
-        case 'BrightMagenta': return 'var(--fg-400)';
-        case 'BrightCyan': return 'var(--fg-400)';
-        case 'BrightWhite': return 'var(--fg-400)';
-        default: return '#ff00ff';
+        // Standard ANSI colors - better terminal-appropriate colors
+        case 'Default': return '#d4d4d4'; // Light gray for default text
+        case 'Black': return '#0c0c0c';   // True black
+        case 'Red': return '#cd3131';     // Proper red
+        case 'Green': return '#0dbc79';   // Proper green  
+        case 'Yellow': return '#e5e510';  // Proper yellow
+        case 'Blue': return '#2472c8';    // Proper blue
+        case 'Magenta': return '#bc3fbc'; // Proper magenta
+        case 'Cyan': return '#11a8cd';    // Proper cyan
+        case 'White': return '#e5e5e5';   // Light gray
+        
+        // Bright/Bold ANSI colors - more vivid versions
+        case 'BrightBlack': return '#666666';   // Gray
+        case 'BrightRed': return '#f14c4c';     // Bright red
+        case 'BrightGreen': return '#23d18b';   // Bright green
+        case 'BrightYellow': return '#f5f543';  // Bright yellow
+        case 'BrightBlue': return '#3b8eea';    // Bright blue
+        case 'BrightMagenta': return '#d670d6'; // Bright magenta
+        case 'BrightCyan': return '#29b8db';    // Bright cyan
+        case 'BrightWhite': return '#ffffff';   // Pure white
+        
+        default: return '#ff00ff'; // Magenta for unknown colors (debug)
       }
     }
 
@@ -389,33 +393,56 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
       return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     }
 
-    return '#cccccc';
+    return '#d4d4d4'; // Default to light gray instead of arbitrary color
   };
 
-  // Convert ANSI 256-color codes to hex
+  // Convert ANSI 256-color codes to hex - improved accuracy
   const ansi256ToHex = (colorCode: number): string => {
     if (colorCode < 16) {
-      // Standard colors (0-15)
+      // Standard colors (0-15) - use same colors as our string mapping for consistency
       const colors = [
-        '#000000', '#800000', '#008000', '#808000',
-        '#000080', '#800080', '#008080', '#c0c0c0',
-        '#808080', '#ff0000', '#00ff00', '#ffff00',
-        '#0000ff', '#ff00ff', '#00ffff', '#ffffff'
+        '#0c0c0c',   // 0: Black
+        '#cd3131',   // 1: Red
+        '#0dbc79',   // 2: Green  
+        '#e5e510',   // 3: Yellow
+        '#2472c8',   // 4: Blue
+        '#bc3fbc',   // 5: Magenta
+        '#11a8cd',   // 6: Cyan
+        '#e5e5e5',   // 7: White
+        '#666666',   // 8: Bright Black (Gray)
+        '#f14c4c',   // 9: Bright Red
+        '#23d18b',   // 10: Bright Green
+        '#f5f543',   // 11: Bright Yellow
+        '#3b8eea',   // 12: Bright Blue
+        '#d670d6',   // 13: Bright Magenta
+        '#29b8db',   // 14: Bright Cyan
+        '#ffffff'    // 15: Bright White
       ];
-      return colors[colorCode] || '#cccccc';
+      return colors[colorCode] || '#d4d4d4';
     } else if (colorCode < 232) {
-      // 216-color cube (16-231)
+      // 216-color cube (16-231) - more accurate color cube
       const n = colorCode - 16;
       const r = Math.floor(n / 36);
       const g = Math.floor((n % 36) / 6);
       const b = n % 6;
 
-      const convert = (val: number) => val === 0 ? 0 : 55 + val * 40;
-      return `#${convert(r).toString(16).padStart(2, '0')}${convert(g).toString(16).padStart(2, '0')}${convert(b).toString(16).padStart(2, '0')}`;
+      // More accurate ANSI color cube values
+      const convert = (val: number) => {
+        const values = [0, 95, 135, 175, 215, 255];
+        return values[val] || 0;
+      };
+      
+      const red = convert(r);
+      const green = convert(g);
+      const blue = convert(b);
+      
+      return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
     } else {
-      // Grayscale (232-255)
-      const gray = 8 + (colorCode - 232) * 10;
-      const hex = gray.toString(16).padStart(2, '0');
+      // Grayscale (232-255) - improved grayscale ramp
+      const level = colorCode - 232;
+      const gray = 8 + level * 10;
+      const clampedGray = Math.min(238, gray); // Cap at 238 for better contrast
+      const hex = clampedGray.toString(16).padStart(2, '0');
       return `#${hex}${hex}${hex}`;
     }
   };
@@ -470,7 +497,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           // Span before cursor (if any)
           if (textBeforeCursor.length > 0) {
             targetArray.push(
-              <span
+              <div
                 key={`${spanStartCol}-before`}
                 style={{
                   color: colorToCSS(currentItem.foreground_color),
@@ -479,17 +506,18 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                   fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                   textDecoration: currentItem.is_underline ? 'underline' : 'none',
                   whiteSpace: 'pre',
+                  width: `${textBeforeCursor.length * 7.35}px`,
                   boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
                 }}
               >
                 {textBeforeCursor}
-              </span>
+              </div>
             );
           }
 
           // Span at cursor position
           targetArray.push(
-            <span
+            <div
               key={`${spanStartCol}-cursor`}
               style={{
                 color: colorToCSS(currentItem.foreground_color),
@@ -498,17 +526,18 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
                 whiteSpace: 'pre',
+                width: `${textAtCursor.length * 7.35}px`,
                 boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
               }}
             >
               {textAtCursor}
-            </span>
+            </div>
           );
 
           // Span after cursor (if any)
           if (textAfterCursor.length > 0) {
             targetArray.push(
-              <span
+              <div
                 key={`${spanStartCol}-after`}
                 style={{
                   color: colorToCSS(currentItem.foreground_color),
@@ -517,16 +546,17 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                   fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                   textDecoration: currentItem.is_underline ? 'underline' : 'none',
                   whiteSpace: 'pre',
+                  width: `${textAfterCursor.length * 7.35}px`,
                   boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
                 }}
               >
                 {textAfterCursor}
-              </span>
+              </div>
             );
           }
         } else {
           targetArray.push(
-            <span
+            <div
               key={spanStartCol}
               style={{
                 color: colorToCSS(currentItem.foreground_color),
@@ -535,11 +565,12 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
                 whiteSpace: 'pre',
+                width: `${combinedText.length * 7.35}px`,
                 boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
               }}
             >
               {combinedText}
-            </span>
+            </div>
           );
         }
 
@@ -570,7 +601,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     if (line.length > 0 && lineIndex === cursorPosition.line && currentCol <= cursorPosition.col) {
       const lastItem = line[line.length - 1];
       lineAfterCursor.push(
-        <span
+        <div
           key={currentCol}
           style={{
             color: colorToCSS(lastItem.foreground_color),
@@ -579,19 +610,20 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
             fontStyle: lastItem.is_italic ? 'italic' : 'normal',
             textDecoration: lastItem.is_underline ? 'underline' : 'none',
             whiteSpace: 'pre',
+            width: '8px',
             boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
           }}
         >
           {' '}
-        </span>
+        </div>
       );
     }
 
     const isAtCursorLine = lineIndex === cursorPosition.line;
     return (
-      <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap min-h-4")}
+      <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap min-h-4 flex")}
         style={{ 
-          width: `${totalCols * 8}px`,
+          width: `fit`,
           boxShadow: `inset 0 -0.5px 0 var(--fg-800-30)`,
         }}>
         {lineBeforeCursor}

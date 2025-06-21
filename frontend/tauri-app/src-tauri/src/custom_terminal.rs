@@ -413,6 +413,7 @@ impl TerminalState {
             ParserState::Ground => {
                 match ch {
                     '\x1b' => {
+                        eprintln!("ESC received, entering escape state");
                         self.parser_state = ParserState::Escape;
                         self.escape_buffer.clear();
                     },
@@ -446,27 +447,33 @@ impl TerminalState {
                 }
             },
             ParserState::Escape => {
+                eprintln!("In escape state, received: '{}'", ch);
                 match ch {
                     '[' => {
+                        eprintln!("CSI sequence starting");
                         self.parser_state = ParserState::CSI;
                         self.escape_buffer.clear();
                     },
                     ']' => {
+                        eprintln!("OSC sequence starting");
                         self.parser_state = ParserState::OSC;
                         self.escape_buffer.clear();
                     },
                     '7' => {
                         // Save cursor position (DECSC)
+                        eprintln!("Save cursor (ESC 7)");
                         self.save_cursor();
                         self.parser_state = ParserState::Ground;
                     },
                     '8' => {
                         // Restore cursor position (DECRC)
+                        eprintln!("Restore cursor (ESC 8)");
                         self.restore_cursor();
                         self.parser_state = ParserState::Ground;
                     },
                     _ => {
                         // Unknown escape sequence, go back to ground
+                        eprintln!("Unknown escape sequence: ESC {}", ch);
                         self.parser_state = ParserState::Ground;
                     }
                 }
@@ -475,12 +482,14 @@ impl TerminalState {
                 if ch.is_ascii_alphabetic() {
                     // End of CSI sequence
                     let buffer = self.escape_buffer.clone();
+                    eprintln!("Complete CSI sequence: ESC[{}{}", buffer, ch);
                     self.handle_csi_sequence(&buffer, ch);
                     self.parser_state = ParserState::Ground;
                     self.escape_buffer.clear();
                 } else {
                     // Accumulate parameters
                     self.escape_buffer.push(ch);
+                    eprintln!("CSI buffer now: '{}'", self.escape_buffer);
                 }
             },
             ParserState::OSC => {
@@ -499,18 +508,27 @@ impl TerminalState {
     
     fn handle_csi_sequence(&mut self, params: &str, cmd: char) {
         let mut is_dec_private = false;
-        let params_str = if params.starts_with('?') {
-            is_dec_private = true;
-            &params[1..]
-        } else {
-            params
-        };
+        let mut params_str = params;
         
+        // Handle DEC private mode marker
+        if params_str.starts_with('?') {
+            is_dec_private = true;
+            params_str = &params_str[1..];
+        }
+        
+        // Parse parameters, handling empty strings and malformed sequences
         let params: Vec<u16> = if params_str.is_empty() {
             vec![]
         } else {
             params_str.split(';')
-                .filter_map(|s| s.parse().ok())
+                .filter_map(|s| {
+                    let trimmed = s.trim();
+                    if trimmed.is_empty() {
+                        Some(0) // Default parameter
+                    } else {
+                        trimmed.parse().ok()
+                    }
+                })
                 .collect()
         };
         
@@ -527,12 +545,47 @@ impl TerminalState {
                 // Set mode
                 for &param in params {
                     match param {
-                        1049 => {
-                            // Enable alternate screen buffer
+                        1 => {
+                            // DECCKM - Cursor Keys Mode (application mode)
+                            // VIM uses this for arrow keys
+                            eprintln!("Cursor keys mode: application");
+                        },
+                        5 => {
+                            // DECSCNM - Screen mode (reverse video)
+                            eprintln!("Reverse video mode enabled");
+                        },
+                        7 => {
+                            // DECAWM - Auto-wrap Mode
+                            // Enable line wrapping
+                        },
+                        12 => {
+                            // Start blinking cursor
+                        },
+                        25 => {
+                            // DECTCEM - Show cursor
+                            eprintln!("CURSOR SHOWN");
+                        },
+                        47 | 1047 => {
+                            // Use alternate screen buffer (simpler version)
                             self.alternate_screen = Some(self.screen_buffer.clone());
                             self.clear_screen();
                         },
-                        _ => {} // Ignore other modes
+                        1049 => {
+                            // Enable alternate screen buffer + save cursor
+                            self.alternate_screen = Some(self.screen_buffer.clone());
+                            self.save_cursor();
+                            self.clear_screen();
+                        },
+                        1004 => {
+                            // Send FocusIn/FocusOut events - VIM uses this for cursor shape
+                            eprintln!("Enabling focus events - should send ESC[I on focus in, ESC[O on focus out");
+                        },
+                        2004 => {
+                            // Bracketed paste mode (ignore for now)
+                        },
+                        _ => {
+                            eprintln!("Unknown DEC private mode set: {}", param);
+                        }
                     }
                 }
             },
@@ -540,17 +593,93 @@ impl TerminalState {
                 // Reset mode
                 for &param in params {
                     match param {
-                        1049 => {
-                            // Disable alternate screen buffer
+                        1 => {
+                            // DECCKM - Cursor Keys Mode (normal mode)
+                            eprintln!("Cursor keys mode: normal");
+                        },
+                        5 => {
+                            // DECSCNM - Screen mode (normal video)
+                            eprintln!("Reverse video mode disabled");
+                        },
+                        7 => {
+                            // DECAWM - Auto-wrap Mode
+                            // Disable line wrapping
+                        },
+                        12 => {
+                            // Stop blinking cursor
+                        },
+                        25 => {
+                            // DECTCEM - Hide cursor
+                            eprintln!("CURSOR HIDDEN");
+                        },
+                        47 | 1047 => {
+                            // Use normal screen buffer (simpler version)
                             if let Some(main_screen) = self.alternate_screen.take() {
                                 self.screen_buffer = main_screen;
                             }
                         },
-                        _ => {} // Ignore other modes
+                        1049 => {
+                            // Disable alternate screen buffer + restore cursor
+                            if let Some(main_screen) = self.alternate_screen.take() {
+                                self.screen_buffer = main_screen;
+                                self.restore_cursor();
+                            }
+                        },
+                        1004 => {
+                            // Disable FocusIn/FocusOut events
+                            eprintln!("Disabling focus events");
+                        },
+                        2004 => {
+                            // Disable bracketed paste mode
+                        },
+                        _ => {
+                            eprintln!("Unknown DEC private mode reset: {}", param);
+                        }
                     }
                 }
             },
-            _ => {} // Ignore other DEC commands
+            'n' => {
+                // Device Status Report (DSR) - VIM uses this to query terminal capabilities
+                let param = params.get(0).copied().unwrap_or(0);
+                match param {
+                    5 => eprintln!("Status report request - should respond with ESC[0n (terminal OK)"),
+                    6 => eprintln!("Cursor position report request - should respond with ESC[{};{}R", self.cursor_line + 1, self.cursor_col + 1),
+                    _ => eprintln!("Unknown DSR request: {}", param),
+                }
+            },
+            'c' => {
+                // Device Attributes - VIM queries terminal capabilities
+                if params.is_empty() || params[0] == 0 {
+                    eprintln!("Primary device attributes request - should respond with terminal type");
+                } else {
+                    eprintln!("Secondary device attributes request");
+                }
+            },
+            'q' => {
+                // DECSCUSR - Set cursor style (VIM uses this extensively)
+                let style = params.get(0).copied().unwrap_or(0);
+                match style {
+                    0 => eprintln!("Reset cursor to default"),
+                    1 => eprintln!("Set cursor to blinking block"),
+                    2 => eprintln!("Set cursor to steady block"),
+                    3 => eprintln!("Set cursor to blinking underline"),
+                    4 => eprintln!("Set cursor to steady underline"),
+                    5 => eprintln!("Set cursor to blinking bar"),
+                    6 => eprintln!("Set cursor to steady bar"),
+                    _ => eprintln!("Unknown cursor style: {}", style),
+                }
+            },
+            'p' => {
+                // Various DEC private mode controls
+                eprintln!("DEC private mode 'p' command with params: {:?}", params);
+            },
+            'm' => {
+                // DEC private mode SGR-like sequences
+                eprintln!("DEC private mode 'm' command with params: {:?}", params);
+            },
+            _ => {
+                eprintln!("Unknown DEC private command '{}' with params: {:?}", cmd, params);
+            }
         }
     }
     
@@ -559,29 +688,58 @@ impl TerminalState {
             'A' => {
                 // Cursor up
                 let amount = params.get(0).copied().unwrap_or(1);
+                let old_line = self.cursor_line;
                 self.cursor_line = self.cursor_line.saturating_sub(amount);
+                eprintln!("Cursor up {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
             },
             'B' => {
                 // Cursor down
                 let amount = params.get(0).copied().unwrap_or(1);
+                let old_line = self.cursor_line;
                 self.cursor_line = (self.cursor_line + amount).min(self.screen_rows.saturating_sub(1));
+                eprintln!("Cursor down {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
             },
             'C' => {
                 // Cursor right
                 let amount = params.get(0).copied().unwrap_or(1);
+                let old_col = self.cursor_col;
                 self.cursor_col = (self.cursor_col + amount).min(self.screen_cols.saturating_sub(1));
+                eprintln!("Cursor right {} from {}:{} to {}:{}", amount, self.cursor_line, old_col, self.cursor_line, self.cursor_col);
             },
             'D' => {
                 // Cursor left
                 let amount = params.get(0).copied().unwrap_or(1);
+                let old_col = self.cursor_col;
                 self.cursor_col = self.cursor_col.saturating_sub(amount);
+                eprintln!("Cursor left {} from {}:{} to {}:{}", amount, self.cursor_line, old_col, self.cursor_line, self.cursor_col);
+            },
+            'E' => {
+                // Cursor next line
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.cursor_line = (self.cursor_line + amount).min(self.screen_rows.saturating_sub(1));
+                self.cursor_col = 0;
+            },
+            'F' => {
+                // Cursor previous line
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.cursor_line = self.cursor_line.saturating_sub(amount);
+                self.cursor_col = 0;
+            },
+            'G' => {
+                // Cursor horizontal absolute
+                let col = params.get(0).copied().unwrap_or(1).saturating_sub(1);
+                self.cursor_col = col.min(self.screen_cols.saturating_sub(1));
             },
             'H' | 'f' => {
                 // Cursor position (1-indexed)
                 let line = params.get(0).copied().unwrap_or(1).saturating_sub(1);
                 let col = params.get(1).copied().unwrap_or(1).saturating_sub(1);
+                let old_line = self.cursor_line;
+                let old_col = self.cursor_col;
                 self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
                 self.cursor_col = col.min(self.screen_cols.saturating_sub(1));
+                eprintln!("Cursor position set from {}:{} to {}:{} (requested: {}:{})", 
+                    old_line, old_col, self.cursor_line, self.cursor_col, line, col);
             },
             'J' => {
                 // Clear screen
@@ -607,6 +765,42 @@ impl TerminalState {
                     _ => {}
                 }
             },
+            'L' => {
+                // Insert lines
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.insert_lines_at_cursor(amount);
+            },
+            'M' => {
+                // Delete lines
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.delete_lines_at_cursor(amount);
+            },
+            'P' => {
+                // Delete characters
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.delete_chars_at_cursor(amount);
+            },
+            'S' => {
+                // Scroll up
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.scroll_up(amount);
+            },
+            'T' => {
+                // Scroll down
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.scroll_down_terminal(amount);
+            },
+            'X' => {
+                // Erase characters
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.erase_chars_at_cursor(amount);
+            },
+            'r' => {
+                // Set scrolling region
+                let top = params.get(0).copied().unwrap_or(1).saturating_sub(1);
+                let bottom = params.get(1).copied().unwrap_or(self.screen_rows).saturating_sub(1);
+                self.set_scroll_region(top, bottom);
+            },
             's' => {
                 // Save cursor position
                 self.save_cursor();
@@ -615,11 +809,68 @@ impl TerminalState {
                 // Restore cursor position
                 self.restore_cursor();
             },
+            'd' => {
+                // Line position absolute
+                let line = params.get(0).copied().unwrap_or(1).saturating_sub(1);
+                self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
+            },
+            't' => {
+                // Window manipulation sequences - VIM uses these extensively
+                match params.get(0).copied().unwrap_or(0) {
+                    8 => {
+                        // Resize window to given size in characters
+                        if params.len() >= 3 {
+                            let rows = params[1];
+                            let cols = params[2];
+                            // Actually resize the terminal
+                            self.resize(rows, cols);
+                        }
+                    },
+                    18 => {
+                        // Report terminal size in characters - VIM expects ESC[8;rows;colst response
+                        // TODO: Send response back to terminal
+                        eprintln!("Terminal size request: should respond with ESC[8;{};{}t", self.screen_rows, self.screen_cols);
+                    },
+                    19 => {
+                        // Report screen size in characters
+                        eprintln!("Screen size request: should respond with ESC[9;{};{}t", self.screen_rows, self.screen_cols);
+                    },
+                    21 => {
+                        // Report window title
+                        eprintln!("Window title request: should respond with title");
+                    },
+                    22 => {
+                        // Push window title onto stack
+                        if params.len() >= 2 {
+                            let mode = params[1];
+                            eprintln!("Push title mode {}", mode);
+                        }
+                    },
+                    23 => {
+                        // Pop window title from stack
+                        if params.len() >= 2 {
+                            let mode = params[1];
+                            eprintln!("Pop title mode {}", mode);
+                        }
+                    },
+                    _ => {
+                        eprintln!("Unknown window manipulation: ESC[{}t", 
+                            params.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(";"));
+                    }
+                }
+            },
             'm' => {
                 // SGR - Select Graphic Rendition
                 self.handle_sgr_sequence(params);
             },
-            _ => {} // Ignore unknown sequences
+            _ => {
+                // Log unknown sequences for debugging
+                eprintln!("Unknown CSI sequence: {}[{}]{}", 
+                    "\x1b", 
+                    params.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(";"),
+                    cmd
+                );
+            }
         }
     }
     
@@ -690,6 +941,11 @@ impl TerminalState {
     
     fn write_char_at_cursor(&mut self, ch: char) {
         if self.cursor_line < self.screen_rows {
+            // Debug output for important characters
+            if ch != ' ' && !ch.is_control() {
+                eprintln!("Writing '{}' at {}:{}", ch, self.cursor_line, self.cursor_col);
+            }
+            
             // Ensure the line exists
             while self.screen_buffer.len() <= self.cursor_line as usize {
                 self.screen_buffer.push(Vec::new());
@@ -708,6 +964,9 @@ impl TerminalState {
             if self.cursor_col < self.screen_cols {
                 line[self.cursor_col as usize] = char_item;
             }
+        } else {
+            eprintln!("WARNING: Trying to write '{}' at invalid line {}:{} (screen_rows: {})", 
+                ch, self.cursor_line, self.cursor_col, self.screen_rows);
         }
     }
     
@@ -922,6 +1181,71 @@ impl TerminalState {
         // Final verification
         debug_assert_eq!(self.screen_buffer.len(), self.screen_rows as usize,
             "Screen buffer size verification failed: {} != {}", self.screen_buffer.len(), self.screen_rows);
+    }
+
+    // Additional ANSI sequence implementations
+    fn insert_lines_at_cursor(&mut self, amount: u16) {
+        let current_line = self.cursor_line as usize;
+        for _ in 0..amount {
+            if current_line < self.screen_buffer.len() {
+                self.screen_buffer.insert(current_line, Vec::new());
+                if self.screen_buffer.len() > self.screen_rows as usize {
+                    self.screen_buffer.pop();
+                }
+            }
+        }
+    }
+
+    fn delete_lines_at_cursor(&mut self, amount: u16) {
+        let current_line = self.cursor_line as usize;
+        for _ in 0..amount {
+            if current_line < self.screen_buffer.len() {
+                self.screen_buffer.remove(current_line);
+                self.screen_buffer.push(Vec::new());
+            }
+        }
+    }
+
+    fn delete_chars_at_cursor(&mut self, amount: u16) {
+        if let Some(line) = self.screen_buffer.get_mut(self.cursor_line as usize) {
+            let start_col = self.cursor_col as usize;
+            let end_col = (start_col + amount as usize).min(line.len());
+            if start_col < line.len() {
+                line.drain(start_col..end_col);
+            }
+        }
+    }
+
+    fn scroll_down_terminal(&mut self, amount: u16) {
+        for _ in 0..amount {
+            if !self.scrollback_buffer.is_empty() {
+                let restored_line = self.scrollback_buffer.pop().unwrap_or_default();
+                self.screen_buffer.insert(0, restored_line);
+                if self.screen_buffer.len() > self.screen_rows as usize {
+                    self.screen_buffer.pop();
+                }
+            }
+        }
+    }
+
+    fn erase_chars_at_cursor(&mut self, amount: u16) {
+        let space_item = self.create_line_item(" ".to_string());
+        if let Some(line) = self.screen_buffer.get_mut(self.cursor_line as usize) {
+            let start_col = self.cursor_col as usize;
+            let end_col = (start_col + amount as usize).min(line.len());
+            
+            // Replace characters with spaces
+            for i in start_col..end_col {
+                if i < line.len() {
+                    line[i] = space_item.clone();
+                }
+            }
+        }
+    }
+
+    fn set_scroll_region(&mut self, _top: u16, _bottom: u16) {
+        // TODO: Implement scroll region support
+        // For now, just ignore - this would require more complex buffer management
     }
     
     /// Scroll up in the scrollback buffer (view older content)
