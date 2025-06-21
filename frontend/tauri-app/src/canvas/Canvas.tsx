@@ -6,6 +6,7 @@ import { Rectangle } from './Rectangle';
 import { Terminal, TerminalConfig } from './Terminal';
 import RectangleOnCanvas from './RectangleOnCanvas';
 import TerminalOnCanvas from './TerminalOnCanvas';
+import CustomTerminalOnCanvas from './CustomTerminalOnCanvas';
 import { cn } from '../utils';
 
 interface CanvasProps {
@@ -195,8 +196,6 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.1, onElem
     onElementsChange([...elements]);
   }, [elements, onElementsChange]);
 
-  const sortedIds = layouts.map(layout => layout.element.id).sort((a, b) => a.localeCompare(b));
-
   return (
     <div className={cn("flex w-full h-full p-2")}>
       <div className={cn("relative w-full h-full rounded-md overflow-hidden")}>
@@ -231,6 +230,21 @@ const Canvas: React.FC<CanvasProps> = ({ elements, stabilityWeight = 0.1, onElem
                     console.log("No drag")
                   }}
                   onTerminalUpdate={handleTerminalUpdate}
+                  isDragTarget={layout.element === dragTarget}
+                  isDragging={layout.element === draggedElement}
+                />
+              );
+            } else if ("customTerminal" in layout.element.kind) {
+              return (
+                <CustomTerminalOnCanvas
+                  key={`${layout.element.id}`}
+                  layout={layout}
+                  spec={layout.element.kind.customTerminal.spec}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDrag={layout.element === draggedElement ? handleDrag : () => {
+                    console.log("No drag")
+                  }}
                   isDragTarget={layout.element === dragTarget}
                   isDragging={layout.element === draggedElement}
                 />

@@ -178,37 +178,37 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   }, [terminalId, isConnected, sendRawInput]);
 
   // Handle wheel events for scrolling
-  // const handleWheel = useCallback(async (event: React.WheelEvent) => {
-  //   if (!terminalId || !isConnected) return;
+  const handleWheel = useCallback(async (event: React.WheelEvent) => {
+    if (!terminalId || !isConnected) return;
 
-  //   // Use Page Up/Down for better scrolling behavior
-  //   const lines = Math.ceil(Math.abs(event.deltaY) / 120); // Adjust sensitivity
-  //   try {
-  //     if (event.deltaY > 0) {
-  //       // Scroll down - send Page Down
-  //       for (let i = 0; i < lines; i++) {
-  //         await sendRawInput('\x1b[6~'); // Page Down
-  //       }
-  //     } else {
-  //       // Scroll up - send Page Up
-  //       for (let i = 0; i < lines; i++) {
-  //         await sendRawInput('\x1b[5~'); // Page Up
-  //       }
-  //     }
-  //   } catch (err) {
-  //     console.error('Error handling scroll:', err);
-  //   }
+    // Use Page Up/Down for better scrolling behavior
+    const lines = Math.ceil(Math.abs(event.deltaY) / 120); // Adjust sensitivity
+    try {
+      if (event.deltaY > 0) {
+        // Scroll down - send Page Down
+        for (let i = 0; i < lines; i++) {
+          await sendRawInput('\x1b[6~'); // Page Down
+        }
+      } else {
+        // Scroll up - send Page Up
+        for (let i = 0; i < lines; i++) {
+          await sendRawInput('\x1b[5~'); // Page Up
+        }
+      }
+    } catch (err) {
+      console.error('Error handling scroll:', err);
+    }
 
-  //   event.preventDefault();
-  // }, [terminalId, isConnected, sendRawInput]);
+    event.preventDefault();
+  }, [terminalId, isConnected, sendRawInput]);
 
   const handleResize = useCallback(async () => {
     if (!terminalId || !terminalInnerRef.current) return;
 
     const containerRect = terminalInnerRef.current.getBoundingClientRect();
 
-    const charWidth = 8.13;
-    const charHeight = 16.7;
+    const charWidth = 8.2;
+    const charHeight = 17;
 
     const cols = Math.max(1, Math.floor(containerRect.width / charWidth));
     const lines = Math.max(1, Math.floor(containerRect.height / charHeight));
@@ -247,24 +247,24 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
     if (typeof color === 'string') {
       switch (color) {
-        case 'Default': return ''; // Let CSS handle default color
-        case 'Black': return '#000000';
-        case 'Red': return '#cc0000';
-        case 'Green': return '#00cc00';
-        case 'Yellow': return '#cccc00';
-        case 'Blue': return '#0000cc';
-        case 'Magenta': return '#cc00cc';
-        case 'Cyan': return '#00cccc';
-        case 'White': return '#cccccc';
-        case 'BrightBlack': return '#555555';
-        case 'BrightRed': return '#ff5555';
-        case 'BrightGreen': return '#55ff55';
-        case 'BrightYellow': return '#ffff55';
-        case 'BrightBlue': return '#5555ff';
-        case 'BrightMagenta': return '#ff55ff';
-        case 'BrightCyan': return '#55ffff';
-        case 'BrightWhite': return '#ffffff';
-        default: return '#cccccc';
+        case 'Default': return 'var(--fg-500)';
+        case 'Black': return 'var(--fg-800)';
+        case 'Red': return 'var(--negative-500)';
+        case 'Green': return 'var(--positive-500)';
+        case 'Yellow': return 'var(--fg-600)';
+        case 'Blue': return 'var(--fg-600)';
+        case 'Magenta': return 'var(--fg-600)';
+        case 'Cyan': return 'var(--fg-600)';
+        case 'White': return 'var(--fg-300)';
+        case 'BrightBlack': return 'var(--fg-400)';
+        case 'BrightRed': return 'var(--fg-400)';
+        case 'BrightGreen': return 'var(--fg-400)';
+        case 'BrightYellow': return 'var(--fg-400)';
+        case 'BrightBlue': return 'var(--fg-400)';
+        case 'BrightMagenta': return 'var(--fg-400)';
+        case 'BrightCyan': return 'var(--fg-400)';
+        case 'BrightWhite': return 'var(--fg-400)';
+        default: return '#ff00ff';
       }
     }
 
@@ -311,25 +311,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   };
 
   const renderScreenLine = (line: LineItem[], lineIndex: number, totalCols: number) => {
-    const isCursorLine = lineIndex === cursorPosition.line;
-
-    // Create a grid mapping for this line
-    // const grid: (LineItem | null | 'skip')[] = new Array(totalCols).fill(null);
-
-    // // Fill the grid with LineItems, accounting for multi-width characters
-    // let currentCol = 0;
-    // for (const item of line) {
-    //   if (currentCol >= totalCols) break; // Don't overflow the line
-
-    //   grid[currentCol] = item;
-    //   // Skip additional columns for multi-width characters
-    //   const itemWidth = Math.max(1, item.width || 1);
-    //   for (let i = 1; i < itemWidth && currentCol + i < totalCols; i++) {
-    //     grid[currentCol + i] = 'skip';
-    //   }
-    //   currentCol += itemWidth;
-    // }
-
     let lineBeforeCursor: React.ReactNode[] = []
     let lineAfterCursor: React.ReactNode[] = []
     let currentCol = 0
@@ -349,7 +330,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         lineAfterCursor.push((
           <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
             color: colorToCSS(item.foreground_color),
-            backgroundColor: currentCol == cursorPosition.col && lineIndex == cursorPosition.line ? 'white' : colorToCSS(item.background_color),
+            backgroundColor: currentCol == cursorPosition.col && lineIndex == cursorPosition.line ? 'var(--whitest)' : colorToCSS(item.background_color),
             fontWeight: item.is_bold ? 'bold' : 'normal',
             fontStyle: item.is_italic ? 'italic' : 'normal',
             textDecoration: item.is_underline ? 'underline' : 'none',
@@ -362,7 +343,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         lineAfterCursor.push((
           <span key={currentCol} className={cn('border-r border-[var(--fg-300)]/20')} style={{
             color: colorToCSS(item.foreground_color),
-            backgroundColor: 'white',
+            backgroundColor: 'var(--whitest)',
             fontWeight: item.is_bold ? 'bold' : 'normal',
             fontStyle: item.is_italic ? 'italic' : 'normal',
             textDecoration: item.is_underline ? 'underline' : 'none',
@@ -397,11 +378,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     <div
       ref={terminalRef}
       className={cn(
-        "bg-[var(--bg-800)] rounded-lg text-[var(--fg-50)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
+        "bg-[var(--bg-900)] rounded-lg text-[var(--fg-50)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
       )}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      // onWheel={handleWheel}
+      onWheel={handleWheel}
       onClick={() => terminalRef.current?.focus()}
     >
       <div className={cn("mb-2 text-xs text-[var(--fg-400)] flex justify-between items-center")}>
@@ -437,8 +418,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         </div>
       </div>
 
-      <div ref={terminalInnerRef} className={cn("terminal-screen relative border border-[var(--bg-700)] rounded bg-[var(--bg-950)] overflow-hidden max-h-full h-full font-mono")}>
-        <div className={cn("absolute top-0 left-0 w-full h-fit p-2 bg-[var(--bg-200)]/10")}>
+      <div ref={terminalInnerRef} className={cn("terminal-screen relative border border-[var(--bg-700)] rounded bg-[var(--blackest)] overflow-hidden max-h-full h-full font-mono")}>
+        <div className={cn("absolute top-0 left-0 w-full h-fit p-2")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
             const line = screen[rowIndex] || []; // Use empty array if line doesn't exist
             return renderScreenLine(line, rowIndex, terminalDimensions.cols);

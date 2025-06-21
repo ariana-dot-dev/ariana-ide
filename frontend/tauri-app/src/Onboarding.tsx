@@ -1,5 +1,3 @@
-import { CancelSquareIcon } from "@hugeicons-pro/core-bulk-rounded";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useContext, useEffect, useState } from "react";
 import { StateContext } from "./App";
 import { InterpreterContext } from "./App";
@@ -28,8 +26,8 @@ const Onboarding = ({ userEmail }: { userEmail: string }) => {
                     await interpreter?.tryRunInstruction("Onboarding.hide()");
                 }}
             >
-                <div className={cn("group-hover/closebutton:opacity-100 opacity-50")}>
-                    <HugeiconsIcon icon={CancelSquareIcon} />
+                <div className={cn("group-hover/closebutton:opacity-100 opacity-50 text-xl")}>
+                    ✕
                 </div>
             </button>
             <div className={cn("flex flex-col items-center gap-0.5")}>

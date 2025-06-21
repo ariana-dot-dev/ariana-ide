@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Canvas from './canvas/Canvas';
 import { Rectangle } from './canvas/Rectangle';
 import { Terminal } from './canvas/Terminal';
+import { CustomTerminal } from './canvas/CustomTerminal';
 import { CanvasElement, SizeTarget, AreaTarget } from './canvas/types';
 import { cn } from './utils';
 
@@ -9,28 +10,36 @@ import { cn } from './utils';
 const createDemoElements = (): CanvasElement[] => {
   return [
     Rectangle.canvasElement({ size: 'large', aspectRatio: 1/1, area: 'center' }, 1),
-    Terminal.canvasElement({
-        kind: { 
+    // Terminal.canvasElement({
+    //     kind: { 
+    //       $type: 'git-bash',
+    //       workingDirectory: 'C:\\Users\\mr003\\riana'
+    //     },
+    //     environment: {},
+    //     shellCommand: '',
+    //     colorScheme: 'default',
+    //     fontSize: 14,
+    //     fontFamily: 'Space Mono'
+    // }, 1),
+    // Terminal.canvasElement({
+    //   kind: { 
+    //     $type: 'wsl',
+    //     distribution: 'Ubuntu'
+    //   },
+    //   environment: {},
+    //   shellCommand: '',
+    //   colorScheme: 'default',
+    //   fontSize: 14,
+    //   fontFamily: 'Space Mono'
+    // }, 1),<
+    CustomTerminal.canvasElement({
+        kind: {
           $type: 'git-bash',
-          workingDirectory: 'C:\\Users\\mr003\\riana'
         },
-        environment: {},
-        shellCommand: '',
-        colorScheme: 'default',
-        fontSize: 14,
-        fontFamily: 'Space Mono'
-    }, 1),
-    Terminal.canvasElement({
-      kind: { 
-        $type: 'wsl',
-        distribution: 'Ubuntu'
-      },
-      environment: {},
-      shellCommand: '',
-      colorScheme: 'default',
-      fontSize: 14,
-      fontFamily: 'Space Mono'
-  }, 1)
+        workingDir: '$HOME',
+        lines: 5,
+        cols: 10,
+    }, 1)
     // new Terminal({
     //   kind: {
     //     $type: 'ssh',

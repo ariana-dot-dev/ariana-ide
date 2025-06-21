@@ -1,5 +1,6 @@
 import { Rectangle } from "./Rectangle";
 import { Terminal } from "./Terminal";
+import { CustomTerminal } from "./CustomTerminal";
 
 export type SizeTarget = 'small' | 'medium' | 'large';
 export type AreaTarget = 'center' | 'left' | 'top' | 'right' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -27,10 +28,12 @@ export interface ElementLayout {
 
 export type CanvasElementKind = 
   | RectangleKind
-  | TerminalKind;
+  | TerminalKind
+  | CustomTerminalKind;
 
 export type RectangleKind = { rectangle: Rectangle };
 export type TerminalKind = { terminal: Terminal };
+export type CustomTerminalKind = { customTerminal: CustomTerminal };
 
 export class CanvasElement {
   public weight: number;
@@ -48,6 +51,8 @@ export class CanvasElement {
       return this.kind.rectangle.targets();
     } else if ("terminal" in this.kind) {
       return this.kind.terminal.targets();
+    } else if ("customTerminal" in this.kind) {
+      return this.kind.customTerminal.targets();
     }
     throw new Error("Invalid kind");
   }

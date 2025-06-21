@@ -25,8 +25,8 @@ from typing import Dict, Tuple
 # Configuration – base colours expressed in 6-digit sRGB hex
 # ---------------------------------------------------------------------------
 BASE_COLOURS: Dict[str, str] = {
-    "--fg-500": "#1C398E",
-    "--bg-500": "#D5D9FF",  # ~ oklch(82.8% 0.111 230.318)
+    "--fg-500": "#00bcff",
+    "--bg-500": "#51a2ff",  # ~ oklch(82.8% 0.111 230.318)
     "--whitest": "#ecfeff",
     "--blackest": "#1e1a4d",
     "--positive-500": "#30D48A",  # green

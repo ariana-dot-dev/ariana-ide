@@ -8,7 +8,6 @@ import { State } from './state';
 import Onboarding from './Onboarding';
 import Repl from './Repl';
 import CanvasView from './CanvasView';
-import CustomTerminalExample from './canvas/CustomTerminalExample';
 import { cn } from './utils';
 
 
@@ -24,17 +23,32 @@ function App() {
     const [showTitlebar, setShowTitlebar] = useState(false);
 
     useEffect(() => {
-        async function importAndRunSwcOnMount() {
-            await initSwc('/wasm_bg.wasm');
-            const interpreter = new Interpreter(state);
-            await interpreter.init();
-            setInterpreter(interpreter);
-        }
-        importAndRunSwcOnMount();
-
+        // Initialize user email listener immediately for better UX
         const unlistenUserEmail = listen<string>('user-email-changed', (event: Event<string>) => {
             setUserEmail(event.payload);
         });
+
+        // Initialize heavy components asynchronously without blocking UI
+        async function importAndRunSwcOnMount() {
+            try {
+                console.log('Starting SWC initialization...');
+                await initSwc('/wasm_bg.wasm');
+                console.log('SWC initialized, starting interpreter...');
+                
+                const interpreter = new Interpreter(state);
+                await interpreter.init();
+                console.log('Interpreter initialized');
+                
+                setInterpreter(interpreter);
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                // Set a placeholder interpreter to unblock the UI
+                setInterpreter(new Interpreter(state));
+            }
+        }
+        
+        // Start initialization after a brief delay to allow UI to render
+        setTimeout(importAndRunSwcOnMount, 100);
 
         return () => {
             unlistenUserEmail.then((unlisten) => unlisten());
@@ -59,9 +73,9 @@ function App() {
     };
     const handleClose = () => appWindow.close();
 
-    if (loading || error || interpreter === null) {
+    if (loading || error) {
         return (<div className={cn("h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden")}>
-            Loading...
+            {loading ? 'Loading user config...' : `Error: ${error}`}
         </div>)
     }
 
@@ -96,10 +110,14 @@ function App() {
                             </>)}
                         </div>
 
-                        {/* <CanvasView /> */}
-                        <div className={cn("h-full")}>
-                            <CustomTerminalExample/>
-                        </div>
+                        {/* Show interpreter loading status */}
+                        {!interpreter && (
+                            <div className={cn("absolute top-16 right-4 bg-[var(--bg-800)]/90 text-[var(--fg-300)] px-3 py-2 rounded-md text-sm")}>
+                                Initializing interpreter...
+                            </div>
+                        )}
+
+                        <CanvasView />
 
                         <div className={cn("flex-1 font-mono flex items-center justify-center")}>
                             <Onboarding userEmail={userEmail} />
