@@ -12,10 +12,11 @@
 ## Short term Roadmap
 
 - [x] TS Scripting engine + Boot script
-- [wip] Auto Layout
+- [x] LLM API integration (Anthropic, OpenAI, Google, Groq, OpenRouter)
+- [x] Auto Layout
 - [ ] Small Agent for UI control
 - [ ] Machine/Env setup system with [mise](https://mise.jdx.dev/getting-started.html)
-- [ ] Terminal UI
+- [x] Terminal UI DONNNNNE (buggy)
 - [ ] Machine/Env UI + fs UI
 - [ ] Text editing UI
 
@@ -25,7 +26,7 @@ Ariana IDE is not ready for usage yet. Come back in a few days/weeks!
 
 ## Architecture
 
-- **Backend**: Rust + Actix Web + SQLite
+- **Backend**: Rust + Actix Web + SQLite + LLM API
 - **CLI**: Node.js with email-based authentication flow
 - **Desktop App**: Tauri + React + Vite
 
@@ -38,7 +39,8 @@ ariana/
 │   │   ├── main.rs
 │   │   ├── auth.rs
 │   │   ├── database.rs
-│   │   └── email.rs
+│   │   ├── email.rs
+│   │   └── llm/      # LLM API integration
 │   └── Cargo.toml
 ├── frontend/         # Node.js CLI + Tauri app
 │   ├── src/
@@ -67,6 +69,15 @@ cp .env.example .env
 ```bash
 cargo run
 ```
+
+The backend will start on `http://localhost:8080` with the following endpoints:
+- `/ping` - Health check
+- `/auth/*` - Authentication endpoints
+- `/api/providers` - List LLM providers and models
+- `/api/inference` - LLM text completion
+- `/api/inference/stream` - LLM streaming completion
+
+See `backend/API_DOCUMENTATION.md` for complete LLM API documentation.
 
 ### Frontend Setup
 

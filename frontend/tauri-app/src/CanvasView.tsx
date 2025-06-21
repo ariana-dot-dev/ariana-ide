@@ -16,7 +16,7 @@ const createDemoElements = (): CanvasElement[] => {
         environment: {},
         shellCommand: '',
         colorScheme: 'default',
-        fontSize: 16,
+        fontSize: 14,
         fontFamily: 'Space Mono'
     }, 1),
     Terminal.canvasElement({
@@ -27,7 +27,7 @@ const createDemoElements = (): CanvasElement[] => {
       environment: {},
       shellCommand: '',
       colorScheme: 'default',
-      fontSize: 16,
+      fontSize: 14,
       fontFamily: 'Space Mono'
   }, 1)
     // new Terminal({

@@ -36,6 +36,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const dataDisposableRef = useRef<IDisposable | null>(null);
+  const clipboardHandlerRef = useRef<IDisposable | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -105,6 +106,32 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
     xterm.loadAddon(searchAddon);
 
     xterm.open(terminalRef.current);
+
+    // Clipboard integration using xterm's custom key handler
+    const clipboardHandler = xterm.attachCustomKeyEventHandler((ev: KeyboardEvent) => {
+      if (!ev.ctrlKey || ev.altKey || ev.metaKey) {
+        return true; // let xterm handle
+      }
+      const key = ev.key.toLowerCase();
+      if (key === 'c') {
+        const sel = xterm.getSelection();
+        if (sel) {
+          navigator.clipboard.writeText(sel).catch(() => {});
+        }
+        // don't cancel; allow normal copy as well but avoid ^C char
+        return false;
+      }
+      if (key === 'v') {
+        ev.preventDefault();
+        navigator.clipboard.readText().then(text => {
+          if (text) {
+            xterm.paste(text);
+          }
+        });
+        return false;
+      }
+      return true;
+    });
     
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
