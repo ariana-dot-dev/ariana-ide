@@ -61,6 +61,18 @@ pub async fn custom_send_input_lines(
 }
 
 #[tauri::command]
+pub async fn custom_send_raw_input(
+    id: String,
+    data: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
+    terminal_manager
+        .send_raw_input(&id, &data)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn custom_send_ctrl_c(
     id: String,
     state: State<'_, AppState>,

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { customTerminalAPI, TerminalEvent, TerminalSpec, LineItem, Colors } from '../services/CustomTerminalAPI';
 import { cn } from '../utils';
-import FloatingTerminalInput from './FloatingTerminalInput';
 
 interface CustomTerminalRendererProps {
   spec: TerminalSpec;
@@ -10,12 +9,6 @@ interface CustomTerminalRendererProps {
   onTerminalError?: (error: string) => void;
 }
 
-interface TerminalLine {
-  items: LineItem[];
-}
-
-
-
 export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   spec,
   className,
@@ -23,10 +16,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   onTerminalError,
 }) => {
   const [terminalId, setTerminalId] = useState<string | null>(null);
-  const [lines, setLines] = useState<TerminalLine[]>([]);
+  const [screen, setScreen] = useState<LineItem[][]>([]);
+  const [cursorPosition, setCursorPosition] = useState({ line: 0, col: 0 });
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cursorPosition, setCursorPosition] = useState({ line: 0, col: 0 }); // Start at origin
+  const [terminalDimensions, setTerminalDimensions] = useState({ rows: 24, cols: 80 });
   const terminalRef = useRef<HTMLDivElement>(null);
 
   // Initialize terminal connection
@@ -69,78 +63,18 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
   const handleTerminalEvent = useCallback((event: TerminalEvent) => {
     switch (event.type) {
+      case 'screenUpdate':
+        if (event.screen && event.cursor_line !== undefined && event.cursor_col !== undefined) {
+          setScreen(event.screen);
+          setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
+        }
+        break;
+
       case 'newLines':
-        if (event.lines) {
-          setLines(prevLines => {
-            const newLines = [
-              ...prevLines,
-              ...event.lines!.map(items => ({ items }))
-            ];
-            
-            // Update cursor position to end of last line
-            const lastLine = newLines[newLines.length - 1];
-            if (lastLine && lastLine.items.length > 0) {
-              const lastItem = lastLine.items[lastLine.items.length - 1];
-              const totalWidth = lastLine.items.reduce((sum, item) => sum + item.width, 0);
-              setCursorPosition({ 
-                line: newLines.length - 1, 
-                col: totalWidth 
-              });
-            } else {
-              // Empty line, cursor at start of new line
-              setCursorPosition({ 
-                line: newLines.length, 
-                col: 0 
-              });
-            }
-            
-            return newLines;
-          });
-        }
-        break;
-
       case 'patch':
-        if (event.line !== undefined && event.col !== undefined && event.items) {
-          setLines(prevLines => {
-            const newLines = [...prevLines];
-            const lineIndex = event.line!;
-            
-            // Ensure we have enough lines
-            while (newLines.length <= lineIndex) {
-              newLines.push({ items: [] });
-            }
-            
-            // Create a new line with the patched items
-            const line = newLines[lineIndex];
-            const newItems = [...line.items];
-            
-            // Replace items starting at the specified column
-            for (let i = 0; i < event.items!.length; i++) {
-              newItems[event.col! + i] = event.items![i];
-            }
-            
-            newLines[lineIndex] = { items: newItems };
-            
-            // Update cursor position after patch
-            const totalWidth = newItems.reduce((sum, item) => sum + item.width, 0);
-            setCursorPosition({ line: lineIndex, col: totalWidth });
-            
-            return newLines;
-          });
-        }
-        break;
-
       case 'cursorMove':
-        // Update cursor position for floating input
-        if (event.line !== undefined && event.col !== undefined) {
-          console.log('ANSI Cursor moved to:', event.line, event.col);
-          setCursorPosition({ line: event.line, col: event.col });
-        }
-        break;
-
       case 'scroll':
-        // Handle scroll events - for now just log them
-        console.log('Scroll event:', event.direction, event.amount);
+        // These are now handled by screenUpdate
         break;
     }
   }, []);
@@ -150,23 +84,126 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     setTerminalId(null);
   }, []);
 
+  // Send raw input directly
+  const sendRawInput = useCallback(async (input: string) => {
+    if (!terminalId || !isConnected) return;
+    
+    try {
+      console.log('Sending raw input:', JSON.stringify(input));
+      await customTerminalAPI.sendRawInput(terminalId, input);
+    } catch (err) {
+      console.error('Error sending input:', err);
+    }
+  }, [terminalId, isConnected]);
 
+  // Handle keyboard input - send each character immediately
+  const handleKeyDown = useCallback(async (event: React.KeyboardEvent) => {
+    if (!terminalId || !isConnected) return;
 
-  // Prevent default key handling since we're using floating input
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    // Don't interfere with floating input
-    return;
-  }, []);
+    try {
+      if (event.ctrlKey) {
+        if (event.key === 'c') {
+          await customTerminalAPI.sendCtrlC(terminalId);
+          event.preventDefault();
+          return;
+        }
+        if (event.key === 'd') {
+          await customTerminalAPI.sendCtrlD(terminalId);
+          event.preventDefault();
+          return;
+        }
+      }
+
+      if (event.key === 'Enter') {
+        await sendRawInput('\r');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'Backspace') {
+        await sendRawInput('\b');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'Tab') {
+        await sendRawInput('\t');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'Escape') {
+        await sendRawInput('\x1b');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'ArrowUp') {
+        await sendRawInput('\x1b[A');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'ArrowDown') {
+        await sendRawInput('\x1b[B');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'ArrowLeft') {
+        await sendRawInput('\x1b[D');
+        event.preventDefault();
+        return;
+      } else if (event.key === 'ArrowRight') {
+        await sendRawInput('\x1b[C');
+        event.preventDefault();
+        return;
+      } else if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        // Send regular characters immediately
+        await sendRawInput(event.key);
+        event.preventDefault();
+        return;
+      }
+    } catch (err) {
+      console.error('Error handling key event:', err);
+    }
+  }, [terminalId, isConnected, sendRawInput]);
+
+  // Handle wheel events for scrolling
+  const handleWheel = useCallback(async (event: React.WheelEvent) => {
+    if (!terminalId || !isConnected) return;
+
+    // Send scroll sequences to terminal
+    const lines = Math.ceil(Math.abs(event.deltaY) / 50); // Adjust sensitivity
+    try {
+      if (event.deltaY > 0) {
+        // Scroll down
+        for (let i = 0; i < lines; i++) {
+          await sendRawInput('\x1b[B'); // Down arrow
+        }
+      } else {
+        // Scroll up  
+        for (let i = 0; i < lines; i++) {
+          await sendRawInput('\x1b[A'); // Up arrow
+        }
+      }
+    } catch (err) {
+      console.error('Error handling scroll:', err);
+    }
+
+    event.preventDefault();
+  }, [terminalId, isConnected, sendRawInput]);
 
   const handleResize = useCallback(async () => {
     if (!terminalId || !terminalRef.current) return;
 
-    const { width, height } = terminalRef.current.getBoundingClientRect();
-    const charWidth = 8; // Approximate character width in pixels
-    const charHeight = 16; // Approximate character height in pixels
+    const containerRect = terminalRef.current.getBoundingClientRect();
     
-    const cols = Math.floor(width / charWidth);
-    const lines = Math.floor(height / charHeight);
+    const paddingHorizontal = 32 + 12; 
+    const paddingVertical = 32 + 12; 
+    const statusBarHeight = 24;
+    
+    const availableWidth = containerRect.width - paddingHorizontal;
+    const availableHeight = containerRect.height - paddingVertical - statusBarHeight;
+
+    const charWidth = 10; 
+    const charHeight = 16; 
+    
+    const cols = Math.max(1, Math.floor(availableWidth / charWidth));
+    const lines = Math.max(1, Math.floor(availableHeight / charHeight));
+
+    console.log(`Terminal resize: ${cols}x${lines} (container: ${containerRect.width}x${containerRect.height}, available: ${availableWidth}x${availableHeight})`);
+
+    // Update our tracked dimensions
+    setTerminalDimensions({ rows: lines, cols });
 
     try {
       await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
@@ -180,6 +217,17 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [handleResize]);
+
+  // Auto-focus the terminal and set initial size
+  useEffect(() => {
+    if (terminalRef.current && isConnected) {
+      terminalRef.current.focus();
+      // Set initial terminal size
+      setTimeout(() => {
+        handleResize();
+      }, 500);
+    }
+  }, [isConnected, handleResize]);
 
   const colorToCSS = (color?: any): string => {
     if (!color) return '';
@@ -221,43 +269,75 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
       fontWeight: item.is_bold ? 'bold' : 'normal',
       fontStyle: item.is_italic ? 'italic' : 'normal',
       textDecoration: item.is_underline ? 'underline' : 'none',
+      width: `${item.width * 10}px`,
+      maxWidth: `${item.width * 10}px`,
+      minWidth: `${item.width * 10}px`
     };
 
     return (
       <span key={index} style={style}>
-        {item.lexeme}
+        {item.lexeme || ' '}
       </span>
     );
   };
 
-  const renderLine = (line: TerminalLine, lineIndex: number) => {
-    // Handle line wrapping
-    const maxCols = spec.cols || 80;
-    const wrappedLines: LineItem[][] = [];
-    let currentLine: LineItem[] = [];
-    let currentWidth = 0;
+  const renderScreenLine = (line: LineItem[], lineIndex: number, totalCols: number) => {
+    const isCursorLine = lineIndex === cursorPosition.line;
     
-    for (const item of line.items) {
-      if (currentWidth + item.width > maxCols && currentLine.length > 0) {
-        wrappedLines.push(currentLine);
-        currentLine = [];
-        currentWidth = 0;
+    // Create a grid mapping for this line
+    const grid: (LineItem | null)[] = new Array(totalCols).fill(null);
+    
+    // Fill the grid with LineItems, accounting for multi-width characters
+    let currentCol = 0;
+    for (const item of line) {
+      if (currentCol < totalCols) {
+        grid[currentCol] = item;
+        // Skip additional columns for multi-width characters
+        for (let i = 1; i < item.width && currentCol + i < totalCols; i++) {
+          grid[currentCol + i] = 'skip' as any; // Mark as occupied by previous character
+        }
+        currentCol += item.width;
       }
-      currentLine.push(item);
-      currentWidth += item.width;
-    }
-    
-    if (currentLine.length > 0) {
-      wrappedLines.push(currentLine);
     }
     
     return (
-      <div key={lineIndex} className="font-mono text-xs leading-4">
-        {wrappedLines.map((wrappedLine, wrapIndex) => (
-          <div key={wrapIndex} className="whitespace-pre">
-            {wrappedLine.map((item, itemIndex) => renderLineItem(item, itemIndex))}
-          </div>
-        ))}
+      <div key={lineIndex} className="font-mono text-xs leading-4" style={{ lineHeight: '16px', minHeight: '16px' }}>
+        {Array.from({ length: totalCols }, (_, colIndex) => {
+          const isCursorPosition = isCursorLine && colIndex === cursorPosition.col;
+          const gridItem = grid[colIndex];
+          
+          if (gridItem === 'skip') {
+            // This column is part of a multi-width character, don't render anything
+            return null;
+          } else if (gridItem) {
+            // Render the actual character
+            return (
+              <span 
+                key={colIndex} 
+                className={isCursorPosition ? 'bg-white text-black' : ''}
+                style={{
+                  color: isCursorPosition ? '#000000' : (colorToCSS(gridItem.foreground_color) || '#cccccc'),
+                  backgroundColor: isCursorPosition ? '#ffffff' : (colorToCSS(gridItem.background_color) || 'transparent'),
+                  fontWeight: gridItem.is_bold ? 'bold' : 'normal',
+                  fontStyle: gridItem.is_italic ? 'italic' : 'normal',
+                  textDecoration: gridItem.is_underline ? 'underline' : 'none',
+                }}
+              >
+                {gridItem.lexeme || ' '}
+              </span>
+            );
+          } else {
+            // Empty cell
+            return (
+              <span 
+                key={colIndex} 
+                className={isCursorPosition ? 'bg-white text-black' : ''}
+              >
+                {' '}
+              </span>
+            );
+          }
+        })}
       </div>
     );
   };
@@ -276,27 +356,26 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     <div 
       ref={terminalRef}
       className={cn(
-        "bg-black text-white font-mono text-xs p-4 overflow-auto focus:outline-none relative",
+        "bg-black text-white font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full",
         className
       )}
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      onWheel={handleWheel}
+      onClick={() => terminalRef.current?.focus()}
     >
       <div className="mb-2 text-xs text-gray-400">
         Status: {isConnected ? 'Connected' : 'Disconnected'} 
         {terminalId && ` | ID: ${terminalId.slice(0, 8)}...`}
+        {isConnected && ` | Cursor: ${cursorPosition.line},${cursorPosition.col}`}
       </div>
       
-      <div className="terminal-content">
-        {lines.map((line, index) => renderLine(line, index))}
+      <div className="terminal-screen border border-gray-700 rounded p-1" style={{ minHeight: '400px' }}>
+        {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
+          const line = screen[rowIndex] || []; // Use empty array if line doesn't exist
+          return renderScreenLine(line, rowIndex, terminalDimensions.cols);
+        })}
       </div>
-
-      {/* Floating input that follows cursor */}
-      <FloatingTerminalInput
-        terminalId={terminalId}
-        isConnected={isConnected}
-        cursorPosition={cursorPosition}
-      />
     </div>
   );
 };

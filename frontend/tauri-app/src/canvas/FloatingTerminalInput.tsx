@@ -6,6 +6,7 @@ interface FloatingTerminalInputProps {
   terminalId: string | null;
   isConnected: boolean;
   cursorPosition: { line: number; col: number };
+  scrollOffset?: number;
   onInputFocus?: () => void;
   onInputBlur?: () => void;
 }
@@ -16,6 +17,7 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
   terminalId,
   isConnected,
   cursorPosition,
+  scrollOffset = 0,
   onInputFocus,
   onInputBlur,
 }) => {
@@ -23,26 +25,39 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
   const [isVisible, setIsVisible] = useState(true); // Always visible for now
   const [inputMode, setInputMode] = useState<InputMode>('shell');
   const [fakeCursorOffset, setFakeCursorOffset] = useState(0); // Offset from real cursor due to typing
+  const [charDimensions, setCharDimensions] = useState({ width: 7.2, height: 16 });
   const inputRef = useRef<HTMLInputElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+
+  // Measure actual character dimensions from the terminal's font
+  useEffect(() => {
+    if (measureRef.current) {
+      const rect = measureRef.current.getBoundingClientRect();
+      setCharDimensions({
+        width: rect.width,
+        height: rect.height
+      });
+    }
+  }, []);
 
   // Calculate input position based on cursor + fake offset (relative to terminal container)
   const getInputPosition = useCallback(() => {
-    const charWidth = 7; // Approximate character width in pixels
-    const lineHeight = 16; // Approximate line height in pixels
+    const terminalPadding = 16; // Terminal has p-4 = 1rem = 16px padding
     
     // In shell mode, show cursor at real position + typed characters
     const effectiveCol = inputMode === 'shell' ? 
       cursorPosition.col + fakeCursorOffset : 
       cursorPosition.col;
     
-    const left = effectiveCol * charWidth;
-    const top = cursorPosition.line * lineHeight;
+    const left = terminalPadding + (effectiveCol * charDimensions.width);
+    // Adjust for scroll offset - subtract scrolled lines
+    const top = terminalPadding + 24 + ((cursorPosition.line - scrollOffset) * charDimensions.height); // +24 for status line
 
     return {
-      left: Math.max(0, left),
-      top: Math.max(0, top)
+      left: Math.max(terminalPadding, left),
+      top: Math.max(terminalPadding + 24, top)
     };
-  }, [cursorPosition, fakeCursorOffset, inputMode]);
+  }, [cursorPosition, fakeCursorOffset, inputMode, charDimensions, scrollOffset]);
 
   const position = getInputPosition();
   
@@ -179,9 +194,10 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
     const newValue = event.target.value;
     setInputValue(newValue);
     
-    // Update fake cursor offset in shell mode
+    // Update fake cursor offset in shell mode - this shows where the cursor WOULD be after typing
+    // We don't need to add anything because the input element itself handles the visual cursor
     if (inputMode === 'shell') {
-      setFakeCursorOffset(newValue.length);
+      setFakeCursorOffset(0); // Reset to 0 - the input field handles its own cursor
     }
     
     // Auto-show input when typing
@@ -241,14 +257,24 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
   }
 
   return (
-    <div
-      className="absolute pointer-events-none"
-      style={{
-        left: position.left,
-        top: position.top,
-        zIndex: 1000,
-      }}
-    >
+    <>
+      {/* Hidden measurement element to get accurate character dimensions */}
+      <span 
+        ref={measureRef}
+        className="absolute invisible font-mono text-xs leading-4 pointer-events-none"
+        style={{ left: -9999, top: -9999 }}
+      >
+        M
+      </span>
+      
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          left: position.left,
+          top: position.top,
+          zIndex: 1000,
+        }}
+      >
       {/* Visual cursor indicator */}
       <div 
         className={cn(
@@ -301,6 +327,7 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
         {inputMode === 'interactive' ? 'L' : 'E'}
       </div>
     </div>
+    </>
   );
 };
 

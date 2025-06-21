@@ -29,8 +29,8 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ cl
     switch (terminalType) {
       case 'git-bash':
         spec = TerminalSpecs.gitBash(workingDirectory || undefined, {
-          lines: 30,
-          cols: 100,
+          lines: 24,
+          cols: 80,
         });
         break;
       
@@ -39,8 +39,8 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ cl
           wslDistribution || undefined,
           workingDirectory || undefined,
           {
-            lines: 30,
-            cols: 100,
+            lines: 24,
+            cols: 80,
           }
         );
         break;
@@ -51,8 +51,8 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ cl
           return;
         }
         spec = TerminalSpecs.ssh(sshHost, sshUsername, sshPort, {
-          lines: 30,
-          cols: 100,
+          lines: 24,
+          cols: 80,
         });
         break;
       
@@ -84,8 +84,6 @@ export const CustomTerminalExample: React.FC<CustomTerminalExampleProps> = ({ cl
   return (
     <div className={cn("space-y-4", className)}>
       <div className="bg-gray-900 p-4 rounded-lg">
-        <h2 className="text-xl font-bold text-white mb-4">Custom Terminal API Demo</h2>
-        
         {/* Terminal Type Selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-300 mb-2">

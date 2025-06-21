@@ -52,13 +52,16 @@ export interface LineItem {
 export type ScrollDirection = 'Up' | 'Down';
 
 export interface TerminalEvent {
-  type: 'newLines' | 'patch' | 'cursorMove' | 'scroll';
+  type: 'newLines' | 'patch' | 'cursorMove' | 'scroll' | 'screenUpdate';
   lines?: LineItem[][];
   line?: number;
   col?: number;
   items?: LineItem[];
   direction?: ScrollDirection;
   amount?: number;
+  screen?: LineItem[][];
+  cursor_line?: number;
+  cursor_col?: number;
 }
 
 export interface CursorCommand {
@@ -126,6 +129,17 @@ export class CustomTerminalAPI {
       await invoke('custom_send_input_lines', { id, lines });
     } catch (error) {
       throw new Error(`Failed to send input lines: ${error}`);
+    }
+  }
+
+  /**
+   * Send raw input data directly to terminal
+   */
+  async sendRawInput(id: string, data: string): Promise<void> {
+    try {
+      await invoke('custom_send_raw_input', { id, data });
+    } catch (error) {
+      throw new Error(`Failed to send raw input: ${error}`);
     }
   }
 
@@ -269,21 +283,21 @@ export const Colors = {
 export const TerminalSpecs = {
   ssh: (host: string, username: string, port = 22, options: Partial<TerminalSpec> = {}): TerminalSpec => ({
     kind: { $type: 'ssh', host, username, port },
-    lines: 24,
+    lines: 10,
     cols: 80,
     ...options,
   }),
 
   gitBash: (workingDirectory?: string, options: Partial<TerminalSpec> = {}): TerminalSpec => ({
     kind: { $type: 'git-bash', workingDirectory },
-    lines: 24,
+    lines: 10,
     cols: 80,
     ...options,
   }),
 
   wsl: (distribution?: string, workingDirectory?: string, options: Partial<TerminalSpec> = {}): TerminalSpec => ({
     kind: { $type: 'wsl', distribution, workingDirectory },
-    lines: 24,
+    lines: 10,
     cols: 80,
     ...options,
   }),

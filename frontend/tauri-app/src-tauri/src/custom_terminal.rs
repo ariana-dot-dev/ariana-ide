@@ -98,6 +98,12 @@ pub enum TerminalEvent {
         direction: ScrollDirection,
         amount: u16,
     },
+    #[serde(rename = "screenUpdate")]
+    ScreenUpdate {
+        screen: Vec<Vec<LineItem>>,
+        cursor_line: u16,
+        cursor_col: u16,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -255,10 +261,12 @@ impl CustomTerminalConnection {
         let mut reader = self.pty_pair.master.try_clone_reader()?;
         let app_handle = self.app_handle.clone();
         let connection_id = self.id.clone();
+        let rows = self.spec.lines;
+        let cols = self.spec.cols;
         
         thread::spawn(move || {
             let mut buffer = [0u8; 4096];
-            let mut ansi_parser = AnsiParser::new();
+            let mut ansi_parser = AnsiParser::with_size(rows, cols);
             
             loop {
                 match reader.read(&mut buffer) {
@@ -314,6 +322,12 @@ pub struct AnsiParser {
     // Parser state for processing ANSI escape sequences
     buffer: Vec<u8>,
     current_style: TextStyle,
+    cursor_line: u16,
+    cursor_col: u16,
+    screen_buffer: Vec<Vec<LineItem>>, // 2D grid representing the terminal screen
+    screen_rows: u16,
+    screen_cols: u16,
+    is_in_alternate_screen: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -339,9 +353,24 @@ impl Default for TextStyle {
 
 impl AnsiParser {
     pub fn new() -> Self {
+        Self::with_size(24, 80) // Default terminal size
+    }
+
+    pub fn with_size(rows: u16, cols: u16) -> Self {
+        let mut screen_buffer = Vec::new();
+        for _ in 0..rows {
+            screen_buffer.push(Vec::new());
+        }
+
         Self {
             buffer: Vec::new(),
             current_style: TextStyle::default(),
+            cursor_line: 0,
+            cursor_col: 0,
+            screen_buffer,
+            screen_rows: rows,
+            screen_cols: cols,
+            is_in_alternate_screen: false,
         }
     }
 
@@ -352,21 +381,19 @@ impl AnsiParser {
         let text = String::from_utf8_lossy(data);
         let chars = text.chars().collect::<Vec<_>>();
         let mut pos = 0;
-        let mut current_line = Vec::new();
         let mut text_buffer = String::new();
         
         while pos < chars.len() {
             let ch = chars[pos];
             
             if ch == '\x1b' && pos + 1 < chars.len() && chars[pos + 1] == '[' {
-                // Start of CSI sequence - finish current text if any
+                // Flush any pending text
                 if !text_buffer.is_empty() {
-                    current_line.push(self.create_line_item(text_buffer.clone()));
+                    self.write_text_to_screen(&text_buffer);
                     text_buffer.clear();
                 }
                 
-                // Find the end of the escape sequence
-                let start_pos = pos;
+                // Parse CSI sequence
                 pos += 2; // Skip \x1b[
                 
                 // Check for DEC private mode sequences that start with ?
@@ -386,15 +413,45 @@ impl AnsiParser {
                     } else if c.is_ascii_alphabetic() {
                         // Found command character
                         if is_dec_private {
-                            // DEC private mode sequences - just ignore them
+                            // DEC private mode sequences
                             match c {
-                                'h' | 'l' => {
-                                    // Set/Reset modes like ?2004h (bracketed paste), ?25l (hide cursor), ?25h (show cursor)
-                                    // Just ignore these for now
+                                'h' => {
+                                    // Set mode
+                                    let params: Vec<u16> = if params_str.is_empty() {
+                                        vec![]
+                                    } else {
+                                        params_str.split(';').filter_map(|s| s.parse().ok()).collect()
+                                    };
+                                    for param in params {
+                                        match param {
+                                            1049 => {
+                                                // Enable alternate screen buffer
+                                                self.is_in_alternate_screen = true;
+                                                self.clear_screen();
+                                            }
+                                            _ => {} // Ignore other modes for now
+                                        }
+                                    }
                                 },
-                                _ => {
-                                    // Other DEC private sequences
-                                }
+                                'l' => {
+                                    // Reset mode
+                                    let params: Vec<u16> = if params_str.is_empty() {
+                                        vec![]
+                                    } else {
+                                        params_str.split(';').filter_map(|s| s.parse().ok()).collect()
+                                    };
+                                    for param in params {
+                                        match param {
+                                            1049 => {
+                                                // Disable alternate screen buffer
+                                                self.is_in_alternate_screen = false;
+                                                self.clear_screen();
+                                            }
+                                            _ => {} // Ignore other modes for now
+                                        }
+                                    }
+                                },
+                                _ => {} // Ignore other DEC sequences
                             }
                         } else {
                             // Regular CSI sequences
@@ -407,112 +464,107 @@ impl AnsiParser {
                             };
                             
                             match c {
-                                'A' => events.push(TerminalEvent::CursorMove { 
-                                    line: self.saturating_sub_u16(0, params.get(0).copied().unwrap_or(1)), 
-                                    col: 0 
-                                }),
-                                'B' => events.push(TerminalEvent::CursorMove { 
-                                    line: 0 + params.get(0).copied().unwrap_or(1), 
-                                    col: 0 
-                                }),
-                                'C' => events.push(TerminalEvent::CursorMove { 
-                                    line: 0, 
-                                    col: 0 + params.get(0).copied().unwrap_or(1) 
-                                }),
-                                'D' => events.push(TerminalEvent::CursorMove { 
-                                    line: 0, 
-                                    col: self.saturating_sub_u16(0, params.get(0).copied().unwrap_or(1)) 
-                                }),
+                                'A' => {
+                                    // Cursor up
+                                    let amount = params.get(0).copied().unwrap_or(1);
+                                    self.cursor_line = self.cursor_line.saturating_sub(amount);
+                                },
+                                'B' => {
+                                    // Cursor down
+                                    let amount = params.get(0).copied().unwrap_or(1);
+                                    self.cursor_line = (self.cursor_line + amount).min(self.screen_rows - 1);
+                                },
+                                'C' => {
+                                    // Cursor right
+                                    let amount = params.get(0).copied().unwrap_or(1);
+                                    self.cursor_col = (self.cursor_col + amount).min(self.screen_cols - 1);
+                                },
+                                'D' => {
+                                    // Cursor left
+                                    let amount = params.get(0).copied().unwrap_or(1);
+                                    self.cursor_col = self.cursor_col.saturating_sub(amount);
+                                },
                                 'H' | 'f' => {
-                                    let line = params.get(0).copied().unwrap_or(1);
-                                    let col = params.get(1).copied().unwrap_or(1);
-                                    events.push(TerminalEvent::CursorMove { line, col });
+                                    // Cursor position (1-indexed)
+                                    let line = params.get(0).copied().unwrap_or(1).saturating_sub(1);
+                                    let col = params.get(1).copied().unwrap_or(1).saturating_sub(1);
+                                    self.cursor_line = line.min(self.screen_rows - 1);
+                                    self.cursor_col = col.min(self.screen_cols - 1);
                                 },
                                 'J' => {
-                                    // Clear screen - emit empty lines
-                                    events.push(TerminalEvent::NewLines { lines: vec![] });
+                                    // Clear screen
+                                    let mode = params.get(0).copied().unwrap_or(0);
+                                    match mode {
+                                        0 => self.clear_from_cursor_to_end(),
+                                        1 => self.clear_from_start_to_cursor(),
+                                        2 => self.clear_screen(),
+                                        _ => {}
+                                    }
                                 },
                                 'K' => {
-                                    // Clear line - for now just ignore, could implement as patch
+                                    // Clear line
+                                    let mode = params.get(0).copied().unwrap_or(0);
+                                    match mode {
+                                        0 => self.clear_line_from_cursor(),
+                                        1 => self.clear_line_to_cursor(),
+                                        2 => self.clear_line(),
+                                        _ => {}
+                                    }
                                 },
                                 'm' => {
                                     // SGR - handle styling
                                     self.handle_sgr_sequence(&params);
                                 },
-                                'S' => events.push(TerminalEvent::Scroll { 
-                                    direction: ScrollDirection::Up, 
-                                    amount: params.get(0).copied().unwrap_or(1) 
-                                }),
-                                'T' => events.push(TerminalEvent::Scroll { 
-                                    direction: ScrollDirection::Down, 
-                                    amount: params.get(0).copied().unwrap_or(1) 
-                                }),
-                                _ => {
-                                    // Unknown sequence, ignore
-                                }
+                                _ => {} // Ignore unknown sequences
                             }
                         }
                         pos += 1;
                         break;
                     } else {
-                        // Invalid sequence, treat as regular text
-                        for i in start_pos..=pos {
-                            if i < chars.len() {
-                                text_buffer.push(chars[i]);
-                            }
-                        }
+                        // Invalid sequence, skip
                         pos += 1;
                         break;
                     }
                 }
             } else if ch == '\x1b' && pos + 1 < chars.len() && chars[pos + 1] == ']' {
-                // OSC (Operating System Command) sequences like ]0;title
-                let _start_pos = pos;
-                pos += 2; // Skip \x1b]
-                
-                // Find the terminator (usually \x07 or \x1b\)
-                while pos < chars.len() {
-                    if chars[pos] == '\x07' || 
-                       (chars[pos] == '\x1b' && pos + 1 < chars.len() && chars[pos + 1] == '\\') {
-                        if chars[pos] == '\x1b' {
-                            pos += 2; // Skip \x1b\
-                        } else {
-                            pos += 1; // Skip \x07
-                        }
-                        break;
-                    }
+                // OSC sequences - skip for now
+                pos += 2;
+                while pos < chars.len() && chars[pos] != '\x07' {
                     pos += 1;
                 }
+                if pos < chars.len() {
+                    pos += 1; // Skip \x07
+                }
             } else if ch == '\x1b' {
-                // Other escape sequences, just skip them
+                // Other escape sequences, skip
                 pos += 1;
                 if pos < chars.len() {
-                    pos += 1; // Skip the next character too
+                    pos += 1;
                 }
             } else if ch == '\n' {
-                // New line - finish current text and emit line
+                // Line feed
                 if !text_buffer.is_empty() {
-                    current_line.push(self.create_line_item(text_buffer.clone()));
+                    self.write_text_to_screen(&text_buffer);
                     text_buffer.clear();
                 }
-                
-                events.push(TerminalEvent::NewLines { 
-                    lines: vec![current_line.clone()] 
-                });
-                current_line.clear();
+                self.cursor_line = (self.cursor_line + 1).min(self.screen_rows - 1);
                 pos += 1;
             } else if ch == '\r' {
-                // Carriage return - cursor to beginning of line
+                // Carriage return
                 if !text_buffer.is_empty() {
-                    current_line.push(self.create_line_item(text_buffer.clone()));
+                    self.write_text_to_screen(&text_buffer);
                     text_buffer.clear();
                 }
-                
-                if !current_line.is_empty() {
-                    events.push(TerminalEvent::NewLines { 
-                        lines: vec![current_line.clone()] 
-                    });
-                    current_line.clear();
+                self.cursor_col = 0;
+                pos += 1;
+            } else if ch == '\x08' {
+                // Backspace
+                if !text_buffer.is_empty() {
+                    self.write_text_to_screen(&text_buffer);
+                    text_buffer.clear();
+                }
+                if self.cursor_col > 0 {
+                    self.cursor_col -= 1;
                 }
                 pos += 1;
             } else if ch.is_control() && ch != '\t' {
@@ -527,21 +579,126 @@ impl AnsiParser {
 
         // Handle any remaining text
         if !text_buffer.is_empty() {
-            current_line.push(self.create_line_item(text_buffer));
+            self.write_text_to_screen(&text_buffer);
         }
-        if !current_line.is_empty() {
-            events.push(TerminalEvent::NewLines { 
-                lines: vec![current_line] 
-            });
-        }
+
+        // Always emit the entire screen state
+        events.push(TerminalEvent::ScreenUpdate { 
+            screen: self.get_screen_lines(),
+            cursor_line: self.cursor_line,
+            cursor_col: self.cursor_col,
+        });
 
         events
     }
     
 
 
-    fn saturating_sub_u16(&self, a: u16, b: u16) -> u16 {
-        a.saturating_sub(b)
+    fn write_text_to_screen(&mut self, text: &str) {
+        for ch in text.chars() {
+            if self.cursor_line < self.screen_rows && self.cursor_col < self.screen_cols {
+                // Ensure the line exists
+                while self.screen_buffer.len() <= self.cursor_line as usize {
+                    self.screen_buffer.push(Vec::new());
+                }
+                
+                // Create items first to avoid borrow conflicts
+                let space_item = self.create_line_item(" ".to_string());
+                let char_item = self.create_line_item(ch.to_string());
+                
+                // Extend the line if needed
+                let line = &mut self.screen_buffer[self.cursor_line as usize];
+                while line.len() <= self.cursor_col as usize {
+                    line.push(space_item.clone());
+                }
+                
+                // Write the character
+                line[self.cursor_col as usize] = char_item;
+                self.cursor_col += 1;
+                
+                // Wrap to next line if needed
+                if self.cursor_col >= self.screen_cols {
+                    self.cursor_col = 0;
+                    self.cursor_line = (self.cursor_line + 1).min(self.screen_rows - 1);
+                }
+            }
+        }
+    }
+
+    fn clear_screen(&mut self) {
+        self.screen_buffer.clear();
+        for _ in 0..self.screen_rows {
+            self.screen_buffer.push(Vec::new());
+        }
+        self.cursor_line = 0;
+        self.cursor_col = 0;
+    }
+
+    fn clear_line(&mut self) {
+        if self.cursor_line < self.screen_rows {
+            while self.screen_buffer.len() <= self.cursor_line as usize {
+                self.screen_buffer.push(Vec::new());
+            }
+            self.screen_buffer[self.cursor_line as usize].clear();
+        }
+    }
+
+    fn clear_line_from_cursor(&mut self) {
+        if self.cursor_line < self.screen_rows {
+            while self.screen_buffer.len() <= self.cursor_line as usize {
+                self.screen_buffer.push(Vec::new());
+            }
+            let line = &mut self.screen_buffer[self.cursor_line as usize];
+            line.truncate(self.cursor_col as usize);
+        }
+    }
+
+    fn clear_line_to_cursor(&mut self) {
+        if self.cursor_line < self.screen_rows {
+            while self.screen_buffer.len() <= self.cursor_line as usize {
+                self.screen_buffer.push(Vec::new());
+            }
+            
+            // Create space item first to avoid borrow conflicts
+            let space_item = self.create_line_item(" ".to_string());
+            
+            let line = &mut self.screen_buffer[self.cursor_line as usize];
+            for i in 0..=self.cursor_col as usize {
+                if i < line.len() {
+                    line[i] = space_item.clone();
+                }
+            }
+        }
+    }
+
+    fn clear_from_cursor_to_end(&mut self) {
+        // Clear from cursor to end of screen
+        self.clear_line_from_cursor();
+        for line_idx in (self.cursor_line + 1) as usize..self.screen_buffer.len() {
+            self.screen_buffer[line_idx].clear();
+        }
+    }
+
+    fn clear_from_start_to_cursor(&mut self) {
+        // Clear from start of screen to cursor
+        for line_idx in 0..self.cursor_line as usize {
+            if line_idx < self.screen_buffer.len() {
+                self.screen_buffer[line_idx].clear();
+            }
+        }
+        self.clear_line_to_cursor();
+    }
+
+    fn get_screen_lines(&self) -> Vec<Vec<LineItem>> {
+        let mut result = Vec::new();
+        for row in 0..self.screen_rows {
+            if row < self.screen_buffer.len() as u16 {
+                result.push(self.screen_buffer[row as usize].clone());
+            } else {
+                result.push(Vec::new());
+            }
+        }
+        result
     }
 
     fn create_line_item(&self, text: String) -> LineItem {
@@ -665,14 +822,22 @@ impl CustomTerminalManager {
     pub fn send_input_lines(&self, id: &str, lines: Vec<String>) -> Result<()> {
         let mut writers = self.writers.lock().unwrap();
         if let Some(writer) = writers.get_mut(id) {
-            // If it's a single character (raw input), send it directly
-            if lines.len() == 1 && lines[0].len() <= 4 {
-                writer.write_all(lines[0].as_bytes())?;
-            } else {
-                // Multi-line command, join with backslashes
-                let input = lines.join(" \\\n") + "\n";
-                writer.write_all(input.as_bytes())?;
+            // Always send as raw bytes without any processing
+            // The terminal will handle echoing and line processing
+            for line in lines {
+                writer.write_all(line.as_bytes())?;
             }
+            writer.flush()?;
+            Ok(())
+        } else {
+            Err(anyhow!("Terminal not found: {}", id))
+        }
+    }
+
+    pub fn send_raw_input(&self, id: &str, data: &str) -> Result<()> {
+        let mut writers = self.writers.lock().unwrap();
+        if let Some(writer) = writers.get_mut(id) {
+            writer.write_all(data.as_bytes())?;
             writer.flush()?;
             Ok(())
         } else {
