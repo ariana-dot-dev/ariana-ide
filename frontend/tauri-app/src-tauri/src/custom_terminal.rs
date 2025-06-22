@@ -223,7 +223,7 @@ impl TerminalState {
                     if row_in_rows_state < self.rows_state.len() {
                         let (existing_content, _) = &self.rows_state[row_in_rows_state];
                         score += similarities_count(&existing_content, content)
-                            + (self.cols as usize - content.len().max(existing_content.len()));
+                            + ((self.cols as usize).saturating_sub(content.len().max(existing_content.len())));
                     } else {
                         score += self.cols as usize;
                     }
@@ -234,22 +234,22 @@ impl TerminalState {
                 }
             }
 
-            println!(
-                "Current rows: {:#?}",
-                self.rows_state
-                    .iter()
-                    .map(|(content, _)| content)
-                    .collect::<Vec<_>>()
-            );
-            println!(
-                "Current screen: {:#?}",
-                current_screen
-                    .iter()
-                    .map(|(content, _)| content)
-                    .collect::<Vec<_>>()
-            );
-            println!("Best shift: {}", best_shift);
-            println!("Best shift score: {}", best_shift_score);
+            // println!(
+            //     "Current rows: {:#?}",
+            //     self.rows_state
+            //         .iter()
+            //         .map(|(content, _)| content)
+            //         .collect::<Vec<_>>()
+            // );
+            // println!(
+            //     "Current screen: {:#?}",
+            //     current_screen
+            //         .iter()
+            //         .map(|(content, _)| content)
+            //         .collect::<Vec<_>>()
+            // );
+            // println!("Best shift: {}", best_shift);
+            // println!("Best shift score: {}", best_shift_score);
 
             for (i, row) in current_screen.iter().enumerate() {
                 let row_in_rows_state =
@@ -273,19 +273,19 @@ impl TerminalState {
             .map(|(_, row)| row.clone())
             .collect();
 
-        println!("Cursor line: {}", cursor_line);
-        println!("Cursor col: {}", cursor_col);
-        println!(
-            "Results: {}",
-            result
-                .iter()
-                .map(|row| {
-                    let row = row.iter().map(|item| item.lexeme.clone()).collect::<Vec<_>>();
-                    row.join("")
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
+        // println!("Cursor line: {}", cursor_line);
+        // println!("Cursor col: {}", cursor_col);
+        // println!(
+        //     "Results: {}",
+        //     result
+        //         .iter()
+        //         .map(|row| {
+        //             let row = row.iter().map(|item| item.lexeme.clone()).collect::<Vec<_>>();
+        //             row.join("")
+        //         })
+        //         .collect::<Vec<_>>()
+        //         .join("\n")
+        // );
 
         TerminalEvent::ScreenUpdate {
             screen: result,
@@ -511,12 +511,12 @@ impl CustomTerminalConnection {
         Ok(())
     }
 
-    pub fn decrement_scrollback(&mut self) -> Result<()> {
+    pub fn decrement_scrollback(&mut self, amount: usize) -> Result<()> {
         let mut state = self.terminal_state.lock().unwrap();
         if state.scrollback > 0 {
-            let new_offset = state.scrollback - 1;
+            let new_offset = state.scrollback.saturating_sub(amount);
             // state.parser.set_scrollback(new_offset);
-            state.scrollback = new_offset;
+            state.scrollback = new_offset.max(0);
             let ev = state.screen_event();
             let _ = self
                 .app_handle
@@ -525,14 +525,14 @@ impl CustomTerminalConnection {
         Ok(())
     }
 
-    pub fn increment_scrollback(&mut self) -> Result<()> {
+    pub fn increment_scrollback(&mut self, amount: usize) -> Result<()> {
         let mut state = self.terminal_state.lock().unwrap();
         // vt100 panics if scrollback offset exceeds current rows_len, so clamp to rows.
-        let max_offset = state.rows_state.len() - state.rows as usize;
+        let max_offset = state.rows_state.len().saturating_sub(state.rows as usize);
         if state.scrollback < max_offset {
-            let new_offset = state.scrollback + 1;
+            let new_offset = state.scrollback.saturating_add(amount);
             // state.parser.set_scrollback(new_offset);
-            state.scrollback = new_offset;
+            state.scrollback = new_offset.min(max_offset);
             let ev = state.screen_event();
             let _ = self
                 .app_handle
@@ -589,7 +589,7 @@ impl CustomTerminalManager {
 
     pub fn send_raw_input(&self, id: &str, data: &str) -> Result<()> {
         if let Some(w) = self.writers.lock().unwrap().get_mut(id) {
-            println!("Sending raw input: {}", data);
+            // println!("Sending raw input: {}", data);
             w.write_all(data.as_bytes())?;
             w.flush()?;
             Ok(())
@@ -609,17 +609,17 @@ impl CustomTerminalManager {
         self.send_raw_input(id, &(lines.join("\n") + "\n"))
     }
 
-    pub fn decrement_scrollback(&self, id: &str) -> Result<()> {
+    pub fn decrement_scrollback(&self, id: &str, amount: usize) -> Result<()> {
         if let Some(conn) = self.connections.lock().unwrap().get_mut(id) {
-            conn.decrement_scrollback()
+            conn.decrement_scrollback(amount)
         } else {
             Err(anyhow!("Terminal connection not found"))
         }
     }
 
-    pub fn increment_scrollback(&self, id: &str) -> Result<()> {
+    pub fn increment_scrollback(&self, id: &str, amount: usize) -> Result<()> {
         if let Some(conn) = self.connections.lock().unwrap().get_mut(id) {
-            conn.increment_scrollback()
+            conn.increment_scrollback(amount)
         } else {
             Err(anyhow!("Terminal connection not found"))
         }

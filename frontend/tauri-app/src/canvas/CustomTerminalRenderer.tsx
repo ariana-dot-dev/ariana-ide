@@ -233,23 +233,49 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     }
   }, [terminalId, isConnected, sendRawInput]);
 
+  // Scroll acceleration/deceleration state
+  const scrollSpeedRef = useRef<number>(1); // current speed (1-10)
+  const scrollDirectionRef = useRef<1 | -1>(1); // 1 = down, -1 = up
+  const accelStartRef = useRef<number>(Date.now());
+  const lastWheelTimeRef = useRef<number>(0);
+
   // Handle wheel events for scrolling
   const handleWheel = useCallback(async (event: React.WheelEvent) => {
     if (!terminalId || !isConnected) return;
 
-    // Use proper scroll API methods
-    const lines = Math.ceil(Math.abs(event.deltaY) / 120); // Adjust sensitivity
+    const now = Date.now();
+    const direction: 1 | -1 = event.deltaY > 0 ? 1 : -1; // deltaY > 0 means wheel scrolled down
+
+    // Reset acceleration if direction changed
+    if (scrollDirectionRef.current !== direction) {
+      scrollDirectionRef.current = direction;
+      scrollSpeedRef.current = 1;
+      accelStartRef.current = now;
+    }
+
+    // Linear acceleration 1 -> 10 over ACCEL_DURATION (2000ms)
+    const ACCEL_DURATION = 2000;
+    const accelProgress = Math.min(1, (now - accelStartRef.current) / ACCEL_DURATION);
+    scrollSpeedRef.current = 1 + (10 - 1) * accelProgress;
+
+    // Deceleration when there is a pause between wheel events
+    const timeSinceLast = now - lastWheelTimeRef.current;
+    if (lastWheelTimeRef.current !== 0 && timeSinceLast > 250) {
+      const decayProgress = Math.min(1, timeSinceLast / ACCEL_DURATION);
+      scrollSpeedRef.current = Math.max(1, scrollSpeedRef.current - (10 - 1) * decayProgress);
+      // Adjust accelStart so next acceleration continues smoothly from the current speed
+      accelStartRef.current = now - ((scrollSpeedRef.current - 1) / (10 - 1)) * ACCEL_DURATION;
+    }
+
+    lastWheelTimeRef.current = now;
+
+    const amount = Math.ceil(scrollSpeedRef.current);
+
     try {
-      if (event.deltaY > 0) {
-        // Scroll down
-        for (let i = 0; i < lines; i++) {
-          await customTerminalAPI.sendScrollUp(terminalId);
-        }
+      if (direction === 1) {
+        await customTerminalAPI.sendScrollUp(terminalId, amount);
       } else {
-        // Scroll up
-        for (let i = 0; i < lines; i++) {
-          await customTerminalAPI.sendScrollDown(terminalId);
-        }
+        await customTerminalAPI.sendScrollDown(terminalId, amount);
       }
     } catch (err) {
       console.error('Error handling scroll:', err);
@@ -710,14 +736,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
         <div className={cn("flex gap-1")}>
           <button
-            onClick={() => customTerminalAPI.sendScrollUp(terminalId!)}
+            onClick={() => customTerminalAPI.sendScrollUp(terminalId!, 1)}
             className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
             title="Scroll Up"
           >
             ↑
           </button>
           <button
-            onClick={() => customTerminalAPI.sendScrollDown(terminalId!)}
+            onClick={() => customTerminalAPI.sendScrollDown(terminalId!, 1)}
             className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
             title="Scroll Down"
           >

@@ -97,22 +97,24 @@ pub async fn custom_send_ctrl_d(
 #[tauri::command]
 pub async fn custom_send_scroll_up(
     id: String,
+    amount: usize,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
     terminal_manager
-        .increment_scrollback(&id)
+        .increment_scrollback(&id, amount)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn custom_send_scroll_down(
     id: String,
+    amount: usize,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
     terminal_manager
-        .decrement_scrollback(&id)
+        .decrement_scrollback(&id, amount)
         .map_err(|e| e.to_string())
 }
 

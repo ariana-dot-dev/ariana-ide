@@ -221,9 +221,9 @@ export class CustomTerminalAPI {
   /**
    * Send scroll up signal
    */
-  async sendScrollUp(id: string): Promise<void> {
+  async sendScrollUp(id: string, amount: number): Promise<void> {
     try {
-      await invoke('custom_send_scroll_up', { id });
+      await invoke('custom_send_scroll_up', { id, amount });
     } catch (error) {
       throw new Error(`Failed to send scroll up: ${error}`);
     }
@@ -232,9 +232,9 @@ export class CustomTerminalAPI {
   /**
    * Send scroll down signal
    */
-  async sendScrollDown(id: string): Promise<void> {
+  async sendScrollDown(id: string, amount: number): Promise<void> {
     try {
-      await invoke('custom_send_scroll_down', { id });
+      await invoke('custom_send_scroll_down', { id, amount });
     } catch (error) {
       throw new Error(`Failed to send scroll down: ${error}`);
     }
