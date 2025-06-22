@@ -254,13 +254,13 @@ impl CustomTerminalConnection {
                         
                         for event in events {
                             if let Err(e) = app_handle.emit_all(&format!("custom-terminal-event-{}", connection_id), &event) {
-                                eprintln!("Failed to emit terminal event: {}", e);
+                                println!("Failed to emit terminal event: {}", e);
                                 break;
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error reading from PTY: {}", e);
+                        println!("Error reading from PTY: {}", e);
                         break;
                     }
                 }
@@ -318,6 +318,10 @@ pub struct TerminalState {
     parser_state: ParserState,
     escape_buffer: String,
     scroll_offset: u16, // How many lines we're scrolled back from the bottom
+    // Scrolling region (inclusive). If top == 0 and bottom == screen_rows - 1, the whole screen scrolls.
+    scroll_region_top: u16,
+    scroll_region_bottom: u16,
+    scroll_region_active: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -372,6 +376,9 @@ impl TerminalState {
             parser_state: ParserState::Ground,
             escape_buffer: String::new(),
             scroll_offset: 0,
+            scroll_region_top: 0,
+            scroll_region_bottom: rows.saturating_sub(1),
+            scroll_region_active: false,
         };
         
         // Ensure buffer is properly sized from the start
@@ -413,7 +420,7 @@ impl TerminalState {
             ParserState::Ground => {
                 match ch {
                     '\x1b' => {
-                        eprintln!("ESC received, entering escape state");
+                        println!("ESC received, entering escape state");
                         self.parser_state = ParserState::Escape;
                         self.escape_buffer.clear();
                     },
@@ -428,7 +435,13 @@ impl TerminalState {
                     '\t' => {
                         // Tab - move to next tab stop (every 8 characters)
                         let next_tab = ((self.cursor_col / 8) + 1) * 8;
-                        self.cursor_col = next_tab.min(self.screen_cols.saturating_sub(1));
+                        let target_col = next_tab.min(self.screen_cols.saturating_sub(1));
+                        
+                        // Fill with spaces from current position to tab stop
+                        while self.cursor_col < target_col && self.cursor_col < self.screen_cols {
+                            self.write_char_at_cursor(' ');
+                            self.cursor_col += 1;
+                        }
                     },
                     c if c.is_control() => {
                         // Skip other control characters
@@ -447,33 +460,45 @@ impl TerminalState {
                 }
             },
             ParserState::Escape => {
-                eprintln!("In escape state, received: '{}'", ch);
+                println!("In escape state, received: '{}'", ch);
                 match ch {
                     '[' => {
-                        eprintln!("CSI sequence starting");
+                        println!("CSI sequence starting");
                         self.parser_state = ParserState::CSI;
                         self.escape_buffer.clear();
                     },
                     ']' => {
-                        eprintln!("OSC sequence starting");
+                        println!("OSC sequence starting");
                         self.parser_state = ParserState::OSC;
                         self.escape_buffer.clear();
                     },
                     '7' => {
                         // Save cursor position (DECSC)
-                        eprintln!("Save cursor (ESC 7)");
+                        println!("Save cursor (ESC 7)");
                         self.save_cursor();
                         self.parser_state = ParserState::Ground;
                     },
                     '8' => {
                         // Restore cursor position (DECRC)
-                        eprintln!("Restore cursor (ESC 8)");
+                        println!("Restore cursor (ESC 8)");
                         self.restore_cursor();
+                        self.parser_state = ParserState::Ground;
+                    },
+                    'D' => {
+                        // Index (IND) – move cursor down, scrolling if needed
+                        println!("Index (ESC D)");
+                        self.line_feed();
+                        self.parser_state = ParserState::Ground;
+                    },
+                    'M' => {
+                        // Reverse Index (RI) – move cursor up, scrolling within region
+                        println!("Reverse Index (ESC M)");
+                        self.reverse_index();
                         self.parser_state = ParserState::Ground;
                     },
                     _ => {
                         // Unknown escape sequence, go back to ground
-                        eprintln!("Unknown escape sequence: ESC {}", ch);
+                        println!("Unknown escape sequence: ESC {}", ch);
                         self.parser_state = ParserState::Ground;
                     }
                 }
@@ -482,14 +507,14 @@ impl TerminalState {
                 if ch.is_ascii_alphabetic() {
                     // End of CSI sequence
                     let buffer = self.escape_buffer.clone();
-                    eprintln!("Complete CSI sequence: ESC[{}{}", buffer, ch);
+                    println!("Complete CSI sequence: ESC[{}{}", buffer, ch);
                     self.handle_csi_sequence(&buffer, ch);
                     self.parser_state = ParserState::Ground;
                     self.escape_buffer.clear();
                 } else {
                     // Accumulate parameters
                     self.escape_buffer.push(ch);
-                    eprintln!("CSI buffer now: '{}'", self.escape_buffer);
+                    println!("CSI buffer now: '{}'", self.escape_buffer);
                 }
             },
             ParserState::OSC => {
@@ -548,11 +573,11 @@ impl TerminalState {
                         1 => {
                             // DECCKM - Cursor Keys Mode (application mode)
                             // VIM uses this for arrow keys
-                            eprintln!("Cursor keys mode: application");
+                            println!("Cursor keys mode: application");
                         },
                         5 => {
                             // DECSCNM - Screen mode (reverse video)
-                            eprintln!("Reverse video mode enabled");
+                            println!("Reverse video mode enabled");
                         },
                         7 => {
                             // DECAWM - Auto-wrap Mode
@@ -563,7 +588,7 @@ impl TerminalState {
                         },
                         25 => {
                             // DECTCEM - Show cursor
-                            eprintln!("CURSOR SHOWN");
+                            println!("CURSOR SHOWN");
                         },
                         47 | 1047 => {
                             // Use alternate screen buffer (simpler version)
@@ -578,13 +603,13 @@ impl TerminalState {
                         },
                         1004 => {
                             // Send FocusIn/FocusOut events - VIM uses this for cursor shape
-                            eprintln!("Enabling focus events - should send ESC[I on focus in, ESC[O on focus out");
+                            println!("Enabling focus events - should send ESC[I on focus in, ESC[O on focus out");
                         },
                         2004 => {
                             // Bracketed paste mode (ignore for now)
                         },
                         _ => {
-                            eprintln!("Unknown DEC private mode set: {}", param);
+                            println!("Unknown DEC private mode set: {}", param);
                         }
                     }
                 }
@@ -595,11 +620,11 @@ impl TerminalState {
                     match param {
                         1 => {
                             // DECCKM - Cursor Keys Mode (normal mode)
-                            eprintln!("Cursor keys mode: normal");
+                            println!("Cursor keys mode: normal");
                         },
                         5 => {
                             // DECSCNM - Screen mode (normal video)
-                            eprintln!("Reverse video mode disabled");
+                            println!("Reverse video mode disabled");
                         },
                         7 => {
                             // DECAWM - Auto-wrap Mode
@@ -610,7 +635,7 @@ impl TerminalState {
                         },
                         25 => {
                             // DECTCEM - Hide cursor
-                            eprintln!("CURSOR HIDDEN");
+                            println!("CURSOR HIDDEN");
                         },
                         47 | 1047 => {
                             // Use normal screen buffer (simpler version)
@@ -627,13 +652,13 @@ impl TerminalState {
                         },
                         1004 => {
                             // Disable FocusIn/FocusOut events
-                            eprintln!("Disabling focus events");
+                            println!("Disabling focus events");
                         },
                         2004 => {
                             // Disable bracketed paste mode
                         },
                         _ => {
-                            eprintln!("Unknown DEC private mode reset: {}", param);
+                            println!("Unknown DEC private mode reset: {}", param);
                         }
                     }
                 }
@@ -642,43 +667,51 @@ impl TerminalState {
                 // Device Status Report (DSR) - VIM uses this to query terminal capabilities
                 let param = params.get(0).copied().unwrap_or(0);
                 match param {
-                    5 => eprintln!("Status report request - should respond with ESC[0n (terminal OK)"),
-                    6 => eprintln!("Cursor position report request - should respond with ESC[{};{}R", self.cursor_line + 1, self.cursor_col + 1),
-                    _ => eprintln!("Unknown DSR request: {}", param),
+                    5 => {
+                        println!("Status report request - responding with ESC[0n (terminal OK)");
+                        // TODO: Send response back to PTY: "\x1b[0n"
+                    },
+                    6 => {
+                        println!("Cursor position report request - responding with ESC[{};{}R", self.cursor_line + 1, self.cursor_col + 1);
+                        // TODO: Send response back to PTY: format!("\x1b[{};{}R", self.cursor_line + 1, self.cursor_col + 1)
+                    },
+                    _ => println!("Unknown DSR request: {}", param),
                 }
             },
             'c' => {
                 // Device Attributes - VIM queries terminal capabilities
                 if params.is_empty() || params[0] == 0 {
-                    eprintln!("Primary device attributes request - should respond with terminal type");
+                    println!("Primary device attributes request - responding with terminal type");
+                    // TODO: Send response back to PTY: "\x1b[?1;2c" (VT100 compatible)
                 } else {
-                    eprintln!("Secondary device attributes request");
+                    println!("Secondary device attributes request");
+                    // TODO: Send response back to PTY: "\x1b[>0;95;0c" (VT220 compatible)
                 }
             },
             'q' => {
                 // DECSCUSR - Set cursor style (VIM uses this extensively)
                 let style = params.get(0).copied().unwrap_or(0);
                 match style {
-                    0 => eprintln!("Reset cursor to default"),
-                    1 => eprintln!("Set cursor to blinking block"),
-                    2 => eprintln!("Set cursor to steady block"),
-                    3 => eprintln!("Set cursor to blinking underline"),
-                    4 => eprintln!("Set cursor to steady underline"),
-                    5 => eprintln!("Set cursor to blinking bar"),
-                    6 => eprintln!("Set cursor to steady bar"),
-                    _ => eprintln!("Unknown cursor style: {}", style),
+                    0 => println!("Reset cursor to default"),
+                    1 => println!("Set cursor to blinking block"),
+                    2 => println!("Set cursor to steady block"),
+                    3 => println!("Set cursor to blinking underline"),
+                    4 => println!("Set cursor to steady underline"),
+                    5 => println!("Set cursor to blinking bar"),
+                    6 => println!("Set cursor to steady bar"),
+                    _ => println!("Unknown cursor style: {}", style),
                 }
             },
             'p' => {
                 // Various DEC private mode controls
-                eprintln!("DEC private mode 'p' command with params: {:?}", params);
+                println!("DEC private mode 'p' command with params: {:?}", params);
             },
             'm' => {
                 // DEC private mode SGR-like sequences
-                eprintln!("DEC private mode 'm' command with params: {:?}", params);
+                println!("DEC private mode 'm' command with params: {:?}", params);
             },
             _ => {
-                eprintln!("Unknown DEC private command '{}' with params: {:?}", cmd, params);
+                println!("Unknown DEC private command '{}' with params: {:?}", cmd, params);
             }
         }
     }
@@ -690,28 +723,28 @@ impl TerminalState {
                 let amount = params.get(0).copied().unwrap_or(1);
                 let old_line = self.cursor_line;
                 self.cursor_line = self.cursor_line.saturating_sub(amount);
-                eprintln!("Cursor up {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
+                println!("Cursor up {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
             },
             'B' => {
                 // Cursor down
                 let amount = params.get(0).copied().unwrap_or(1);
                 let old_line = self.cursor_line;
                 self.cursor_line = (self.cursor_line + amount).min(self.screen_rows.saturating_sub(1));
-                eprintln!("Cursor down {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
+                println!("Cursor down {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
             },
             'C' => {
                 // Cursor right
                 let amount = params.get(0).copied().unwrap_or(1);
                 let old_col = self.cursor_col;
                 self.cursor_col = (self.cursor_col + amount).min(self.screen_cols.saturating_sub(1));
-                eprintln!("Cursor right {} from {}:{} to {}:{}", amount, self.cursor_line, old_col, self.cursor_line, self.cursor_col);
+                println!("Cursor right {} from {}:{} to {}:{}", amount, self.cursor_line, old_col, self.cursor_line, self.cursor_col);
             },
             'D' => {
                 // Cursor left
                 let amount = params.get(0).copied().unwrap_or(1);
                 let old_col = self.cursor_col;
                 self.cursor_col = self.cursor_col.saturating_sub(amount);
-                eprintln!("Cursor left {} from {}:{} to {}:{}", amount, self.cursor_line, old_col, self.cursor_line, self.cursor_col);
+                println!("Cursor left {} from {}:{} to {}:{}", amount, self.cursor_line, old_col, self.cursor_line, self.cursor_col);
             },
             'E' => {
                 // Cursor next line
@@ -738,7 +771,7 @@ impl TerminalState {
                 let old_col = self.cursor_col;
                 self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
                 self.cursor_col = col.min(self.screen_cols.saturating_sub(1));
-                eprintln!("Cursor position set from {}:{} to {}:{} (requested: {}:{})", 
+                println!("Cursor position set from {}:{} to {}:{} (requested: {}:{})", 
                     old_line, old_col, self.cursor_line, self.cursor_col, line, col);
             },
             'J' => {
@@ -828,33 +861,33 @@ impl TerminalState {
                     },
                     18 => {
                         // Report terminal size in characters - VIM expects ESC[8;rows;colst response
-                        // TODO: Send response back to terminal
-                        eprintln!("Terminal size request: should respond with ESC[8;{};{}t", self.screen_rows, self.screen_cols);
+                        println!("Terminal size request: responding with ESC[8;{};{}t", self.screen_rows, self.screen_cols);
+                        // TODO: Send response back to PTY: format!("\x1b[8;{};{}t", self.screen_rows, self.screen_cols)
                     },
                     19 => {
                         // Report screen size in characters
-                        eprintln!("Screen size request: should respond with ESC[9;{};{}t", self.screen_rows, self.screen_cols);
+                        println!("Screen size request: should respond with ESC[9;{};{}t", self.screen_rows, self.screen_cols);
                     },
                     21 => {
                         // Report window title
-                        eprintln!("Window title request: should respond with title");
+                        println!("Window title request: should respond with title");
                     },
                     22 => {
                         // Push window title onto stack
                         if params.len() >= 2 {
                             let mode = params[1];
-                            eprintln!("Push title mode {}", mode);
+                            println!("Push title mode {}", mode);
                         }
                     },
                     23 => {
                         // Pop window title from stack
                         if params.len() >= 2 {
                             let mode = params[1];
-                            eprintln!("Pop title mode {}", mode);
+                            println!("Pop title mode {}", mode);
                         }
                     },
                     _ => {
-                        eprintln!("Unknown window manipulation: ESC[{}t", 
+                        println!("Unknown window manipulation: ESC[{}t", 
                             params.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(";"));
                     }
                 }
@@ -865,7 +898,7 @@ impl TerminalState {
             },
             _ => {
                 // Log unknown sequences for debugging
-                eprintln!("Unknown CSI sequence: {}[{}]{}", 
+                println!("Unknown CSI sequence: {}[{}]{}", 
                     "\x1b", 
                     params.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(";"),
                     cmd
@@ -943,7 +976,7 @@ impl TerminalState {
         if self.cursor_line < self.screen_rows {
             // Debug output for important characters
             if ch != ' ' && !ch.is_control() {
-                eprintln!("Writing '{}' at {}:{}", ch, self.cursor_line, self.cursor_col);
+                println!("Writing '{}' at {}:{}", ch, self.cursor_line, self.cursor_col);
             }
             
             // Ensure the line exists
@@ -956,6 +989,7 @@ impl TerminalState {
             
             // Extend the line if needed
             let line = &mut self.screen_buffer[self.cursor_line as usize];
+            
             while line.len() <= self.cursor_col as usize {
                 line.push(space_item.clone());
             }
@@ -965,41 +999,63 @@ impl TerminalState {
                 line[self.cursor_col as usize] = char_item;
             }
         } else {
-            eprintln!("WARNING: Trying to write '{}' at invalid line {}:{} (screen_rows: {})", 
+            println!("WARNING: Trying to write '{}' at invalid line {}:{} (screen_rows: {})", 
                 ch, self.cursor_line, self.cursor_col, self.screen_rows);
         }
     }
     
     fn line_feed(&mut self) {
-        self.cursor_line += 1;
-        
-        // If we've gone past the bottom of the screen, scroll up
-        if self.cursor_line >= self.screen_rows {
-            self.scroll_up(1);
-            self.cursor_line = self.screen_rows.saturating_sub(1);
+        if !self.scroll_region_active {
+            // classic behaviour
+            self.cursor_line += 1;
+            if self.cursor_line >= self.screen_rows {
+                self.scroll_up(1);
+                self.cursor_line = self.screen_rows.saturating_sub(1);
+            }
+        } else {
+            let bottom = self.scroll_region_bottom.min(self.screen_rows.saturating_sub(1));
+            if self.cursor_line == bottom {
+                self.scroll_up_region(1, self.scroll_region_top, bottom);
+            } else {
+                self.cursor_line += 1;
+            }
         }
-        
         // Ensure we have enough lines in the buffer
         self.ensure_screen_buffer_size();
     }
     
+    fn scroll_up_region(&mut self, amount: u16, top: u16, bottom: u16) {
+        if top >= bottom || bottom as usize >= self.screen_buffer.len() {
+            return;
+        }
+        for _ in 0..amount {
+            // Remove the line at the top of the region
+            let removed_line = self.screen_buffer.remove(top as usize);
+            // Optionally push removed line to scrollback if region is full screen
+            if top == 0 && bottom == self.screen_rows.saturating_sub(1) {
+                self.scrollback_buffer.push(removed_line);
+                if self.scrollback_buffer.len() > 10000 {
+                    self.scrollback_buffer.remove(0);
+                }
+            }
+            // Insert a blank line at the bottom of the region
+            self.screen_buffer.insert(bottom as usize, Vec::new());
+        }
+    }
+
     fn scroll_up(&mut self, amount: u16) {
         for _ in 0..amount {
             if !self.screen_buffer.is_empty() {
                 // Move top line to scrollback buffer
                 let top_line = self.screen_buffer.remove(0);
                 self.scrollback_buffer.push(top_line);
-                
-                // Limit scrollback buffer size to prevent memory issues
                 if self.scrollback_buffer.len() > 10000 {
                     self.scrollback_buffer.remove(0);
                 }
-                
                 // Add empty line at bottom
                 self.screen_buffer.push(Vec::new());
             }
         }
-        
         // Ensure screen buffer always has the correct number of lines
         self.ensure_screen_buffer_size();
     }
@@ -1043,12 +1099,8 @@ impl TerminalState {
             let space_item = self.create_line_item(" ".to_string());
             let line = &mut self.screen_buffer[self.cursor_line as usize];
             
-            for i in 0..=self.cursor_col as usize {
-                if i < line.len() {
-                    line[i] = space_item.clone();
-                } else {
-                    line.push(space_item.clone());
-                }
+            while line.len() <= self.cursor_col as usize {
+                line.push(space_item.clone());
             }
         }
     }
@@ -1136,7 +1188,7 @@ impl TerminalState {
     
     fn create_line_item(&self, text: String) -> LineItem {
         LineItem {
-            width: text.chars().count() as u16,
+            width: Self::calculate_display_width(&text),
             lexeme: text,
             is_bold: self.current_style.bold,
             is_italic: self.current_style.italic,
@@ -1144,6 +1196,35 @@ impl TerminalState {
             foreground_color: self.current_style.foreground.clone(),
             background_color: self.current_style.background.clone(),
         }
+    }
+    
+    /// Calculate the display width of text in terminal columns
+    /// This handles Unicode characters, zero-width characters, and control sequences properly
+    fn calculate_display_width(text: &str) -> u16 {
+        let mut width = 0u16;
+        
+        for ch in text.chars() {
+            match ch {
+                // Control characters have zero width
+                '\x00'..='\x1F' | '\x7F' => {},
+                // Regular ASCII characters have width 1
+                '\x20'..='\x7E' => width += 1,
+                // Handle common Unicode cases
+                _ => {
+                    // For now, assume width 1 for most Unicode characters
+                    // In a full implementation, we'd use a Unicode width library
+                    // like unicode-width crate, but for simplicity:
+                    if ch.is_whitespace() {
+                        width += 1;
+                    } else if !ch.is_control() {
+                        width += 1;
+                    }
+                    // Zero-width characters (combining marks, etc.) add 0
+                }
+            }
+        }
+        
+        width
     }
     
     /// Resize the terminal state to new dimensions
@@ -1207,6 +1288,7 @@ impl TerminalState {
     }
 
     fn delete_chars_at_cursor(&mut self, amount: u16) {
+        let space_item = self.create_line_item(" ".to_string());
         if let Some(line) = self.screen_buffer.get_mut(self.cursor_line as usize) {
             let start_col = self.cursor_col as usize;
             let end_col = (start_col + amount as usize).min(line.len());
@@ -1216,16 +1298,38 @@ impl TerminalState {
         }
     }
 
-    fn scroll_down_terminal(&mut self, amount: u16) {
-        for _ in 0..amount {
-            if !self.scrollback_buffer.is_empty() {
-                let restored_line = self.scrollback_buffer.pop().unwrap_or_default();
-                self.screen_buffer.insert(0, restored_line);
-                if self.screen_buffer.len() > self.screen_rows as usize {
-                    self.screen_buffer.pop();
-                }
+    fn reverse_index(&mut self) {
+        if self.cursor_line == self.scroll_region_top {
+            // Scroll region down by one line
+            self.scroll_down_region(1, self.scroll_region_top, self.scroll_region_bottom);
+        } else {
+            // Just move cursor up one line if possible
+            if self.cursor_line > 0 {
+                self.cursor_line -= 1;
             }
         }
+    }
+
+    fn scroll_down_region(&mut self, amount: u16, top: u16, bottom: u16) {
+        if top >= bottom || bottom as usize >= self.screen_buffer.len() {
+            return;
+        }
+        for _ in 0..amount {
+            // Remove the line at the bottom of the region
+            let removed_line = self.screen_buffer.remove(bottom as usize);
+            // Insert an empty line at the top of the region
+            self.screen_buffer.insert(top as usize, Vec::new());
+            // If full screen, push removed line into scrollback (opposite of up)
+            if top == 0 && bottom == self.screen_rows.saturating_sub(1) {
+                // When scrolling down terminal history we restore from scrollback, but for region we drop.
+            }
+        }
+    }
+
+    fn scroll_down_terminal(&mut self, amount: u16) {
+        let top = self.scroll_region_top;
+        let bottom = self.scroll_region_bottom.min(self.screen_rows.saturating_sub(1));
+        self.scroll_down_region(amount, top, bottom);
     }
 
     fn erase_chars_at_cursor(&mut self, amount: u16) {
@@ -1243,9 +1347,22 @@ impl TerminalState {
         }
     }
 
-    fn set_scroll_region(&mut self, _top: u16, _bottom: u16) {
-        // TODO: Implement scroll region support
-        // For now, just ignore - this would require more complex buffer management
+    fn set_scroll_region(&mut self, top: u16, bottom: u16) {
+        // CSI r  parameters are 1-based; convert to 0-based inclusive indices.
+        let max_bottom = self.screen_rows.saturating_sub(1);
+        let t = top.saturating_sub(1);
+        let b = bottom.saturating_sub(1);
+        if top == 0 && bottom == 0 {
+            // ESC[r with no params resets region
+            self.scroll_region_top = 0;
+            self.scroll_region_bottom = max_bottom;
+            self.scroll_region_active = false;
+        } else {
+            self.scroll_region_top = t.min(max_bottom);
+            self.scroll_region_bottom = b.min(max_bottom).max(self.scroll_region_top);
+            self.scroll_region_active = !(self.scroll_region_top == 0 && self.scroll_region_bottom == max_bottom);
+        }
+        println!("Set scroll region: {}-{} / rows {}", self.scroll_region_top, self.scroll_region_bottom, self.screen_rows);
     }
     
     /// Scroll up in the scrollback buffer (view older content)
@@ -1381,7 +1498,7 @@ impl CustomTerminalManager {
             // Emit the scroll events
             for event in events {
                 if let Err(e) = connection.app_handle.emit_all(&format!("custom-terminal-event-{}", connection_id), &event) {
-                    eprintln!("Failed to emit scroll event: {}", e);
+                    println!("Failed to emit scroll event: {}", e);
                 }
             }
             

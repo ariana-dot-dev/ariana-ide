@@ -280,8 +280,9 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         return;
       }
 
-      const charWidth = 8.2;
-      const charHeight = 17;
+      // Use more precise character measurements for monospace fonts
+      const charWidth = 8.5;  // Slightly wider for better accuracy
+      const charHeight = 17;  // Better line height
 
       const cols = Math.max(20, Math.floor(containerRect.width / charWidth));
       const lines = Math.max(5, Math.floor(containerRect.height / charHeight));
@@ -499,6 +500,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
             targetArray.push(
               <div
                 key={`${spanStartCol}-before`}
+                className="flex"
                 style={{
                   color: colorToCSS(currentItem.foreground_color),
                   backgroundColor: colorToCSS(currentItem.background_color),
@@ -506,11 +508,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                   fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                   textDecoration: currentItem.is_underline ? 'underline' : 'none',
                   whiteSpace: 'pre',
-                  width: `${textBeforeCursor.length * 7.35}px`,
+                  // width: `${textBeforeCursor.length * 7.45}px`,
+                  overflow: 'hidden',
                   boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
                 }}
               >
-                {textBeforeCursor}
+                {textBeforeCursor.split('').map((char, index) => (
+                  <div key={index} style={{ width: '7.45px' }}>{char}</div>
+                ))}
               </div>
             );
           }
@@ -519,6 +524,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           targetArray.push(
             <div
               key={`${spanStartCol}-cursor`}
+              className="flex"
               style={{
                 color: colorToCSS(currentItem.foreground_color),
                 backgroundColor: 'var(--whitest)',
@@ -526,11 +532,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
                 whiteSpace: 'pre',
-                width: `${textAtCursor.length * 7.35}px`,
+                overflow: 'hidden',
                 boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
               }}
             >
-              {textAtCursor}
+              {textAtCursor.split('').map((char, index) => (
+                <div key={index} style={{ width: '7.45px' }}>{char}</div>
+              ))}
             </div>
           );
 
@@ -539,6 +547,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
             targetArray.push(
               <div
                 key={`${spanStartCol}-after`}
+                className="flex"
                 style={{
                   color: colorToCSS(currentItem.foreground_color),
                   backgroundColor: colorToCSS(currentItem.background_color),
@@ -546,11 +555,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                   fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                   textDecoration: currentItem.is_underline ? 'underline' : 'none',
                   whiteSpace: 'pre',
-                  width: `${textAfterCursor.length * 7.35}px`,
+                  overflow: 'hidden',
                   boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
                 }}
               >
-                {textAfterCursor}
+                {textAfterCursor.split('').map((char, index) => (
+                  <div key={index} style={{ width: '7.45px' }}>{char}</div>
+                ))}
               </div>
             );
           }
@@ -558,6 +569,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           targetArray.push(
             <div
               key={spanStartCol}
+              className="flex"
               style={{
                 color: colorToCSS(currentItem.foreground_color),
                 backgroundColor: hasCursor ? 'var(--whitest)' : colorToCSS(currentItem.background_color),
@@ -565,11 +577,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
                 whiteSpace: 'pre',
-                width: `${combinedText.length * 7.35}px`,
+                overflow: 'hidden',
                 boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
               }}
             >
-              {combinedText}
+              {combinedText.split('').map((char, index) => (
+                <div key={index} style={{ width: '7.45px' }}>{char}</div>
+              ))}
             </div>
           );
         }
@@ -598,19 +612,19 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     createOptimizedSpans(itemsAfterCursor, itemsBeforeCursor.reduce((acc, item) => acc + (item.width || 1), 0), lineAfterCursor, true);
 
     // Add cursor at end of line if needed
-    if (line.length > 0 && lineIndex === cursorPosition.line && currentCol <= cursorPosition.col) {
-      const lastItem = line[line.length - 1];
+    if (lineIndex === cursorPosition.line && currentCol <= cursorPosition.col) {
+      const styleSource = line.length > 0 ? line[line.length - 1] : { foreground_color: null, is_bold: false, is_italic: false, is_underline: false };
       lineAfterCursor.push(
         <div
           key={currentCol}
           style={{
-            color: colorToCSS(lastItem.foreground_color),
+            color: colorToCSS(styleSource.foreground_color),
             backgroundColor: 'var(--whitest)',
-            fontWeight: lastItem.is_bold ? 'bold' : 'normal',
-            fontStyle: lastItem.is_italic ? 'italic' : 'normal',
-            textDecoration: lastItem.is_underline ? 'underline' : 'none',
+            fontWeight: styleSource.is_bold ? 'bold' : 'normal',
+            fontStyle: styleSource.is_italic ? 'italic' : 'normal',
+            textDecoration: styleSource.is_underline ? 'underline' : 'none',
             whiteSpace: 'pre',
-            width: '8px',
+            width: '7.45px',
             boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
           }}
         >
@@ -620,10 +634,37 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     }
 
     const isAtCursorLine = lineIndex === cursorPosition.line;
+    
+    // Handle empty lines or lines with no content
+    if (lineBeforeCursor.length === 0 && lineAfterCursor.length === 0) {
+      return (
+        <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap min-h-4 flex")}
+          style={{ 
+            width: `fit`,
+            height: '16px',
+            boxShadow: `inset 0 -0.5px 0 var(--fg-800-30)`,
+          }}>
+          {isAtCursorLine && (
+            <div
+              style={{
+                backgroundColor: 'var(--whitest)',
+                width: '7.45px',
+                height: '16px',
+                boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
+              }}
+            >
+              {' '}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
     return (
       <div key={lineIndex} className={cn("font-mono text-xs leading-4 whitespace-nowrap min-h-4 flex")}
         style={{ 
           width: `fit`,
+          height: '16px',
           boxShadow: `inset 0 -0.5px 0 var(--fg-800-30)`,
         }}>
         {lineBeforeCursor}
@@ -686,7 +727,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         </div>
       </div>
 
-      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--blackest)] overflow-hidden max-h-full h-full font-mono")}>
+      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--blackest)] overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
         <div className={cn("absolute top-0 left-0 w-full h-fit p-2")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
             const line = screen[rowIndex] || []; // Use empty array if line doesn't exist
