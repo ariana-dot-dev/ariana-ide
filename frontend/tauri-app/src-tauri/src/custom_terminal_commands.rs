@@ -31,7 +31,7 @@ pub async fn custom_reconnect_terminal(
     id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
+    let mut terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
     terminal_manager
         .reconnect_terminal(&id)
         .map_err(|e| e.to_string())

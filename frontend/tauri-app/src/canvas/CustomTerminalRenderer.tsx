@@ -243,12 +243,12 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
       if (event.deltaY > 0) {
         // Scroll down
         for (let i = 0; i < lines; i++) {
-          await customTerminalAPI.sendScrollDown(terminalId);
+          await customTerminalAPI.sendScrollUp(terminalId);
         }
       } else {
         // Scroll up
         for (let i = 0; i < lines; i++) {
-          await customTerminalAPI.sendScrollUp(terminalId);
+          await customTerminalAPI.sendScrollDown(terminalId);
         }
       }
     } catch (err) {
@@ -286,6 +286,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
       const cols = Math.max(20, Math.floor(containerRect.width / charWidth));
       const lines = Math.max(5, Math.floor(containerRect.height / charHeight));
+      // const lines = 100;
 
       // Only resize if dimensions actually changed
       if (terminalDimensions.cols === cols && terminalDimensions.rows === lines) {
@@ -735,7 +736,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
       <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--bg-900)] overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
         <div className={cn("absolute top-0 left-0 w-full h-fit p-2")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
-            const line = screen[rowIndex] || []; // Use empty array if line doesn't exist
+            const line = screen[rowIndex] || [];
             return renderScreenLine(line, rowIndex, terminalDimensions.cols);
           })}
         </div>

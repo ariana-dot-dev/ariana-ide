@@ -128,14 +128,16 @@ pub enum ScrollDirection {
 // -------------------------------------------------------------------------------------------------
 
 /// How many scroll-back lines to keep.
-const HISTORY_LINES: usize = 10_000;
+const HISTORY_LINES: usize = 100_000;
 
 pub struct TerminalState {
     parser: Parser,
     rows: u16,
     cols: u16,
+    max_rows_ever: u16,
     scrollback: usize,
     max_scrollback: usize,
+    rows_state: Vec<(String, Vec<LineItem>)>,
 }
 
 impl TerminalState {
@@ -144,8 +146,10 @@ impl TerminalState {
             parser: Parser::new(rows.into(), cols.into(), HISTORY_LINES),
             rows,
             cols,
+            max_rows_ever: cols,
             scrollback: 0,
             max_scrollback: HISTORY_LINES,
+            rows_state: Vec::new(),
         }
     }
 
@@ -153,6 +157,7 @@ impl TerminalState {
         self.parser.set_size(rows.into(), cols.into());
         self.rows = rows;
         self.cols = cols;
+        self.max_rows_ever = self.max_rows_ever.max(rows);
     }
 
     /// Feed raw bytes coming from the PTY, return events we must emit.
@@ -175,21 +180,21 @@ impl TerminalState {
 
     /// Used by the scroll wheel handlers.  We simply re-emit the current
     /// screen because vt100 automatically keeps HISTORY_LINES.
-    pub fn screen_event(&self) -> TerminalEvent {
+    pub fn screen_event(&mut self) -> TerminalEvent {
         self.build_screen_event()
     }
 
     // ---------------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------------
-    fn build_screen_event(&self) -> TerminalEvent {
+    fn build_screen_event(&mut self) -> TerminalEvent {
         let screen = self.parser.screen();
 
         // cursor
         let (cursor_line, cursor_col) = screen.cursor_position();
 
         // rows & cols are known so we can iterate directly
-        let mut result = Vec::with_capacity(self.rows as usize);
+        let mut current_screen = Vec::with_capacity(self.rows as usize);
         for r in 0..self.rows {
             let mut row_vec = Vec::with_capacity(self.cols as usize);
             let mut visual_col: u16 = 0;
@@ -198,8 +203,89 @@ impl TerminalState {
                 visual_col += item.width;
                 row_vec.push(item);
             }
-            result.push(row_vec);
+            let mut cumulated_text = String::new();
+            for item in &row_vec {
+                cumulated_text.push_str(&item.lexeme);
+            }
+            current_screen.push((cumulated_text, row_vec));
         }
+
+        if self.rows_state.len() == 0 {
+            self.rows_state = current_screen.clone();
+        } else {
+            let mut best_shift = -1isize;
+            let mut best_shift_score = self.cols as usize * self.rows as usize;
+
+            for shift in 0..self.rows_state.len().min(self.max_rows_ever as usize) {
+                let mut score = 0usize;
+                for (i, (content, _)) in current_screen.iter().enumerate() {
+                    let row_in_rows_state = self.rows_state.len() + i - (shift + 1);
+                    if row_in_rows_state < self.rows_state.len() {
+                        let (existing_content, _) = &self.rows_state[row_in_rows_state];
+                        score += similarities_count(&existing_content, content)
+                            + (self.cols as usize - content.len().max(existing_content.len()));
+                    } else {
+                        score += self.cols as usize;
+                    }
+                }
+                if score > best_shift_score {
+                    best_shift = shift as isize;
+                    best_shift_score = score;
+                }
+            }
+
+            println!(
+                "Current rows: {:#?}",
+                self.rows_state
+                    .iter()
+                    .map(|(content, _)| content)
+                    .collect::<Vec<_>>()
+            );
+            println!(
+                "Current screen: {:#?}",
+                current_screen
+                    .iter()
+                    .map(|(content, _)| content)
+                    .collect::<Vec<_>>()
+            );
+            println!("Best shift: {}", best_shift);
+            println!("Best shift score: {}", best_shift_score);
+
+            for (i, row) in current_screen.iter().enumerate() {
+                let row_in_rows_state =
+                    self.rows_state.len() as isize + i as isize - (best_shift + 1);
+                if row_in_rows_state < self.rows_state.len() as isize && row_in_rows_state >= 0 {
+                    self.rows_state[row_in_rows_state as usize] = row.clone();
+                } else if row_in_rows_state >= 0 {
+                    self.rows_state.push(row.clone());
+                }
+            }
+        }
+
+        // let result = current_screen.into_iter().map(|(_, row)| row).collect();
+
+        // get last self.rows rows from self.rows_state
+        let result: Vec<Vec<LineItem>> = self
+            .rows_state
+            .iter()
+            .skip(self.rows_state.len().saturating_sub(self.rows as usize + self.scrollback))
+            .take(self.rows as usize)
+            .map(|(_, row)| row.clone())
+            .collect();
+
+        println!("Cursor line: {}", cursor_line);
+        println!("Cursor col: {}", cursor_col);
+        println!(
+            "Results: {}",
+            result
+                .iter()
+                .map(|row| {
+                    let row = row.iter().map(|item| item.lexeme.clone()).collect::<Vec<_>>();
+                    row.join("")
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
 
         TerminalEvent::ScreenUpdate {
             screen: result,
@@ -209,7 +295,24 @@ impl TerminalState {
     }
 }
 
-const TAB_WIDTH: usize = 4;   // was 8 in the legacy code – pick whichever
+fn similarities_count(s1: &str, s2: &str) -> usize {
+    s1.chars()
+        .zip(s2.chars())
+        .map(|(c1, c2)| {
+            if c1 == c2 {
+                2
+            } else if (c1.is_whitespace() && !c2.is_whitespace())
+                || (!c1.is_whitespace() && c2.is_whitespace())
+            {
+                1
+            } else {
+                0
+            }
+        })
+        .sum()
+}
+
+const TAB_WIDTH: usize = 4; // was 8 in the legacy code – pick whichever
 
 fn cell_to_item(opt: Option<Cell>, col: u16) -> LineItem {
     let (mut txt, bold, italic, underline, fg, bg) = if let Some(c) = opt {
@@ -278,9 +381,7 @@ impl CustomTerminalConnection {
         let cmd = Self::build_command(&spec)?;
         let child = pty_pair.slave.spawn_command(cmd)?;
 
-        let state = Arc::new(Mutex::new(TerminalState::new(
-            spec.lines, spec.cols,
-        )));
+        let state = Arc::new(Mutex::new(TerminalState::new(spec.lines, spec.cols)));
 
         Ok(Self {
             id,
@@ -324,9 +425,7 @@ impl CustomTerminalConnection {
                     let mut c = CommandBuilder::new(exe);
                     c.arg("--login");
                     c.arg("-i");
-                    if let Some(wd) =
-                        working_directory.as_ref().or(spec.working_dir.as_ref())
-                    {
+                    if let Some(wd) = working_directory.as_ref().or(spec.working_dir.as_ref()) {
                         c.cwd(wd);
                     }
                     c
@@ -348,9 +447,7 @@ impl CustomTerminalConnection {
                         c.arg("-d");
                         c.arg(d);
                     }
-                    if let Some(wd) =
-                        working_directory.as_ref().or(spec.working_dir.as_ref())
-                    {
+                    if let Some(wd) = working_directory.as_ref().or(spec.working_dir.as_ref()) {
                         c.arg("--cd");
                         c.arg(wd);
                     }
@@ -408,8 +505,7 @@ impl CustomTerminalConnection {
                     }
                 }
             }
-            let _ =
-                app.emit_all(&format!("custom-terminal-disconnect-{id}"), ());
+            let _ = app.emit_all(&format!("custom-terminal-disconnect-{id}"), ());
         });
 
         Ok(())
@@ -419,10 +515,12 @@ impl CustomTerminalConnection {
         let mut state = self.terminal_state.lock().unwrap();
         if state.scrollback > 0 {
             let new_offset = state.scrollback - 1;
-            state.parser.set_scrollback(new_offset);
+            // state.parser.set_scrollback(new_offset);
             state.scrollback = new_offset;
             let ev = state.screen_event();
-            let _ = self.app_handle.emit_all(&format!("custom-terminal-event-{}", self.id), &ev);
+            let _ = self
+                .app_handle
+                .emit_all(&format!("custom-terminal-event-{}", self.id), &ev);
         }
         Ok(())
     }
@@ -430,13 +528,15 @@ impl CustomTerminalConnection {
     pub fn increment_scrollback(&mut self) -> Result<()> {
         let mut state = self.terminal_state.lock().unwrap();
         // vt100 panics if scrollback offset exceeds current rows_len, so clamp to rows.
-        let max_offset = std::cmp::min(state.max_scrollback, state.rows as usize);
+        let max_offset = state.rows_state.len() - state.rows as usize;
         if state.scrollback < max_offset {
             let new_offset = state.scrollback + 1;
-            state.parser.set_scrollback(new_offset);
+            // state.parser.set_scrollback(new_offset);
             state.scrollback = new_offset;
             let ev = state.screen_event();
-            let _ = self.app_handle.emit_all(&format!("custom-terminal-event-{}", self.id), &ev);
+            let _ = self
+                .app_handle
+                .emit_all(&format!("custom-terminal-event-{}", self.id), &ev);
         }
         Ok(())
     }
@@ -475,11 +575,7 @@ impl CustomTerminalManager {
         }
     }
 
-    pub fn connect_terminal(
-        &self,
-        spec: TerminalSpec,
-        app_handle: AppHandle,
-    ) -> Result<String> {
+    pub fn connect_terminal(&self, spec: TerminalSpec, app_handle: AppHandle) -> Result<String> {
         let id = Uuid::new_v4().to_string();
         let mut conn = CustomTerminalConnection::new(id.clone(), spec, app_handle)?;
         let writer = conn.pty_pair.master.take_writer()?;
@@ -543,10 +639,10 @@ impl CustomTerminalManager {
         Ok(())
     }
 
-    pub fn reconnect_terminal(&self, id: &str) -> Result<()> {
+    pub fn reconnect_terminal(&mut self, id: &str) -> Result<()> {
         let conns = self.connections.lock().unwrap();
         if let Some(conn) = conns.get(id) {
-            let state = conn.terminal_state.lock().unwrap();
+            let mut state = conn.terminal_state.lock().unwrap();
             let ev = state.screen_event();
             conn.app_handle
                 .emit_all(&format!("custom-terminal-event-{id}"), &ev)?;
