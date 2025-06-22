@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::io::{Read, Write};
 use std::thread;
 
+
 use anyhow::{Result, anyhow};
 use portable_pty::{PtySize, CommandBuilder, Child, PtyPair};
 use serde::{Deserialize, Serialize};
@@ -322,6 +323,7 @@ pub struct TerminalState {
     scroll_region_top: u16,
     scroll_region_bottom: u16,
     scroll_region_active: bool,
+    origin_mode: bool, // DECOM - relative cursor addressing within scroll region
 }
 
 #[derive(Debug, Clone)]
@@ -379,6 +381,7 @@ impl TerminalState {
             scroll_region_top: 0,
             scroll_region_bottom: rows.saturating_sub(1),
             scroll_region_active: false,
+            origin_mode: false,
         };
         
         // Ensure buffer is properly sized from the start
@@ -546,12 +549,14 @@ impl TerminalState {
             vec![]
         } else {
             params_str.split(';')
-                .filter_map(|s| {
+                .map(|s| {
                     let trimmed = s.trim();
                     if trimmed.is_empty() {
-                        Some(0) // Default parameter
+                        // Fix: Default parameter depends on command context
+                        // For most commands, empty parameter means 1, not 0
+                        1
                     } else {
-                        trimmed.parse().ok()
+                        trimmed.parse().unwrap_or(1)
                     }
                 })
                 .collect()
@@ -575,9 +580,13 @@ impl TerminalState {
                             // VIM uses this for arrow keys
                             println!("Cursor keys mode: application");
                         },
-                        5 => {
-                            // DECSCNM - Screen mode (reverse video)
-                            println!("Reverse video mode enabled");
+                        6 => {
+                            // DECOM - Origin mode relative addressing
+                            self.origin_mode = true;
+                            println!("Origin mode enabled");
+                            // Move cursor to home of region
+                            self.cursor_line = self.scroll_region_top;
+                            self.cursor_col = 0;
                         },
                         7 => {
                             // DECAWM - Auto-wrap Mode
@@ -621,6 +630,13 @@ impl TerminalState {
                         1 => {
                             // DECCKM - Cursor Keys Mode (normal mode)
                             println!("Cursor keys mode: normal");
+                        },
+                        6 => {
+                            self.origin_mode = false;
+                            println!("Origin mode disabled");
+                            // Cursor home absolute
+                            self.cursor_line = 0;
+                            self.cursor_col = 0;
                         },
                         5 => {
                             // DECSCNM - Screen mode (normal video)
@@ -722,14 +738,26 @@ impl TerminalState {
                 // Cursor up
                 let amount = params.get(0).copied().unwrap_or(1);
                 let old_line = self.cursor_line;
-                self.cursor_line = self.cursor_line.saturating_sub(amount);
+                
+                // Fix: Respect scroll region bounds in origin mode
+                if self.origin_mode && self.scroll_region_active {
+                    self.cursor_line = self.cursor_line.saturating_sub(amount).max(self.scroll_region_top);
+                } else {
+                    self.cursor_line = self.cursor_line.saturating_sub(amount);
+                }
                 println!("Cursor up {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
             },
             'B' => {
                 // Cursor down
                 let amount = params.get(0).copied().unwrap_or(1);
                 let old_line = self.cursor_line;
-                self.cursor_line = (self.cursor_line + amount).min(self.screen_rows.saturating_sub(1));
+                
+                // Fix: Respect scroll region bounds in origin mode
+                if self.origin_mode && self.scroll_region_active {
+                    self.cursor_line = (self.cursor_line + amount).min(self.scroll_region_bottom);
+                } else {
+                    self.cursor_line = (self.cursor_line + amount).min(self.screen_rows.saturating_sub(1));
+                }
                 println!("Cursor down {} from {}:{} to {}:{}", amount, old_line, self.cursor_col, self.cursor_line, self.cursor_col);
             },
             'C' => {
@@ -767,12 +795,24 @@ impl TerminalState {
                 // Cursor position (1-indexed)
                 let line = params.get(0).copied().unwrap_or(1).saturating_sub(1);
                 let col = params.get(1).copied().unwrap_or(1).saturating_sub(1);
+                
                 let old_line = self.cursor_line;
                 let old_col = self.cursor_col;
-                self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
+                
+                // Fix: Proper origin mode implementation
+                if self.origin_mode && self.scroll_region_active {
+                    // In origin mode, coordinates are relative to scroll region
+                    let absolute_line = line + self.scroll_region_top;
+                    // Clamp to scroll region bounds
+                    self.cursor_line = absolute_line.max(self.scroll_region_top).min(self.scroll_region_bottom);
+                } else {
+                    // Normal mode - absolute positioning
+                    self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
+                }
+                
                 self.cursor_col = col.min(self.screen_cols.saturating_sub(1));
-                println!("Cursor position set from {}:{} to {}:{} (requested: {}:{})", 
-                    old_line, old_col, self.cursor_line, self.cursor_col, line, col);
+                println!("Cursor position set from {}:{} to {}:{} (requested: {}:{}) origin_mode: {}", 
+                    old_line, old_col, self.cursor_line, self.cursor_col, line, col, self.origin_mode);
             },
             'J' => {
                 // Clear screen
@@ -808,11 +848,16 @@ impl TerminalState {
                 let amount = params.get(0).copied().unwrap_or(1);
                 self.delete_lines_at_cursor(amount);
             },
+            '@' => {
+                // Insert characters
+                let amount = params.get(0).copied().unwrap_or(1);
+                self.insert_chars_at_cursor(amount);
+            },
             'P' => {
                 // Delete characters
                 let amount = params.get(0).copied().unwrap_or(1);
                 self.delete_chars_at_cursor(amount);
-            },
+            }
             'S' => {
                 // Scroll up
                 let amount = params.get(0).copied().unwrap_or(1);
@@ -831,7 +876,10 @@ impl TerminalState {
             'r' => {
                 // Set scrolling region
                 let top = params.get(0).copied().unwrap_or(1).saturating_sub(1);
-                let bottom = params.get(1).copied().unwrap_or(self.screen_rows).saturating_sub(1);
+                let bottom = match params.get(1) {
+                    Some(&b) => b.saturating_sub(1).min(self.screen_rows.saturating_sub(1)),
+                    None => self.screen_rows.saturating_sub(1), // Fix: include last line
+                };
                 self.set_scroll_region(top, bottom);
             },
             's' => {
@@ -845,7 +893,17 @@ impl TerminalState {
             'd' => {
                 // Line position absolute
                 let line = params.get(0).copied().unwrap_or(1).saturating_sub(1);
-                self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
+                
+                // Fix: Proper origin mode implementation
+                if self.origin_mode && self.scroll_region_active {
+                    // In origin mode, coordinates are relative to scroll region
+                    let absolute_line = line + self.scroll_region_top;
+                    // Clamp to scroll region bounds
+                    self.cursor_line = absolute_line.max(self.scroll_region_top).min(self.scroll_region_bottom);
+                } else {
+                    // Normal mode - absolute positioning
+                    self.cursor_line = line.min(self.screen_rows.saturating_sub(1));
+                }
             },
             't' => {
                 // Window manipulation sequences - VIM uses these extensively
@@ -990,14 +1048,16 @@ impl TerminalState {
             // Extend the line if needed
             let line = &mut self.screen_buffer[self.cursor_line as usize];
             
-            while line.len() <= self.cursor_col as usize {
-                line.push(space_item.clone());
-            }
+            // Fix: Ensure line is always padded to cursor position before writing
+            Self::pad_line(line, self.cursor_col + 1, &space_item);
             
             // Write the character
-            if self.cursor_col < self.screen_cols {
+            if self.cursor_col < self.screen_cols && (self.cursor_col as usize) < line.len() {
                 line[self.cursor_col as usize] = char_item;
             }
+            
+            // Fix: Always maintain consistent line width
+            Self::pad_line(line, self.screen_cols, &space_item);
         } else {
             println!("WARNING: Trying to write '{}' at invalid line {}:{} (screen_rows: {})", 
                 ch, self.cursor_line, self.cursor_col, self.screen_rows);
@@ -1005,22 +1065,21 @@ impl TerminalState {
     }
     
     fn line_feed(&mut self) {
-        if !self.scroll_region_active {
-            // classic behaviour
+        let (top, bottom) = self.region_bounds();
+        println!("LF before: cursor_line={} region={}..{}", self.cursor_line, top, bottom);
+        
+        if self.cursor_line == bottom {
+            // At bottom of region - scroll and keep cursor at bottom
+            self.scroll_up_region(1, top, bottom);
+            // Fix: cursor stays at bottom line of region after scrolling
+        } else if self.cursor_line < bottom {
+            // Move cursor down within region
             self.cursor_line += 1;
-            if self.cursor_line >= self.screen_rows {
-                self.scroll_up(1);
-                self.cursor_line = self.screen_rows.saturating_sub(1);
-            }
-        } else {
-            let bottom = self.scroll_region_bottom.min(self.screen_rows.saturating_sub(1));
-            if self.cursor_line == bottom {
-                self.scroll_up_region(1, self.scroll_region_top, bottom);
-            } else {
-                self.cursor_line += 1;
-            }
         }
-        // Ensure we have enough lines in the buffer
+        // Fix: cursor should stay within scroll region bounds
+        if self.cursor_line > bottom {
+            self.cursor_line = bottom;
+        }
         self.ensure_screen_buffer_size();
     }
     
@@ -1028,19 +1087,37 @@ impl TerminalState {
         if top >= bottom || bottom as usize >= self.screen_buffer.len() {
             return;
         }
+        
+        // Ensure buffer is properly sized before operations
+        self.ensure_screen_buffer_size();
+        
         for _ in 0..amount {
-            // Remove the line at the top of the region
-            let removed_line = self.screen_buffer.remove(top as usize);
-            // Optionally push removed line to scrollback if region is full screen
-            if top == 0 && bottom == self.screen_rows.saturating_sub(1) {
-                self.scrollback_buffer.push(removed_line);
-                if self.scrollback_buffer.len() > 10000 {
-                    self.scrollback_buffer.remove(0);
+            if (top as usize) < self.screen_buffer.len() && (bottom as usize) < self.screen_buffer.len() {
+                // Remove the line at the top of the region
+                let removed_line = self.screen_buffer.remove(top as usize);
+                
+                // Optionally push removed line to scrollback if region is full screen
+                if top == 0 && bottom == self.screen_rows.saturating_sub(1) {
+                    self.scrollback_buffer.push(removed_line);
+                    if self.scrollback_buffer.len() > 10000 {
+                        self.scrollback_buffer.remove(0);
+                    }
+                }
+                
+                // Fix: Insert at correct position to maintain buffer size
+                // After removal, bottom index has shifted down by 1
+                let insert_pos = bottom as usize;
+                if insert_pos < self.screen_buffer.len() {
+                    self.screen_buffer.insert(insert_pos, self.create_blank_line());
+                } else {
+                    // If insert position is at end, just push
+                    self.screen_buffer.push(self.create_blank_line());
                 }
             }
-            // Insert a blank line at the bottom of the region
-            self.screen_buffer.insert(bottom as usize, Vec::new());
         }
+        
+        // Ensure buffer size consistency after all operations
+        self.ensure_screen_buffer_size();
     }
 
     fn scroll_up(&mut self, amount: u16) {
@@ -1130,6 +1207,17 @@ impl TerminalState {
     fn restore_cursor(&mut self) {
         self.cursor_line = self.saved_cursor_line.min(self.screen_rows.saturating_sub(1));
         self.cursor_col = self.saved_cursor_col.min(self.screen_cols.saturating_sub(1));
+        
+        // Fix: Account for scroll regions in origin mode
+        if self.origin_mode && self.scroll_region_active {
+            // Clamp cursor to scroll region bounds
+            if self.cursor_line < self.scroll_region_top {
+                self.cursor_line = self.scroll_region_top;
+            } else if self.cursor_line > self.scroll_region_bottom {
+                self.cursor_line = self.scroll_region_bottom;
+            }
+        }
+        
         self.current_style = self.saved_style.clone();
     }
     
@@ -1186,6 +1274,37 @@ impl TerminalState {
         result
     }
     
+    fn create_blank_line(&self) -> Vec<LineItem> {
+        Vec::new()
+    }
+
+    /// Determine the effective scrolling region for scrolling commands.
+    /// Returns scroll region bounds if any region is set, otherwise the whole screen.
+    fn region_bounds(&self) -> (u16, u16) {
+        // Fix: Always check if there's an active scroll region, not just the flag
+        // The region is "active" if top != 0 or bottom != screen_rows-1
+        let is_full_screen = self.scroll_region_top == 0 && 
+                           self.scroll_region_bottom == self.screen_rows.saturating_sub(1);
+        
+        if self.scroll_region_active || !is_full_screen {
+            (self.scroll_region_top, self.scroll_region_bottom.min(self.screen_rows.saturating_sub(1)))
+        } else {
+            (0, self.screen_rows.saturating_sub(1))
+        }
+    }
+
+    /// Pad or truncate `line` to `width` using `blank` cell.
+    fn pad_line(line: &mut Vec<LineItem>, width: u16, blank: &LineItem) {
+        while line.len() < width as usize {
+            line.push(blank.clone());
+        }
+        if line.len() > width as usize {
+            line.truncate(width as usize);
+        }
+    }
+
+    // removed ensure_line_width obsolete method
+
     fn create_line_item(&self, text: String) -> LineItem {
         LineItem {
             width: Self::calculate_display_width(&text),
@@ -1207,19 +1326,53 @@ impl TerminalState {
             match ch {
                 // Control characters have zero width
                 '\x00'..='\x1F' | '\x7F' => {},
-                // Regular ASCII characters have width 1
+                // Regular ASCII printable characters have width 1
                 '\x20'..='\x7E' => width += 1,
                 // Handle common Unicode cases
                 _ => {
-                    // For now, assume width 1 for most Unicode characters
-                    // In a full implementation, we'd use a Unicode width library
-                    // like unicode-width crate, but for simplicity:
-                    if ch.is_whitespace() {
-                        width += 1;
-                    } else if !ch.is_control() {
-                        width += 1;
+                    // Fix: Better Unicode width calculation
+                    if ch.is_control() {
+                        // Control characters have zero width
+                        continue;
                     }
-                    // Zero-width characters (combining marks, etc.) add 0
+                    
+                    // Rough approximation for common cases
+                    match ch {
+                        // Zero-width characters
+                        '\u{200B}'..='\u{200F}' | // Zero-width spaces
+                        '\u{202A}'..='\u{202E}' | // BiDi formatting
+                        '\u{2060}'..='\u{206F}' | // Various invisible chars
+                        '\u{FE00}'..='\u{FE0F}' | // Variation selectors
+                        '\u{FEFF}' => {}, // BOM
+                        
+                        // Wide characters (CJK, etc.) - width 2
+                        '\u{1100}'..='\u{115F}' | // Hangul Jamo
+                        '\u{2E80}'..='\u{2EFF}' | // CJK Radicals
+                        '\u{2F00}'..='\u{2FDF}' | // Kangxi Radicals
+                        '\u{3000}'..='\u{303E}' | // CJK Symbols
+                        '\u{3041}'..='\u{3096}' | // Hiragana
+                        '\u{30A1}'..='\u{30FA}' | // Katakana
+                        '\u{3105}'..='\u{312D}' | // Bopomofo
+                        '\u{3131}'..='\u{318E}' | // Hangul Compatibility Jamo
+                        '\u{3190}'..='\u{31BA}' | // Kanbun
+                        '\u{31C0}'..='\u{31E3}' | // CJK Strokes
+                        '\u{31F0}'..='\u{31FF}' | // Katakana Extension
+                        '\u{3200}'..='\u{32FF}' | // Enclosed CJK
+                        '\u{3300}'..='\u{33FF}' | // CJK Compatibility
+                        '\u{3400}'..='\u{4DBF}' | // CJK Extension A
+                        '\u{4E00}'..='\u{9FFF}' | // CJK Unified Ideographs
+                        '\u{A000}'..='\u{A48C}' | // Yi Syllables
+                        '\u{A490}'..='\u{A4C6}' | // Yi Radicals
+                        '\u{AC00}'..='\u{D7AF}' | // Hangul Syllables
+                        '\u{F900}'..='\u{FAFF}' | // CJK Compatibility Ideographs
+                        '\u{FE10}'..='\u{FE19}' | // Vertical forms
+                        '\u{FE30}'..='\u{FE6F}' | // CJK Compatibility Forms
+                        '\u{FF00}'..='\u{FF60}' | // Fullwidth forms
+                        '\u{FFE0}'..='\u{FFE6}' => width += 2,
+                        
+                        // Most other characters have width 1
+                        _ => width += 1,
+                    }
                 }
             }
         }
@@ -1266,47 +1419,115 @@ impl TerminalState {
 
     // Additional ANSI sequence implementations
     fn insert_lines_at_cursor(&mut self, amount: u16) {
-        let current_line = self.cursor_line as usize;
-        for _ in 0..amount {
-            if current_line < self.screen_buffer.len() {
-                self.screen_buffer.insert(current_line, Vec::new());
-                if self.screen_buffer.len() > self.screen_rows as usize {
-                    self.screen_buffer.pop();
+        if amount == 0 { return; }
+        
+        // Fix: Use proper scroll region bounds
+        let (region_top, region_bottom) = self.region_bounds();
+        let top = self.cursor_line.max(region_top);
+        let bottom = region_bottom;
+        
+        let max_amount = bottom.saturating_sub(top) + 1;
+        let n = amount.min(max_amount);
+        
+        // Ensure buffer is properly sized
+        self.ensure_screen_buffer_size();
+        
+        for _ in 0..n {
+            if (top as usize) < self.screen_buffer.len() {
+                // Insert blank line at cursor line
+                self.screen_buffer.insert(top as usize, self.create_blank_line());
+                
+                // Fix: Remove line from bottom of region to maintain size
+                // After insert, indices shift up by 1
+                let remove_index = (bottom + 1) as usize;
+                if remove_index < self.screen_buffer.len() {
+                    self.screen_buffer.remove(remove_index);
                 }
             }
         }
+        
+        // Ensure buffer size consistency
+        self.ensure_screen_buffer_size();
     }
 
     fn delete_lines_at_cursor(&mut self, amount: u16) {
-        let current_line = self.cursor_line as usize;
-        for _ in 0..amount {
-            if current_line < self.screen_buffer.len() {
-                self.screen_buffer.remove(current_line);
-                self.screen_buffer.push(Vec::new());
+        if amount == 0 { return; }
+        
+        // Fix: Use proper scroll region bounds  
+        let (region_top, region_bottom) = self.region_bounds();
+        let top = self.cursor_line.max(region_top);
+        let bottom = region_bottom;
+        
+        let max_amount = bottom.saturating_sub(top) + 1;
+        let n = amount.min(max_amount);
+        
+        // Ensure buffer is properly sized
+        self.ensure_screen_buffer_size();
+        
+        for _ in 0..n {
+            if (top as usize) < self.screen_buffer.len() {
+                // Remove line at cursor_line
+                self.screen_buffer.remove(top as usize);
+                
+                // Fix: Insert blank line at correct position (bottom of region)
+                // After removal, we need to add back at the bottom
+                if (bottom as usize) < self.screen_buffer.len() {
+                    self.screen_buffer.insert(bottom as usize, self.create_blank_line());
+                } else {
+                    self.screen_buffer.push(self.create_blank_line());
+                }
             }
+        }
+        
+        // Ensure buffer size consistency
+        self.ensure_screen_buffer_size();
+    }
+
+    fn insert_chars_at_cursor(&mut self, amount: u16) {
+        if amount == 0 { return; }
+        let shift = amount.min(self.screen_cols.saturating_sub(self.cursor_col));
+        let space_item = self.create_line_item(" ".to_string());
+        if let Some(line) = self.screen_buffer.get_mut(self.cursor_line as usize) {
+            Self::pad_line(line, self.screen_cols, &space_item);
+            let start_col = self.cursor_col as usize;
+            let end_limit = (self.screen_cols as usize).saturating_sub(1);
+            // Shift existing characters to the right
+            for idx in (start_col..=end_limit - shift as usize).rev() {
+                line[idx + shift as usize] = line[idx].clone();
+            }
+            // Fill vacated cells with spaces
+            for idx in start_col..start_col + shift as usize {
+                if idx < line.len() {
+                    line[idx] = space_item.clone();
+                }
+            }
+            Self::pad_line(line, self.screen_cols, &space_item);
         }
     }
 
     fn delete_chars_at_cursor(&mut self, amount: u16) {
         let space_item = self.create_line_item(" ".to_string());
         if let Some(line) = self.screen_buffer.get_mut(self.cursor_line as usize) {
+            Self::pad_line(line, self.screen_cols, &space_item);
             let start_col = self.cursor_col as usize;
             let end_col = (start_col + amount as usize).min(line.len());
             if start_col < line.len() {
                 line.drain(start_col..end_col);
+                let blank = space_item.clone();
+                for _ in 0..(end_col - start_col) {
+                    line.push(blank.clone());
+                }
             }
+            Self::pad_line(line, self.screen_cols, &space_item);
         }
     }
 
     fn reverse_index(&mut self) {
-        if self.cursor_line == self.scroll_region_top {
-            // Scroll region down by one line
-            self.scroll_down_region(1, self.scroll_region_top, self.scroll_region_bottom);
-        } else {
-            // Just move cursor up one line if possible
-            if self.cursor_line > 0 {
-                self.cursor_line -= 1;
-            }
+        let (top, bottom) = self.region_bounds();
+        if self.cursor_line == top {
+            self.scroll_down_region(1, top, bottom);
+        } else if self.cursor_line > 0 {
+            self.cursor_line -= 1;
         }
     }
 
@@ -1314,16 +1535,28 @@ impl TerminalState {
         if top >= bottom || bottom as usize >= self.screen_buffer.len() {
             return;
         }
+        
+        // Ensure buffer is properly sized before operations
+        self.ensure_screen_buffer_size();
+        
         for _ in 0..amount {
-            // Remove the line at the bottom of the region
-            let removed_line = self.screen_buffer.remove(bottom as usize);
-            // Insert an empty line at the top of the region
-            self.screen_buffer.insert(top as usize, Vec::new());
-            // If full screen, push removed line into scrollback (opposite of up)
-            if top == 0 && bottom == self.screen_rows.saturating_sub(1) {
-                // When scrolling down terminal history we restore from scrollback, but for region we drop.
+            if (bottom as usize) < self.screen_buffer.len() && (top as usize) < self.screen_buffer.len() {
+                // Remove the line at the bottom of the region
+                let _removed_line = self.screen_buffer.remove(bottom as usize);
+                
+                // Insert an empty line at the top of the region
+                self.screen_buffer.insert(top as usize, self.create_blank_line());
+                
+                // If full screen, we could push removed line into scrollback in the future
+                if top == 0 && bottom == self.screen_rows.saturating_sub(1) {
+                    // When scrolling down terminal history we could restore from scrollback
+                    // For now, just drop the removed line
+                }
             }
         }
+        
+        // Ensure buffer size consistency after all operations
+        self.ensure_screen_buffer_size();
     }
 
     fn scroll_down_terminal(&mut self, amount: u16) {
@@ -1335,34 +1568,40 @@ impl TerminalState {
     fn erase_chars_at_cursor(&mut self, amount: u16) {
         let space_item = self.create_line_item(" ".to_string());
         if let Some(line) = self.screen_buffer.get_mut(self.cursor_line as usize) {
+            Self::pad_line(line, self.screen_cols, &space_item);
             let start_col = self.cursor_col as usize;
             let end_col = (start_col + amount as usize).min(line.len());
-            
-            // Replace characters with spaces
             for i in start_col..end_col {
                 if i < line.len() {
                     line[i] = space_item.clone();
                 }
             }
+            Self::pad_line(line, self.screen_cols, &space_item);
         }
     }
 
     fn set_scroll_region(&mut self, top: u16, bottom: u16) {
-        // CSI r  parameters are 1-based; convert to 0-based inclusive indices.
+        // Parameters are already 0-based inclusive when passed from handle_standard_csi.
         let max_bottom = self.screen_rows.saturating_sub(1);
-        let t = top.saturating_sub(1);
-        let b = bottom.saturating_sub(1);
-        if top == 0 && bottom == 0 {
-            // ESC[r with no params resets region
-            self.scroll_region_top = 0;
-            self.scroll_region_bottom = max_bottom;
-            self.scroll_region_active = false;
-        } else {
-            self.scroll_region_top = t.min(max_bottom);
-            self.scroll_region_bottom = b.min(max_bottom).max(self.scroll_region_top);
-            self.scroll_region_active = !(self.scroll_region_top == 0 && self.scroll_region_bottom == max_bottom);
+        let t = top.min(max_bottom);
+        // Fix: Allow scroll region to include last line 
+        let b = bottom.min(self.screen_rows.saturating_sub(1)).max(t);
+
+        self.scroll_region_top = t;
+        self.scroll_region_bottom = b;
+        self.scroll_region_active = true; // always active when ESC[r issued
+
+        // Clamp cursor into new region when origin mode is active
+        if self.origin_mode {
+            if self.cursor_line < self.scroll_region_top {
+                self.cursor_line = self.scroll_region_top;
+            } else if self.cursor_line > self.scroll_region_bottom {
+                self.cursor_line = self.scroll_region_bottom;
+            }
+            self.cursor_col = self.cursor_col.min(self.screen_cols.saturating_sub(1));
         }
-        println!("Set scroll region: {}-{} / rows {}", self.scroll_region_top, self.scroll_region_bottom, self.screen_rows);
+
+        println!("Set scroll region (0-based): {}-{} active:{} rows:{} cursor_line:{}", t, b, self.scroll_region_active, self.screen_rows, self.cursor_line);
     }
     
     /// Scroll up in the scrollback buffer (view older content)
