@@ -101,7 +101,7 @@ pub async fn custom_send_scroll_up(
 ) -> Result<(), String> {
     let terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
     terminal_manager
-        .send_scroll(&id, ScrollDirection::Up)
+        .increment_scrollback(&id)
         .map_err(|e| e.to_string())
 }
 
@@ -112,7 +112,7 @@ pub async fn custom_send_scroll_down(
 ) -> Result<(), String> {
     let terminal_manager = state.terminal_manager.lock().map_err(|e| e.to_string())?;
     terminal_manager
-        .send_scroll(&id, ScrollDirection::Down)
+        .decrement_scrollback(&id)
         .map_err(|e| e.to_string())
 }
 

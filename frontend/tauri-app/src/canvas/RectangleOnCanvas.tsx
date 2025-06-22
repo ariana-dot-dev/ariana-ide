@@ -115,7 +115,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         </button>
       )} */}
 
-      <img src="./assets/app-icon-grad.png" className={cn("select-none")} style={{ width: cell.width/4, }} />
+      <img src="./assets/app-icon.png" className={cn("select-none opacity-20")} style={{ width: cell.width/4, }} />
       
       {/* {showOverlay && element instanceof Rectangle && (
         <ElementOverlay

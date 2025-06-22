@@ -22,7 +22,9 @@ portable-pty = "0.8"
 uuid = { version = "1.0", features = ["v4"] }
 anyhow = "1.0"
 async-trait = "0.1"
-anes = { version = "0.2", features = ["parser"] }
+# anes = { version = "0.2", features = ["parser"] }
+vt100          = "0.15" 
+unicode-width  = "0.1"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

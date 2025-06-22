@@ -31,7 +31,7 @@ const Onboarding = ({ userEmail }: { userEmail: string }) => {
                 </div>
             </button>
             <div className={cn("flex flex-col items-center gap-0.5")}>
-                <img src="./assets/app-icon-grad.png" className={cn("w-56")} />
+                <img src="./assets/app-icon.png" className={cn("w-56 opacity-10")} />
                 <h1 className={cn("text-5xl font-mono font-bold mb-8")}>Ariana IDE</h1>
             </div>
             <p className={cn("text-[var(--bg-100)] text-lg px-2")}>Welcome, {userEmail}</p>

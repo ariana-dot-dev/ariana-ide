@@ -470,7 +470,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
       while (i < items.length) {
         const currentItem = items[i];
-        let combinedText = currentItem.lexeme;
+        let combinedText = currentItem.lexeme === '' ? ' ' : currentItem.lexeme;
         let combinedWidth = currentItem.width || 1;
         let spanStartCol = colOffset;
         
@@ -483,16 +483,21 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         }
 
         const spanEndCol = spanStartCol + combinedWidth;
+
         const hasCursor = isCursorSection && 
           lineIndex === cursorPosition.line && 
           spanStartCol <= cursorPosition.col && 
           cursorPosition.col < spanEndCol;
 
         if (hasCursor && combinedWidth > 1) {
+          console.log(`Has cursor in span ${spanStartCol}-${spanEndCol}`);
           // Split the span at cursor position
           const cursorRelativePos = cursorPosition.col - spanStartCol;
           const textBeforeCursor = combinedText.slice(0, cursorRelativePos);
-          const textAtCursor = combinedText.slice(cursorRelativePos, cursorRelativePos + 1);
+          let textAtCursor = combinedText.slice(cursorRelativePos, cursorRelativePos + 1);
+          if (textAtCursor === '') {
+            textAtCursor = ' ';
+          }
           const textAfterCursor = combinedText.slice(cursorRelativePos + 1);
 
           // Span before cursor (if any)
@@ -500,10 +505,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
             targetArray.push(
               <div
                 key={`${spanStartCol}-before`}
-                className="flex"
+                className="flex border-b-4"
                 style={{
                   color: colorToCSS(currentItem.foreground_color),
-                  backgroundColor: colorToCSS(currentItem.background_color),
+                  // backgroundColor: colorToCSS(currentItem.background_color),
                   fontWeight: currentItem.is_bold ? 'bold' : 'normal',
                   fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                   textDecoration: currentItem.is_underline ? 'underline' : 'none',
@@ -524,7 +529,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           targetArray.push(
             <div
               key={`${spanStartCol}-cursor`}
-              className="flex"
+              className="flex animate-pulse"
               style={{
                 color: colorToCSS(currentItem.foreground_color),
                 backgroundColor: 'var(--whitest)',
@@ -550,7 +555,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
                 className="flex"
                 style={{
                   color: colorToCSS(currentItem.foreground_color),
-                  backgroundColor: colorToCSS(currentItem.background_color),
+                  // backgroundColor: colorToCSS(currentItem.background_color),
                   fontWeight: currentItem.is_bold ? 'bold' : 'normal',
                   fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                   textDecoration: currentItem.is_underline ? 'underline' : 'none',
@@ -569,10 +574,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           targetArray.push(
             <div
               key={spanStartCol}
-              className="flex"
+              className="flex min-w-1"
               style={{
                 color: colorToCSS(currentItem.foreground_color),
-                backgroundColor: hasCursor ? 'var(--whitest)' : colorToCSS(currentItem.background_color),
+                // backgroundColor: hasCursor ? 'var(--whitest)' : colorToCSS(currentItem.background_color),
                 fontWeight: currentItem.is_bold ? 'bold' : 'normal',
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
@@ -687,7 +692,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     <div
       ref={terminalRef}
       className={cn(
-        "bg-[var(--bg-900)] rounded-lg text-[var(--fg-50)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
+        "rounded-md backdrop-blur-md bg-gradient-to-b from-[var(--fg-900)]/30 to-[var(--bg-600)]/30 text-[var(--fg-50)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
       )}
       tabIndex={0}
       onKeyDown={handleKeyDown}
@@ -727,7 +732,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
         </div>
       </div>
 
-      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--blackest)] overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
+      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--bg-900)] overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
         <div className={cn("absolute top-0 left-0 w-full h-fit p-2")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
             const line = screen[rowIndex] || []; // Use empty array if line doesn't exist
