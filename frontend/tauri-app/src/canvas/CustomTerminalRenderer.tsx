@@ -4,6 +4,7 @@ import React, {
 	useRef,
 	useCallback,
 	useContext,
+	useMemo,
 } from "react";
 import { useStore } from "../state";
 import {
@@ -52,8 +53,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	const { isLightTheme } = useStore();
 
 	const [terminalId, setTerminalId] = useState<string | null>(null);
-	const [screen, setScreen] = useState<LineItem[][]>([]);
-	const [screenLength, setScreenLength] = useState(24);
+	const screenDataRef = useRef<LineItem[][]>([]);
+	const [screenLength, setScreenLength] = useState(6);
 	const [cursorPosition, setCursorPosition] = useState({ line: 0, col: 0 });
 	const [isConnected, setIsConnected] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -61,12 +62,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		rows: 24,
 		cols: 80,
 	});
-	const [listenersToLineUpdate, setListenersToLineUpdate] = useState<Map<number, (items: LineItem[]) => void>>(new Map());
-
-	const listenersRef = useRef(listenersToLineUpdate);
-	useEffect(() => {
-		listenersRef.current = listenersToLineUpdate;
-	}, [listenersToLineUpdate]);
+	const listenersRef = useRef<Map<number, (items: LineItem[]) => void>>(new Map());
 
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const terminalInnerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +70,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const isResizingRef = useRef<boolean>(false);
 	const hasScrolledRef = useRef<boolean>(false);
+
+	const getCurrentLineData = useCallback((rowIndex: number): LineItem[] => {
+		return screenDataRef.current[rowIndex] || [];
+	}, []);
 
 	// Initialize terminal connection
 	useEffect(() => {
@@ -161,53 +161,45 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		};
 	}, []);
 
-	const handleTerminalEvent = useCallback((event: TerminalEvent) => {
-		switch (event.type) {
-			case "screenUpdate":
-				if (
-					event.screen &&
-					event.cursor_line !== undefined &&
-					event.cursor_col !== undefined
-				) {
-					setScreen(event.screen);
-					setScreenLength(event.screen.length);
-					setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
-				}
-				break;
-			case "cursorMove":
-				if (event.cursor_line !== undefined && event.cursor_col !== undefined) {
-					setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
-				}
-				break;
-			case "patch":
-				if (event.items !== undefined && event.line !== undefined) {
-					setScreen((prevScreen) => {
-						const newScreen = [...prevScreen];
-						newScreen[event.line!] = event.items!;
-						return newScreen;
-					});
-					listenersRef.current.get(event.line!)?.(event.items!);
-				}
-				break;
-			case "newLines":
-				console.log("New lines:", event.lines?.length);
-				if (event.lines !== undefined) {
-					setScreen((prevScreen) => {
-						const newScreen = [...prevScreen];
-						newScreen.push(...event.lines!);
-						return newScreen;
-					});
-					setScreenLength((prevLength) => {
-						const newLength = prevLength + event.lines!.length;
-						console.log(
-							`New screen length:`, prevLength, "+", event.lines!.length, "=", newLength
-						);
-						return newLength;
-					});
-				}
-				break;
+	const handleTerminalEvent = useCallback((events: TerminalEvent[]) => {
+		for (const event of events) {
+			switch (event.type) {
+				case "screenUpdate":
+					if (
+						event.screen &&
+						event.cursor_line !== undefined &&
+						event.cursor_col !== undefined
+					) {
+						screenDataRef.current = event.screen;
+						setScreenLength(event.screen.length);
+						setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
+					}
+					break;
+				case "cursorMove":
+					if (event.cursor_line !== undefined && event.cursor_col !== undefined) {
+						setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
+					}
+					break;
+				case "patch":
+					if (event.items !== undefined && event.line !== undefined) {
+						// Update the ref data (no re-render)
+						screenDataRef.current[event.line!] = event.items!;
+						// Notify only the specific row
+						listenersRef.current.get(event.line!)?.(event.items!);
+					}
+					break;
+				case "newLines":
+					if (event.lines !== undefined) {
+						// Update ref data
+						screenDataRef.current.push(...event.lines!);
+					
+						// Update screenLength (this will trigger re-render for new rows)
+						setScreenLength((prevLength) => prevLength + event.lines!.length);
+					}
+					break;
+			}
 		}
-	}, [elementId]);
+	}, []);
 
 	const handleTerminalDisconnect = useCallback(() => {
 		console.log(`Terminal disconnected for element ${elementId}`);
@@ -351,7 +343,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 			// Use more precise character measurements for monospace fonts
 			const charWidth = 8.5; // Slightly wider for better accuracy
-			const charHeight = 16; // Better line height
+			const charHeight = 18; // Better line height
 
 			const cols = Math.max(20, Math.floor(containerRect.width / charWidth));
 			const lines = Math.max(5, Math.floor(containerRect.height / charHeight));
@@ -592,19 +584,26 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		);
 	}
 
-	const Row = React.memo(({ row, terminalId, initialItems }: { row: number, terminalId: string, initialItems: LineItem[] }) => {
-		const [items, setItems] = useState<LineItem[]>(initialItems);
-
+	const Row = React.memo(({ row, terminalId, getCurrentLineData }: { 
+		row: number, 
+		terminalId: string,
+		getCurrentLineData: (rowIndex: number) => LineItem[]
+	}) => {
+		// Initialize state directly from the ref to prevent flickering.
+		// This lazy initializer runs only on the first render.
+		const [items, setItems] = useState<LineItem[]>(() => getCurrentLineData(row));
+	
 		useEffect(() => {
-			listenersToLineUpdate.set(row, (newItems: LineItem[]) => {
-				console.log(`New items in row ${row} for terminal ${terminalId}:`, newItems);
+			// This listener handles live 'patch' updates to the row after it has mounted.
+			listenersRef.current.set(row, (newItems: LineItem[]) => {
 				setItems(newItems);
 			});
+			
 			return () => {
-				listenersToLineUpdate.delete(row);
+				listenersRef.current.delete(row);
 			}
-		}, [])
-
+		}, [row, terminalId]); // getCurrentLineData is stable and doesn't need to be a dependency
+	
 		return (
 			<div className={cn("flex font-mono")}>
 				<span className={cn("w-10")}>{row} </span>
@@ -628,6 +627,18 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		);
 	});
 
+	const AllRows = useMemo(() => 
+		Array.from({ length: screenLength }, (_, rowIndex) => (
+			<Row 
+				key={`row-${rowIndex}`} 
+				row={rowIndex} 
+				terminalId={terminalId || "unknown"}
+				getCurrentLineData={getCurrentLineData}
+			/>
+		)), 
+		[screenLength, terminalId, getCurrentLineData]
+	);
+
 	return (
 		<div
 			ref={terminalRef}
@@ -638,7 +649,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			onKeyDown={handleKeyDown}
 			onClick={() => terminalRef.current?.focus()}
 		>
-			{screenLength} {windowDimensions.rows}
 			<div
 				ref={terminalInnerRef}
 				className={cn(
@@ -651,9 +661,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 						return renderScreenLine(line, rowIndex, windowDimensions.cols);
 					})} */}
 					
-					{Array.from({ length: screenLength }, (_, rowIndex) => {
-						return <Row key={rowIndex} row={rowIndex} terminalId={terminalId || "unknown"} initialItems={screen[rowIndex] || []} />;
-					})}
+					{AllRows}
 				</div>
 			</div>
 		</div>

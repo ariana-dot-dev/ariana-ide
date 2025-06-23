@@ -145,7 +145,7 @@ export class CustomTerminalAPI {
 	 */
 	async onTerminalEvent(
 		id: string,
-		callback: (event: TerminalEvent) => void,
+		callback: (events: TerminalEvent[]) => void, // Expect an array of events
 	): Promise<void> {
 		try {
 			// Remove existing listener if any
@@ -154,10 +154,11 @@ export class CustomTerminalAPI {
 				existingListener();
 			}
 
-			const unlisten = await listen<TerminalEvent>(
+			// Listen for an array of TerminalEvent
+			const unlisten = await listen<TerminalEvent[]>(
 				`custom-terminal-event-${id}`,
 				(event) => {
-					console.log("Terminal event received:", event.id);
+					// The payload is now an array of events
 					callback(event.payload);
 				},
 			);

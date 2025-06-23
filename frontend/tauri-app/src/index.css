@@ -51,7 +51,7 @@ body {
 }
 
 .animate-fade-in {
-	animation: fadeIn 0.5s ease-out forwards;
+	animation: fadeIn 1s ease-out forwards;
 }
 
 @plugin 'tailwind-scrollbar';

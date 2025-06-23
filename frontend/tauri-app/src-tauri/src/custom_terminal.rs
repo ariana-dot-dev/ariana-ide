@@ -511,15 +511,14 @@ impl CustomTerminalConnection {
         let id_clone = id.clone();
         let state = Arc::clone(&self.terminal_state);
 
-        let (event_tx, event_rx) = mpsc::channel::<TerminalEvent>();
+        let (event_tx, event_rx) = mpsc::channel::<Vec<TerminalEvent>>();
 
         thread::spawn(move || {
             // Forward events from the parser to the frontend until the PTY reader
             // thread finishes and the sender side of the channel is dropped.
-            for event in event_rx {
-                println!("Terminal connection {id_clone} received event: {}", event.r#type());
+            for events in event_rx {
                 if app
-                    .emit(&format!("custom-terminal-event-{id_clone}"), &event)
+                    .emit(&format!("custom-terminal-event-{id_clone}"), &events)
                     .is_err()
                 {
                     println!("Terminal connection {id_clone} disconnected (emit failure)");
@@ -540,12 +539,13 @@ impl CustomTerminalConnection {
                     Ok(n) => {
                         let events = {
                             let mut s = state.lock().unwrap();
-                            // println!("Processing input: {}", String::from_utf8_lossy(&buf[..n]));
                             s.process_input(&buf[..n])
                         };
-                        for ev in events {
-                            println!("Terminal connection {id} sending event: {}", ev.r#type());
-                            event_tx.send(ev).unwrap();
+                        if !events.is_empty() {
+                            if let Err(e) = event_tx.send(events) {
+                                eprintln!("Failed to send events to channel: {}", e);
+                                break;
+                            }
                         }
                     }
                     Err(e) => {
@@ -586,11 +586,10 @@ impl CustomTerminalConnection {
             // state.parser.set_scrollback(new_offset);
             state.scrollback = new_offset.min(max_offset);
             let events = state.screen_events(false);
-            
-            for event in events {
-                let _ = self
-                    .app_handle
-                    .emit(&format!("custom-terminal-event-{}", self.id), &event);
+            if !events.is_empty() {
+                self.app_handle
+                    .emit(&format!("custom-terminal-event-{}", self.id), &events)
+                    .unwrap();
             }
         }
         Ok(())
