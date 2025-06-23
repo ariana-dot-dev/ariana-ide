@@ -49,21 +49,31 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	onTerminalReady,
 	onTerminalError,
 }) => {
-	const { theme, isLightTheme } = useStore();
+	const { isLightTheme } = useStore();
 
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [screen, setScreen] = useState<LineItem[][]>([]);
+	const [screenLength, setScreenLength] = useState(24);
 	const [cursorPosition, setCursorPosition] = useState({ line: 0, col: 0 });
 	const [isConnected, setIsConnected] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [terminalDimensions, setTerminalDimensions] = useState({
+	const [windowDimensions, setWindowDimensions] = useState({
 		rows: 24,
 		cols: 80,
 	});
+	const [listenersToLineUpdate, setListenersToLineUpdate] = useState<Map<number, (items: LineItem[]) => void>>(new Map());
+
+	const listenersRef = useRef(listenersToLineUpdate);
+	useEffect(() => {
+		listenersRef.current = listenersToLineUpdate;
+	}, [listenersToLineUpdate]);
+
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const terminalInnerRef = useRef<HTMLDivElement>(null);
+	const scrollableRef = useRef<HTMLDivElement>(null);
 	const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const isResizingRef = useRef<boolean>(false);
+	const hasScrolledRef = useRef<boolean>(false);
 
 	// Initialize terminal connection
 	useEffect(() => {
@@ -160,11 +170,44 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					event.cursor_col !== undefined
 				) {
 					setScreen(event.screen);
+					setScreenLength(event.screen.length);
 					setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
 				}
 				break;
+			case "cursorMove":
+				if (event.cursor_line !== undefined && event.cursor_col !== undefined) {
+					setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
+				}
+				break;
+			case "patch":
+				if (event.items !== undefined && event.line !== undefined) {
+					setScreen((prevScreen) => {
+						const newScreen = [...prevScreen];
+						newScreen[event.line!] = event.items!;
+						return newScreen;
+					});
+					listenersRef.current.get(event.line!)?.(event.items!);
+				}
+				break;
+			case "newLines":
+				console.log("New lines:", event.lines?.length);
+				if (event.lines !== undefined) {
+					setScreen((prevScreen) => {
+						const newScreen = [...prevScreen];
+						newScreen.push(...event.lines!);
+						return newScreen;
+					});
+					setScreenLength((prevLength) => {
+						const newLength = prevLength + event.lines!.length;
+						console.log(
+							`New screen length:`, prevLength, "+", event.lines!.length, "=", newLength
+						);
+						return newLength;
+					});
+				}
+				break;
 		}
-	}, []);
+	}, [elementId]);
 
 	const handleTerminalDisconnect = useCallback(() => {
 		console.log(`Terminal disconnected for element ${elementId}`);
@@ -281,67 +324,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		[terminalId, isConnected, sendRawInput],
 	);
 
-	// Scroll acceleration/deceleration state
-	const scrollSpeedRef = useRef<number>(1); // current speed (1-10)
-	const scrollDirectionRef = useRef<1 | -1>(1); // 1 = down, -1 = up
-	const accelStartRef = useRef<number>(Date.now());
-	const lastWheelTimeRef = useRef<number>(0);
-
-	// Handle wheel events for scrolling
-	const handleWheel = useCallback(
-		async (event: React.WheelEvent) => {
-			if (!terminalId || !isConnected) return;
-
-			const now = Date.now();
-			const direction: 1 | -1 = event.deltaY > 0 ? 1 : -1; // deltaY > 0 means wheel scrolled down
-
-			// Reset acceleration if direction changed
-			if (scrollDirectionRef.current !== direction) {
-				scrollDirectionRef.current = direction;
-				scrollSpeedRef.current = 1;
-				accelStartRef.current = now;
-			}
-
-			// Linear acceleration 1 -> 10 over ACCEL_DURATION (2000ms)
-			const ACCEL_DURATION = 2000;
-			const accelProgress = Math.min(
-				1,
-				(now - accelStartRef.current) / ACCEL_DURATION,
-			);
-			scrollSpeedRef.current = 1 + (10 - 1) * accelProgress;
-
-			// Deceleration when there is a pause between wheel events
-			const timeSinceLast = now - lastWheelTimeRef.current;
-			if (lastWheelTimeRef.current !== 0 && timeSinceLast > 250) {
-				const decayProgress = Math.min(1, timeSinceLast / ACCEL_DURATION);
-				scrollSpeedRef.current = Math.max(
-					1,
-					scrollSpeedRef.current - (10 - 1) * decayProgress,
-				);
-				// Adjust accelStart so next acceleration continues smoothly from the current speed
-				accelStartRef.current =
-					now - ((scrollSpeedRef.current - 1) / (10 - 1)) * ACCEL_DURATION;
-			}
-
-			lastWheelTimeRef.current = now;
-
-			const amount = Math.ceil(scrollSpeedRef.current);
-
-			try {
-				if (direction === 1) {
-					await customTerminalAPI.sendScrollUp(terminalId, amount);
-				} else {
-					await customTerminalAPI.sendScrollDown(terminalId, amount);
-				}
-			} catch (err) {
-				console.error("Error handling scroll:", err);
-			}
-
-			event.preventDefault();
-		},
-		[terminalId, isConnected],
-	);
-
 	const debouncedResize = useCallback(() => {
 		if (resizeTimeoutRef.current) {
 			clearTimeout(resizeTimeoutRef.current);
@@ -369,7 +351,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 			// Use more precise character measurements for monospace fonts
 			const charWidth = 8.5; // Slightly wider for better accuracy
-			const charHeight = 17; // Better line height
+			const charHeight = 16; // Better line height
 
 			const cols = Math.max(20, Math.floor(containerRect.width / charWidth));
 			const lines = Math.max(5, Math.floor(containerRect.height / charHeight));
@@ -377,8 +359,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 			// Only resize if dimensions actually changed
 			if (
-				terminalDimensions.cols === cols &&
-				terminalDimensions.rows === lines
+				windowDimensions.cols === cols &&
+				windowDimensions.rows === lines
 			) {
 				return;
 			}
@@ -391,7 +373,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			try {
 				await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
 				// Update our tracked dimensions only after successful resize
-				setTerminalDimensions({ rows: lines, cols });
+				setWindowDimensions({ rows: lines, cols });
 				console.log(`Terminal resize successful: ${cols}x${lines}`);
 			} catch (err) {
 				console.error("Error resizing terminal:", err);
@@ -402,8 +384,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		}, 150); // 150ms debounce
 	}, [
 		terminalId,
-		terminalDimensions.cols,
-		terminalDimensions.rows,
+		windowDimensions.cols,
+		windowDimensions.rows,
 		isConnected,
 	]);
 
@@ -432,6 +414,41 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			window.removeEventListener("resize", handleResize);
 		};
 	}, [handleResize, isConnected]);
+
+	// Track scroll events to detect user interaction
+	useEffect(() => {
+		const scrollableDiv = scrollableRef.current;
+		if (!scrollableDiv) return;
+
+		const handleScroll = () => {
+			hasScrolledRef.current = true; // Mark that the user has scrolled
+		};
+
+		scrollableDiv.addEventListener("scroll", handleScroll);
+		return () => {
+			scrollableDiv.removeEventListener("scroll", handleScroll);
+		};
+	}, [isConnected]);
+
+	// Auto-scroll to bottom when screenLength increases
+	useEffect(() => {
+		setTimeout(() => {
+			const scrollableDiv = scrollableRef.current;
+			if (!scrollableDiv) return;
+
+			const isNearBottom = () => {
+				const scrollTop = scrollableDiv.scrollTop;
+				const scrollHeight = scrollableDiv.scrollHeight;
+				const clientHeight = scrollableDiv.clientHeight;
+				return scrollHeight - scrollTop - clientHeight <= 10; // Within 10px of bottom
+			};
+
+			// Scroll to bottom if no scroll has happened or user is near bottom
+			if (true) {//(!hasScrolledRef.current || isNearBottom()) {
+				scrollableDiv.scrollTop = scrollableDiv.scrollHeight;
+			}
+		}, 150);
+	}, [screenLength]);
 
 	// Auto-focus the terminal and set initial size
 	useEffect(() => {
@@ -561,286 +578,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		return `#${gHex}${gHex}${gHex}`;
 	};
 
-	const renderScreenLine = (
-		line: LineItem[],
-		lineIndex: number,
-		totalCols: number,
-	) => {
-		const lineBeforeCursor: React.ReactNode[] = [];
-		const lineAfterCursor: React.ReactNode[] = [];
-
-		// Helper function to check if two items have the same styling
-		const haveSameStyle = (item1: LineItem, item2: LineItem) => {
-			return (
-				colorToCSS(item1.foreground_color) ===
-					colorToCSS(item2.foreground_color) &&
-				colorToCSS(item1.background_color) ===
-					colorToCSS(item2.background_color) &&
-				item1.is_bold === item2.is_bold &&
-				item1.is_italic === item2.is_italic &&
-				item1.is_underline === item2.is_underline
-			);
-		};
-
-		// Helper function to create optimized spans for a section
-		const createOptimizedSpans = (
-			items: LineItem[],
-			startCol: number,
-			targetArray: React.ReactNode[],
-			isCursorSection: boolean,
-		) => {
-			let i = 0;
-			let colOffset = startCol;
-
-			while (i < items.length) {
-				const currentItem = items[i];
-				let combinedText = currentItem.lexeme === "" ? " " : currentItem.lexeme;
-				let combinedWidth = currentItem.width || 1;
-				let spanStartCol = colOffset;
-
-				// Look ahead to combine consecutive items with same styling
-				let j = i + 1;
-				while (j < items.length && haveSameStyle(currentItem, items[j])) {
-					combinedText += items[j].lexeme;
-					combinedWidth += items[j].width || 1;
-					j++;
-				}
-
-				const spanEndCol = spanStartCol + combinedWidth;
-
-				const hasCursor =
-					isCursorSection &&
-					lineIndex === cursorPosition.line &&
-					spanStartCol <= cursorPosition.col &&
-					cursorPosition.col < spanEndCol;
-
-				if (hasCursor && combinedWidth > 1) {
-					console.log(`Has cursor in span ${spanStartCol}-${spanEndCol}`);
-					// Split the span at cursor position
-					const cursorRelativePos = cursorPosition.col - spanStartCol;
-					const textBeforeCursor = combinedText.slice(0, cursorRelativePos);
-					let textAtCursor = combinedText.slice(
-						cursorRelativePos,
-						cursorRelativePos + 1,
-					);
-					if (textAtCursor === "") {
-						textAtCursor = " ";
-					}
-					const textAfterCursor = combinedText.slice(cursorRelativePos + 1);
-
-					// Span before cursor (if any)
-					if (textBeforeCursor.length > 0) {
-						targetArray.push(
-							<div
-								key={`${spanStartCol}-before`}
-								className="flex border-b-4"
-								style={{
-									color: colorToCSS(currentItem.foreground_color),
-									// backgroundColor: colorToCSS(currentItem.background_color),
-									fontWeight: currentItem.is_bold ? "bold" : "normal",
-									fontStyle: currentItem.is_italic ? "italic" : "normal",
-									textDecoration: currentItem.is_underline
-										? "underline"
-										: "none",
-									whiteSpace: "pre",
-									// width: `${textBeforeCursor.length * 7.45}px`,
-									overflow: "hidden",
-									boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
-								}}
-							>
-								{textBeforeCursor.split("").map((char, index) => (
-									<div key={index} style={{ width: "7.45px" }}>
-										{char}
-									</div>
-								))}
-							</div>,
-						);
-					}
-
-					// Span at cursor position
-					targetArray.push(
-						<div
-							key={`${spanStartCol}-cursor`}
-							className="flex animate-pulse"
-							style={{
-								color: colorToCSS(currentItem.foreground_color),
-								backgroundColor: "var(--blackest)",
-								fontWeight: currentItem.is_bold ? "bold" : "normal",
-								fontStyle: currentItem.is_italic ? "italic" : "normal",
-								textDecoration: currentItem.is_underline ? "underline" : "none",
-								whiteSpace: "pre",
-								overflow: "hidden",
-								boxShadow: "inset -1px 0 0 var(--fg-800-30)",
-							}}
-						>
-							{textAtCursor.split("").map((char, index) => (
-								<div key={index} style={{ width: "7.45px" }}>
-									{char}
-								</div>
-							))}
-						</div>,
-					);
-
-					// Span after cursor (if any)
-					if (textAfterCursor.length > 0) {
-						targetArray.push(
-							<div
-								key={`${spanStartCol}-after`}
-								className="flex"
-								style={{
-									color: colorToCSS(currentItem.foreground_color),
-									// backgroundColor: colorToCSS(currentItem.background_color),
-									fontWeight: currentItem.is_bold ? "bold" : "normal",
-									fontStyle: currentItem.is_italic ? "italic" : "normal",
-									textDecoration: currentItem.is_underline
-										? "underline"
-										: "none",
-									whiteSpace: "pre",
-									overflow: "hidden",
-									boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
-								}}
-							>
-								{textAfterCursor.split("").map((char, index) => (
-									<div key={index} style={{ width: "7.45px" }}>
-										{char}
-									</div>
-								))}
-							</div>,
-						);
-					}
-				} else {
-					targetArray.push(
-						<div
-							key={spanStartCol}
-							className="flex min-w-1"
-							style={{
-								color: colorToCSS(currentItem.foreground_color),
-								// backgroundColor: hasCursor ? 'var(--blackest)' : colorToCSS(currentItem.background_color),
-								fontWeight: currentItem.is_bold ? "bold" : "normal",
-								fontStyle: currentItem.is_italic ? "italic" : "normal",
-								textDecoration: currentItem.is_underline ? "underline" : "none",
-								whiteSpace: "pre",
-								overflow: "hidden",
-								boxShadow: `inset -1px 0 0 var(--fg-800-30)`,
-							}}
-						>
-							{combinedText.split("").map((char, index) => (
-								<div key={index} style={{ width: "7.45px" }}>
-									{char}
-								</div>
-							))}
-						</div>,
-					);
-				}
-
-				i = j;
-				colOffset += combinedWidth;
-			}
-		};
-
-		// Split line items before and after cursor
-		let currentCol = 0;
-		const itemsBeforeCursor: LineItem[] = [];
-		const itemsAfterCursor: LineItem[] = [];
-
-		for (const item of line) {
-			if (currentCol < cursorPosition.col) {
-				itemsBeforeCursor.push(item);
-			} else {
-				itemsAfterCursor.push(item);
-			}
-			currentCol += item.width || 1;
-		}
-
-		// Create optimized spans for each section
-		createOptimizedSpans(itemsBeforeCursor, 0, lineBeforeCursor, false);
-		createOptimizedSpans(
-			itemsAfterCursor,
-			itemsBeforeCursor.reduce((acc, item) => acc + (item.width || 1), 0),
-			lineAfterCursor,
-			true,
-		);
-
-		// Add cursor at end of line if needed
-		if (lineIndex === cursorPosition.line && currentCol <= cursorPosition.col) {
-			const styleSource =
-				line.length > 0
-					? line[line.length - 1]
-					: {
-							foreground_color: null,
-							is_bold: false,
-							is_italic: false,
-							is_underline: false,
-						};
-			lineAfterCursor.push(
-				<div
-					key={currentCol}
-					style={{
-						color: colorToCSS(styleSource.foreground_color),
-						backgroundColor: "var(--blackest)",
-						fontWeight: styleSource.is_bold ? "bold" : "normal",
-						fontStyle: styleSource.is_italic ? "italic" : "normal",
-						textDecoration: styleSource.is_underline ? "underline" : "none",
-						whiteSpace: "pre",
-						width: "7.45px",
-						boxShadow: "inset -1px 0 0 var(--fg-800-30)",
-					}}
-				>
-					{" "}
-				</div>,
-			);
-		}
-
-		const isAtCursorLine = lineIndex === cursorPosition.line;
-
-		// Handle empty lines or lines with no content
-		if (lineBeforeCursor.length === 0 && lineAfterCursor.length === 0) {
-			return (
-				<div
-					key={lineIndex}
-					className={cn(
-						"font-mono text-xs leading-4 whitespace-nowrap min-h-4 flex",
-					)}
-					style={{
-						width: `fit`,
-						height: "16px",
-						boxShadow: `inset 0 -0.5px 0 var(--fg-800-30)`,
-					}}
-				>
-					{isAtCursorLine && (
-						<div
-							style={{
-								backgroundColor: "var(--blackest)",
-								width: "7.45px",
-								height: "16px",
-								boxShadow: "inset -1px 0 0 var(--fg-800-30)",
-							}}
-						>
-							{" "}
-						</div>
-					)}
-				</div>
-			);
-		}
-
-		return (
-			<div
-				key={lineIndex}
-				className={cn(
-					"font-mono text-xs leading-4 whitespace-nowrap min-h-4 flex",
-				)}
-				style={{
-					width: `fit`,
-					height: "16px",
-					boxShadow: `inset 0 -0.5px 0 var(--fg-800-30)`,
-				}}
-			>
-				{lineBeforeCursor}
-				{lineAfterCursor}
-			</div>
-		);
-	};
-
 	if (error) {
 		return (
 			<div
@@ -855,6 +592,42 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		);
 	}
 
+	const Row = React.memo(({ row, terminalId, initialItems }: { row: number, terminalId: string, initialItems: LineItem[] }) => {
+		const [items, setItems] = useState<LineItem[]>(initialItems);
+
+		useEffect(() => {
+			listenersToLineUpdate.set(row, (newItems: LineItem[]) => {
+				console.log(`New items in row ${row} for terminal ${terminalId}:`, newItems);
+				setItems(newItems);
+			});
+			return () => {
+				listenersToLineUpdate.delete(row);
+			}
+		}, [])
+
+		return (
+			<div className={cn("flex font-mono")}>
+				<span className={cn("w-10")}>{row} </span>
+				{items.map((item, index) => (
+					<span 
+						key={index} 
+						className={cn("")} 
+						style={{ 
+							backgroundColor: colorToCSS(item.background_color),
+							color: colorToCSS(item.foreground_color),
+							fontWeight: item.is_bold ? "bold" : "normal",
+							textDecoration: item.is_underline ? "underline" : "none",
+							fontStyle: item.is_italic ? "italic" : "normal",
+							whiteSpace: "pre-wrap",
+						}}
+					>
+						{item.lexeme}
+					</span>
+				))}
+			</div>
+		);
+	});
+
 	return (
 		<div
 			ref={terminalRef}
@@ -863,19 +636,23 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			)}
 			tabIndex={0}
 			onKeyDown={handleKeyDown}
-			onWheel={handleWheel}
 			onClick={() => terminalRef.current?.focus()}
 		>
+			{screenLength} {windowDimensions.rows}
 			<div
 				ref={terminalInnerRef}
 				className={cn(
 					"terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text",
 				)}
 			>
-				<div className={cn("absolute top-0 left-0 w-full h-fit")}>
-					{Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
+				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto scrollbar-thin")}>
+					{/* {Array.from({ length: windowDimensions.rows }, (_, rowIndex) => {
 						const line = screen[rowIndex] || [];
-						return renderScreenLine(line, rowIndex, terminalDimensions.cols);
+						return renderScreenLine(line, rowIndex, windowDimensions.cols);
+					})} */}
+					
+					{Array.from({ length: screenLength }, (_, rowIndex) => {
+						return <Row key={rowIndex} row={rowIndex} terminalId={terminalId || "unknown"} initialItems={screen[rowIndex] || []} />;
 					})}
 				</div>
 			</div>

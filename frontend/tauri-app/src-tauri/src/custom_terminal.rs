@@ -58,7 +58,7 @@ pub struct TerminalSpec {
     pub cols: u16,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Color {
     Default,
     Black,
@@ -81,7 +81,7 @@ pub enum Color {
     Rgb(u8, u8, u8),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LineItem {
     pub lexeme: String,
     pub width: u16,
@@ -99,22 +99,21 @@ pub enum TerminalEvent {
     NewLines { lines: Vec<Vec<LineItem>> },
     #[serde(rename = "patch")]
     Patch {
-        line: u16,
-        col: u16,
+        line: usize,
         items: Vec<LineItem>,
     },
     #[serde(rename = "cursorMove")]
-    CursorMove { line: u16, col: u16 },
+    CursorMove { line: usize, col: usize },
     #[serde(rename = "scroll")]
     Scroll {
         direction: ScrollDirection,
-        amount: u16,
+        amount: usize,
     },
     #[serde(rename = "screenUpdate")]
     ScreenUpdate {
         screen: Vec<Vec<LineItem>>,
-        cursor_line: u16,
-        cursor_col: u16,
+        cursor_line: usize,
+        cursor_col: usize,
     },
 }
 
@@ -149,7 +148,6 @@ pub struct TerminalState {
     cols: u16,
     max_rows_ever: u16,
     scrollback: usize,
-    max_scrollback: usize,
     rows_state: Vec<(String, Vec<LineItem>)>,
 }
 
@@ -161,7 +159,6 @@ impl TerminalState {
             cols,
             max_rows_ever: cols,
             scrollback: 0,
-            max_scrollback: HISTORY_LINES,
             rows_state: Vec::new(),
         }
     }
@@ -188,23 +185,25 @@ impl TerminalState {
             self.parser.process(valid);
         }
 
-        vec![self.build_screen_event()]
+        self.build_screen_events(false)
     }
 
     /// Used by the scroll wheel handlers.  We simply re-emit the current
     /// screen because vt100 automatically keeps HISTORY_LINES.
-    pub fn screen_event(&mut self) -> TerminalEvent {
-        self.build_screen_event()
+    pub fn screen_events(&mut self, full: bool) -> Vec<TerminalEvent> {
+        self.build_screen_events(full)
     }
 
     // ---------------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------------
-    fn build_screen_event(&mut self) -> TerminalEvent {
+    fn build_screen_events(&mut self, full: bool) -> Vec<TerminalEvent> {
         let screen = self.parser.screen();
 
         // cursor
-        let (cursor_line, cursor_col) = screen.cursor_position();
+        let (cursor_line, cursor_col) = screen.cursor_position().into();
+        let mut changed_lines = vec![];
+        let mut added_lines = vec![];
 
         // rows & cols are known so we can iterate directly
         let mut current_screen = Vec::with_capacity(self.rows as usize);
@@ -284,8 +283,14 @@ impl TerminalState {
                 let row_in_rows_state =
                     self.rows_state.len() as isize + i as isize - (best_shift + 1);
                 if row_in_rows_state < self.rows_state.len() as isize && row_in_rows_state >= 0 {
+                    let old_line = self.rows_state[row_in_rows_state as usize].clone();
+                    let new_line = row.clone();
+                    if old_line.0 != new_line.0 || old_line.1 != new_line.1 {
+                        changed_lines.push((row_in_rows_state as usize, new_line));
+                    }
                     self.rows_state[row_in_rows_state as usize] = row.clone();
                 } else if row_in_rows_state >= 0 {
+                    added_lines.push(row.clone());
                     self.rows_state.push(row.clone());
                 }
             }
@@ -294,33 +299,30 @@ impl TerminalState {
         // let result = current_screen.into_iter().map(|(_, row)| row).collect();
 
         // get last self.rows rows from self.rows_state
-        let result: Vec<Vec<LineItem>> = self
-            .rows_state
-            .iter()
-            .skip(self.rows_state.len().saturating_sub(self.rows as usize + self.scrollback))
-            .take(self.rows as usize)
-            .map(|(_, row)| row.clone())
-            .collect();
+        let mut events = vec![];
 
-        // println!("Cursor line: {}", cursor_line);
-        // println!("Cursor col: {}", cursor_col);
-        // println!(
-        //     "Results: {}",
-        //     result
-        //         .iter()
-        //         .map(|row| {
-        //             let row = row.iter().map(|item| item.lexeme.clone()).collect::<Vec<_>>();
-        //             row.join("")
-        //         })
-        //         .collect::<Vec<_>>()
-        //         .join("\n")
-        // );
+        let cursor_line = (self.rows_state.len() - self.rows as usize) + cursor_line as usize;
+        let cursor_col = cursor_col as usize;
 
-        TerminalEvent::ScreenUpdate {
-            screen: result,
-            cursor_line,
-            cursor_col,
+        if full {
+            events.push(TerminalEvent::ScreenUpdate { 
+                screen: self
+                    .rows_state
+                    .iter()
+                    .map(|(_, row)| row.clone())
+                    .collect(), 
+                cursor_line, 
+                cursor_col 
+            });
+        } else {
+            events.push(TerminalEvent::CursorMove { line: cursor_line, col: cursor_col });
+            for (line, items) in changed_lines {
+                events.push(TerminalEvent::Patch { line, items: items.1 });
+            }
+            events.push(TerminalEvent::NewLines { lines: added_lines.into_iter().map(|(_, row)| row).collect() });
         }
+
+        events
     }
 }
 
@@ -565,10 +567,12 @@ impl CustomTerminalConnection {
             let new_offset = state.scrollback.saturating_sub(amount);
             // state.parser.set_scrollback(new_offset);
             state.scrollback = new_offset.max(0);
-            let ev = state.screen_event();
-            let _ = self
-                .app_handle
-                .emit(&format!("custom-terminal-event-{}", self.id), &ev);
+            let events = state.screen_events(false);
+            for event in events {
+                let _ = self
+                    .app_handle
+                    .emit(&format!("custom-terminal-event-{}", self.id), &event);
+            }
         }
         Ok(())
     }
@@ -581,10 +585,13 @@ impl CustomTerminalConnection {
             let new_offset = state.scrollback.saturating_add(amount);
             // state.parser.set_scrollback(new_offset);
             state.scrollback = new_offset.min(max_offset);
-            let ev = state.screen_event();
-            let _ = self
-                .app_handle
-                .emit(&format!("custom-terminal-event-{}", self.id), &ev);
+            let events = state.screen_events(false);
+            
+            for event in events {
+                let _ = self
+                    .app_handle
+                    .emit(&format!("custom-terminal-event-{}", self.id), &event);
+            }
         }
         Ok(())
     }
@@ -625,12 +632,18 @@ impl CustomTerminalManager {
 
     pub fn connect_terminal(&self, spec: TerminalSpec, app_handle: AppHandle) -> Result<String> {
         let id = Uuid::new_v4().to_string();
-        let mut conn = CustomTerminalConnection::new(id.clone(), spec, app_handle)?;
+        let mut conn = CustomTerminalConnection::new(id.clone(), spec, app_handle.clone())?;
         let writer = conn.pty_pair.master.take_writer()?;
         conn.start_io_loop()?;
 
         self.connections.lock().unwrap().insert(id.clone(), conn);
         self.writers.lock().unwrap().insert(id.clone(), writer);
+
+        println!("Connected terminal: {}", id);
+        let events = self.connections.lock().unwrap().get_mut(&id).unwrap().terminal_state.lock().unwrap().screen_events(true);
+        for event in events {
+            let _ = app_handle.emit(&format!("custom-terminal-event-{}", id), &event);
+        }
 
         Ok(id)
     }
@@ -675,7 +688,12 @@ impl CustomTerminalManager {
 
     pub fn resize_terminal(&self, id: &str, rows: u16, cols: u16) -> Result<()> {
         if let Some(conn) = self.connections.lock().unwrap().get_mut(id) {
-            conn.resize(rows, cols)
+            let result = conn.resize(rows, cols);
+            if result.is_err() {
+                Err(anyhow!("Terminal connection not found"))
+            } else {
+                Ok(())
+            }
         } else {
             Err(anyhow!("Terminal connection not found"))
         }
@@ -691,9 +709,12 @@ impl CustomTerminalManager {
         let conns = self.connections.lock().unwrap();
         if let Some(conn) = conns.get(id) {
             let mut state = conn.terminal_state.lock().unwrap();
-            let ev = state.screen_event();
-            conn.app_handle
-                .emit(&format!("custom-terminal-event-{id}"), &ev)?;
+            let events = state.screen_events(false);
+            for event in events {
+                let _ = conn
+                    .app_handle
+                    .emit(&format!("custom-terminal-event-{id}"), &event);
+            }
         }
         Ok(())
     }

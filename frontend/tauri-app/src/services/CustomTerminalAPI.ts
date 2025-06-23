@@ -52,7 +52,7 @@ export interface LineItem {
 export type ScrollDirection = "Up" | "Down";
 
 export interface TerminalEvent {
-	type: "screenUpdate";
+	type: "screenUpdate" | "cursorMove" | "patch" | "newLines";
 	lines?: LineItem[][];
 	line?: number;
 	col?: number;
@@ -62,23 +62,6 @@ export interface TerminalEvent {
 	screen?: LineItem[][];
 	cursor_line?: number;
 	cursor_col?: number;
-}
-
-export interface CursorCommand {
-	type:
-		| "CUU"
-		| "CUD"
-		| "CUF"
-		| "CUB"
-		| "CNL"
-		| "CPL"
-		| "CHA"
-		| "CUP"
-		| "ED"
-		| "EL"
-		| "SU"
-		| "SD";
-	params: number[];
 }
 
 export class CustomTerminalAPI {
