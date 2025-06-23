@@ -10,6 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "dev": "npm run build && node dist/cli.js",
+    "format:write": "biome format --write",
     "prepublishOnly": "npm run build",
     "build-tauri": "cd tauri-app && npm run build",
     "dev-tauri": "cd tauri-app && npm run tauri dev",
@@ -50,6 +51,7 @@
     "bin/ariana-ide-windows-x64.exe"
   ],
   "devDependencies": {
+    "@biomejs/biome": "2.0.4",
     "@types/inquirer": "^9.0.8",
     "@types/node": "^24.0.3",
     "typescript": "^5.8.3"

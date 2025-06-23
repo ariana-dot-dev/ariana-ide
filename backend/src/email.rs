@@ -20,7 +20,9 @@ impl EmailService {
 
         let creds = Credentials::new(smtp_username, smtp_password);
 
-        let transport = AsyncSmtpTransport::<Tokio1Executor>::relay(&smtp_server)?
+        // i had runtime errors with normal `relay` and this worked for me.
+        // i used the email service `[resend](http://resend.com/)`
+        let transport = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&smtp_server)?
             .port(smtp_port)
             .credentials(creds)
             .build();

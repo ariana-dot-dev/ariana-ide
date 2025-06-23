@@ -15,6 +15,16 @@ export type TerminalKind =
       $type: 'wsl';
       distribution?: string;
       workingDirectory?: string;
+    }
+  | {
+      $type: 'local-shell';
+      shell?: string;
+      workingDirectory?: string;
+    }
+  | {
+      $type: 'iterm';
+      profile?: string;
+      workingDirectory?: string;
     };
 
 export interface TerminalConfig {
@@ -84,6 +94,10 @@ export class Terminal {
         return `WSL: ${kind.distribution || 'Default'}`;
       case 'git-bash':
         return `Git Bash: ${kind.workingDirectory || '~'}`;
+      case 'local-shell':
+        return `${kind.shell || 'Default Shell'}: ${kind.workingDirectory || '~'}`;
+      case 'iterm':
+        return `iTerm: ${kind.profile || 'Default'}: ${kind.workingDirectory || '~'}`;
       default:
         return 'Terminal';
     }
@@ -92,4 +106,29 @@ export class Terminal {
   static canvasElement(config: TerminalConfig, weight: number = 1): CanvasElement {
     return new CanvasElement({ terminal: new Terminal(config) }, weight);
   }
+
+  // Helper methods for creating different terminal types
+  static createLocalShell(shell?: string, workingDirectory?: string, weight: number = 1): CanvasElement {
+    const config: TerminalConfig = {
+      kind: {
+        $type: 'local-shell',
+        shell,
+        workingDirectory
+      }
+    };
+    return Terminal.canvasElement(config, weight);
+  }
+
+  static createSSH(host: string, username: string, port?: number, weight: number = 1): CanvasElement {
+    const config: TerminalConfig = {
+      kind: {
+        $type: 'ssh',
+        host,
+        username,
+        port
+      }
+    };
+    return Terminal.canvasElement(config, weight);
+  }
 }
+
