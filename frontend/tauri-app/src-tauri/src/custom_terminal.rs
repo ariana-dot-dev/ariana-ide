@@ -8,7 +8,7 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
     thread,
 };
 
@@ -117,6 +117,18 @@ pub enum TerminalEvent {
     },
 }
 
+impl TerminalEvent {
+    pub fn r#type(&self) -> &str {
+        match self {
+            TerminalEvent::NewLines { .. } => "newLines",
+            TerminalEvent::Patch { .. } => "patch",
+            TerminalEvent::CursorMove { .. } => "cursorMove",
+            TerminalEvent::Scroll { .. } => "scroll",
+            TerminalEvent::ScreenUpdate { .. } => "screenUpdate",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ScrollDirection {
     Up,
@@ -213,21 +225,37 @@ impl TerminalState {
         if self.rows_state.len() == 0 {
             self.rows_state = current_screen.clone();
         } else {
-            let mut best_shift = -1isize;
-            let mut best_shift_score = self.cols as usize * self.rows as usize;
+            // -----------------------------------------------------------------
+            // Estimate how many new lines have been appended by trying each
+            // possible "shift" value and keeping the one with the best score.
+            // Earlier (top) lines receive a larger weight because ncurses-like
+            // programs usually paint the screen top-to-bottom.
+            // -----------------------------------------------------------------
+            let mut best_shift: isize = -1;
+            let mut best_shift_score: isize = -1; // maximise
+
+            let total_rows = self.rows as isize;
 
             for shift in 0..self.rows_state.len().min(self.max_rows_ever as usize) {
-                let mut score = 0usize;
+                let mut score: isize = 0;
                 for (i, (content, _)) in current_screen.iter().enumerate() {
+                    // Weight: rows - index  (line 0 => high weight)
+                    let weight = (total_rows - i as isize).max(1);
+
                     let row_in_rows_state = self.rows_state.len() + i - (shift + 1);
-                    if row_in_rows_state < self.rows_state.len() {
+                    let line_score = if row_in_rows_state < self.rows_state.len() {
                         let (existing_content, _) = &self.rows_state[row_in_rows_state];
-                        score += similarities_count(&existing_content, content)
-                            + ((self.cols as usize).saturating_sub(content.len().max(existing_content.len())));
+                        let sim = similarities_count(existing_content, content) as isize;
+                        let diff_penalty = (self.cols as isize - content.len().max(existing_content.len()) as isize).max(0);
+                        sim + diff_penalty
                     } else {
-                        score += self.cols as usize;
-                    }
+                        // Treat totally new row as perfect match (will favour smaller shifts)
+                        self.cols as isize
+                    };
+
+                    score += weight * line_score;
                 }
+
                 if score > best_shift_score {
                     best_shift = shift as isize;
                     best_shift_score = score;
@@ -477,7 +505,29 @@ impl CustomTerminalConnection {
         let mut reader = self.pty_pair.master.try_clone_reader()?;
         let app = self.app_handle.clone();
         let id = self.id.clone();
+        let id_clone = id.clone();
         let state = Arc::clone(&self.terminal_state);
+
+        let (event_tx, event_rx) = mpsc::channel::<TerminalEvent>();
+
+        thread::spawn(move || {
+            // Forward events from the parser to the frontend until the PTY reader
+            // thread finishes and the sender side of the channel is dropped.
+            for event in event_rx {
+                println!("Terminal connection {id_clone} received event: {}", event.r#type());
+                if app
+                    .emit_all(&format!("custom-terminal-event-{id_clone}"), &event)
+                    .is_err()
+                {
+                    println!("Terminal connection {id_clone} disconnected (emit failure)");
+                    break;
+                }
+            }
+
+            // Channel closed – reader thread stopped. Notify the frontend once.
+            println!("Terminal connection {id_clone} disconnected");
+            let _ = app.emit_all(&format!("custom-terminal-disconnect-{id_clone}"), ());
+        });
 
         thread::spawn(move || {
             let mut buf = [0u8; 4096];
@@ -491,12 +541,8 @@ impl CustomTerminalConnection {
                             s.process_input(&buf[..n])
                         };
                         for ev in events {
-                            if app
-                                .emit_all(&format!("custom-terminal-event-{id}"), &ev)
-                                .is_err()
-                            {
-                                break;
-                            }
+                            println!("Terminal connection {id} sending event: {}", ev.r#type());
+                            event_tx.send(ev).unwrap();
                         }
                     }
                     Err(e) => {
@@ -505,7 +551,8 @@ impl CustomTerminalConnection {
                     }
                 }
             }
-            let _ = app.emit_all(&format!("custom-terminal-disconnect-{id}"), ());
+            // Dropping event_tx automatically closes the channel and
+            // terminates the forwarding thread.
         });
 
         Ok(())

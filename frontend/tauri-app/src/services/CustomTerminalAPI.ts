@@ -155,6 +155,7 @@ export class CustomTerminalAPI {
       }
 
       const unlisten = await listen<TerminalEvent>(`custom-terminal-event-${id}`, (event) => {
+        console.log("Terminal event received:", event.id);
         callback(event.payload);
       });
 
