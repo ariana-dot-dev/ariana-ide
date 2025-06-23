@@ -6,7 +6,18 @@
 		"useIgnoreFile": false
 	},
 	"files": {
-		"ignoreUnknown": false
+		"ignoreUnknown": false,
+		"maxSize": 200000,
+		"includes": [
+			"src/**/*.ts",
+			"src/**/*.tsx",
+			"src/**/*.js",
+			"src/**/*.jsx",
+			"tauri-app/src/**/*.ts",
+			"tauri-app/src/**/*.tsx",
+			"tauri-app/src/**/*.js",
+			"tauri-app/src/**/*.jsx"
+		]
 	},
 	"formatter": {
 		"enabled": true,

@@ -1,132 +1,172 @@
-import React, { useState, useEffect } from 'react';
-import { Event, listen } from '@tauri-apps/api/event';
-import { useUserConfig } from './hooks/useUserConfig';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import React, { useState, useEffect } from "react";
+import { Event, listen } from "@tauri-apps/api/event";
+import { useUserConfig } from "./hooks/useUserConfig";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import initSwc from "@swc/wasm-web";
-import { Interpreter } from './scripting/interpreter';
-import { useStore } from './state';
-import Onboarding from './Onboarding';
-import Repl from './Repl';
-import CanvasView from './CanvasView';
-import { cn } from './utils';
-const appWindow = getCurrentWebviewWindow()
+import { Interpreter } from "./scripting/interpreter";
+import { useStore } from "./state";
+import Onboarding from "./Onboarding";
+import Repl from "./Repl";
+import CanvasView from "./CanvasView";
+import { cn } from "./utils";
+const appWindow = getCurrentWebviewWindow();
 
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
 function App() {
-    const store = useStore();
-    const { userEmail, loading, error, setUserEmail } = useUserConfig();
-    const [isMaximized, setIsMaximized] = useState(false);
-    const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
-    const [showTitlebar, setShowTitlebar] = useState(false);
-    const { isLightTheme } = store;
+	const store = useStore();
+	const { userEmail, loading, error, setUserEmail } = useUserConfig();
+	const [isMaximized, setIsMaximized] = useState(false);
+	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
+	const [showTitlebar, setShowTitlebar] = useState(false);
+	const { isLightTheme } = store;
 
-    useEffect(() => {
-        const unlistenUserEmail = listen<string>('user-email-changed', (event: Event<string>) => {
-            setUserEmail(event.payload);
-        });
+	useEffect(() => {
+		const unlistenUserEmail = listen<string>(
+			"user-email-changed",
+			(event: Event<string>) => {
+				setUserEmail(event.payload);
+			},
+		);
 
-        // Initialize heavy components asynchronously without blocking UI
-        async function importAndRunSwcOnMount() {
-            try {
-                console.log('Starting SWC initialization...');
-                await initSwc('/wasm_bg.wasm');
-                console.log('SWC initialized, starting interpreter...');
-                
-                const newInterpreter = new Interpreter(store);
-                await newInterpreter.init();
-                console.log('Interpreter initialized');
-                
-                setInterpreter(newInterpreter);
-            } catch (error) {
-                console.error('Failed to initialize:', error);
-                // Set a placeholder interpreter to unblock the UI
-                setInterpreter(new Interpreter(store));
-            }
-        }
-        
-        // Start initialization after a brief delay to allow UI to render
-        setTimeout(importAndRunSwcOnMount, 100);
+		// Initialize heavy components asynchronously without blocking UI
+		async function importAndRunSwcOnMount() {
+			try {
+				console.log("Starting SWC initialization...");
+				await initSwc("/wasm_bg.wasm");
+				console.log("SWC initialized, starting interpreter...");
 
-        return () => {
-            unlistenUserEmail.then((unlisten) => unlisten());
-        };
-    }, []);
+				const newInterpreter = new Interpreter(store);
+				await newInterpreter.init();
+				console.log("Interpreter initialized");
 
-    useEffect(() => {
-        // Check if window is maximized
-        appWindow.isMaximized().then(setIsMaximized);
-    }, []);
+				setInterpreter(newInterpreter);
+			} catch (error) {
+				console.error("Failed to initialize:", error);
+				// Set a placeholder interpreter to unblock the UI
+				setInterpreter(new Interpreter(store));
+			}
+		}
 
-    const handleMinimize = () => appWindow.minimize();
-    const handleMaximize = () => {
-        if (isMaximized) {
-            appWindow.unmaximize();
-        } else {
-            appWindow.maximize();
-        }
-        setIsMaximized(!isMaximized);
-    };
-    const handleClose = () => appWindow.close();
+		// Start initialization after a brief delay to allow UI to render
+		setTimeout(importAndRunSwcOnMount, 100);
 
-    if (loading || error) {
-        return (<div className={cn("h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden")}>
-            {loading ? 'Loading user config...' : `Error: ${error}`}
-        </div>)
-    }
+		return () => {
+			unlistenUserEmail.then((unlisten) => unlisten());
+		};
+	}, []);
 
-    return (
-        <InterpreterContext value={interpreter}>
-            <div className={cn(
-                "relative font-mono h-screen w-screen flex flex-col overflow-hidden",
-                isLightTheme ? 'bg-gradient-to-t from-[var(--bg-300)] to-[var(--bg-200)]' : 'bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)]',
-                isMaximized ? 'rounded-none' : 'rounded-lg',
-                `theme-${store.theme}`
-            )}>
-                <div className={cn("h-full w-full text-[var(--bg-200)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg")}>
-                    {/* Custom Titlebar */}
-                    <div 
-                        onMouseEnter={() => setShowTitlebar(true)} 
-                        onClick={() => setShowTitlebar(true)} 
-                        onMouseLeave={() => setShowTitlebar(false)} 
-                        className={cn("h-10 flex items-center justify-center px-4 select-none relative z-50")}
-                    >
-                        {showTitlebar && (<>
-                            <span data-tauri-drag-region className={cn("starting:opacity-0 opacity-100 text-sm font-medium font-sans w-full text-center")}>Ariana IDE</span>
-                            <div className={cn("absolute right-4 gap-2 flex items-center")}>
-                                <button
-                                    onClick={handleMinimize}
-                                    className={cn("starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-yellow-400 hover:opacity-100 transition-colors cursor-pointer")}
-                                ></button>
-                                <button
-                                    onClick={handleMaximize}
-                                    className={cn("starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-green-400 hover:opacity-100 transition-colors cursor-pointer")}
-                                ></button>
-                                <button
-                                    onClick={handleClose}
-                                    className={cn("starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-red-400 hover:opacity-100 transition-colors cursor-pointer")}
-                                ></button>
-                            </div>
-                        </>)}
-                    </div>
+	useEffect(() => {
+		// Check if window is maximized
+		appWindow.isMaximized().then(setIsMaximized);
+	}, []);
 
-                    {/* Show interpreter loading status */}
-                    {!interpreter && (
-                        <div className={cn("absolute top-16 right-4 bg-[var(--bg-800)]/90 text-[var(--fg-300)] px-3 py-2 rounded-md text-sm")}>
-                            Initializing interpreter...
-                        </div>
-                    )}
+	const handleMinimize = () => appWindow.minimize();
+	const handleMaximize = () => {
+		if (isMaximized) {
+			appWindow.unmaximize();
+		} else {
+			appWindow.maximize();
+		}
+		setIsMaximized(!isMaximized);
+	};
+	const handleClose = () => appWindow.close();
 
-                    <CanvasView />
+	if (loading || error) {
+		return (
+			<div
+				className={cn(
+					"h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden",
+				)}
+			>
+				{loading ? "Loading user config..." : `Error: ${error}`}
+			</div>
+		);
+	}
 
-                    <div className={cn("flex-1 font-mono flex items-center justify-center")}>
-                        <Onboarding userEmail={userEmail} />
-                        <Repl />
-                    </div>
-                </div>
-            </div>
-        </InterpreterContext>
-    );
+	return (
+		<InterpreterContext value={interpreter}>
+			<div
+				className={cn(
+					"relative font-mono h-screen w-screen flex flex-col overflow-hidden",
+					isLightTheme
+						? "bg-gradient-to-t from-[var(--bg-300)] to-[var(--bg-200)]"
+						: "bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)]",
+					isMaximized ? "rounded-none" : "rounded-lg",
+					`theme-${store.theme}`,
+				)}
+			>
+				<div
+					className={cn(
+						"h-full w-full text-[var(--bg-200)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg",
+					)}
+				>
+					{/* Custom Titlebar */}
+					<div
+						onMouseEnter={() => setShowTitlebar(true)}
+						onClick={() => setShowTitlebar(true)}
+						onMouseLeave={() => setShowTitlebar(false)}
+						className={cn(
+							"h-10 flex items-center justify-center px-4 select-none relative z-50",
+						)}
+					>
+						{showTitlebar && (
+							<>
+								<span
+									data-tauri-drag-region
+									className={cn(
+										"starting:opacity-0 opacity-100 text-sm font-medium font-sans w-full text-center",
+									)}
+								>
+									Ariana IDE
+								</span>
+								<div className={cn("absolute right-4 gap-2 flex items-center")}>
+									<button
+										onClick={handleMinimize}
+										className={cn(
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-yellow-400 hover:opacity-100 transition-colors cursor-pointer",
+										)}
+									></button>
+									<button
+										onClick={handleMaximize}
+										className={cn(
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-green-400 hover:opacity-100 transition-colors cursor-pointer",
+										)}
+									></button>
+									<button
+										onClick={handleClose}
+										className={cn(
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-red-400 hover:opacity-100 transition-colors cursor-pointer",
+										)}
+									></button>
+								</div>
+							</>
+						)}
+					</div>
+
+					{/* Show interpreter loading status */}
+					{!interpreter && (
+						<div
+							className={cn(
+								"absolute top-16 right-4 bg-[var(--bg-800)]/90 text-[var(--fg-300)] px-3 py-2 rounded-md text-sm",
+							)}
+						>
+							Initializing interpreter...
+						</div>
+					)}
+
+					<CanvasView />
+
+					<div
+						className={cn("flex-1 font-mono flex items-center justify-center")}
+					>
+						<Onboarding userEmail={userEmail} />
+						<Repl />
+					</div>
+				</div>
+			</div>
+		</InterpreterContext>
+	);
 }
 
 export default App;

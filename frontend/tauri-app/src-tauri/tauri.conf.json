@@ -1,48 +1,46 @@
 {
-  "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420"
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "resources": [
-      "../src/scripting/baseScript.ts"
-    ],
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  },
-  "productName": "ariana IDE",
-  "mainBinaryName": "ariana IDE",
-  "version": "0.1.0",
-  "identifier": "com.ariana.ide",
-  "plugins": {},
-  "app": {
-    "withGlobalTauri": true,
-    "windows": [
-      {
-        "fullscreen": false,
-        "resizable": true,
-        "title": "ariana IDE",
-        "width": 1200,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
-        "decorations": false,
-        "transparent": true,
-        "center": true,
-        "useHttpsScheme": true
-      }
-    ],
-    "security": {
-      "csp": null
-    }
-  }
+	"build": {
+		"beforeDevCommand": "npm run dev",
+		"beforeBuildCommand": "npm run build",
+		"frontendDist": "../dist",
+		"devUrl": "http://localhost:1420"
+	},
+	"bundle": {
+		"active": true,
+		"targets": "all",
+		"resources": ["../src/scripting/baseScript.ts"],
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		]
+	},
+	"productName": "ariana IDE",
+	"mainBinaryName": "ariana IDE",
+	"version": "0.1.0",
+	"identifier": "com.ariana.ide",
+	"plugins": {},
+	"app": {
+		"withGlobalTauri": true,
+		"windows": [
+			{
+				"fullscreen": false,
+				"resizable": true,
+				"title": "ariana IDE",
+				"width": 1200,
+				"height": 800,
+				"minWidth": 800,
+				"minHeight": 600,
+				"decorations": false,
+				"transparent": true,
+				"center": true,
+				"useHttpsScheme": true
+			}
+		],
+		"security": {
+			"csp": null
+		}
+	}
 }

@@ -1,110 +1,135 @@
-import React, { useContext, useState } from 'react';
-import { motion, PanInfo } from 'framer-motion';
-import { CanvasElement, ElementLayout, ElementTargets } from './types';
-import { Rectangle } from './Rectangle';
-import ElementOverlay from './ElementOverlay';
-import { cn } from '../utils';
-import Logo from '../components/Logo';
-import { useStore } from '../state';
+import React, { useContext, useState } from "react";
+import { motion, PanInfo } from "framer-motion";
+import { CanvasElement, ElementLayout, ElementTargets } from "./types";
+import { Rectangle } from "./Rectangle";
+import ElementOverlay from "./ElementOverlay";
+import { cn } from "../utils";
+import Logo from "../components/Logo";
+import { useStore } from "../state";
 
 interface RectangleOnCanvasProps {
-  layout: ElementLayout;
-  onDragStart: (element: CanvasElement) => void;
-  onDragEnd: (element: CanvasElement) => void;
-  onDrag: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
-  onRectangleUpdate: (element: Rectangle, newTargets: ElementTargets) => void;
-  isDragTarget: boolean;
-  isDragging: boolean;
+	layout: ElementLayout;
+	onDragStart: (element: CanvasElement) => void;
+	onDragEnd: (element: CanvasElement) => void;
+	onDrag: (
+		event: MouseEvent | TouchEvent | PointerEvent,
+		info: PanInfo,
+	) => void;
+	onRectangleUpdate: (element: Rectangle, newTargets: ElementTargets) => void;
+	isDragTarget: boolean;
+	isDragging: boolean;
 }
 
 const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
-  layout,
-  onDragStart: propOnDragStart,
-  onDragEnd: propOnDragEnd,
-  onDrag: propOnDrag,
-  onRectangleUpdate,
-  isDragTarget,
-  isDragging
+	layout,
+	onDragStart: propOnDragStart,
+	onDragEnd: propOnDragEnd,
+	onDrag: propOnDrag,
+	onRectangleUpdate,
+	isDragTarget,
+	isDragging,
 }) => {
-  const { cell, element } = layout;
-  const [isHovered, setIsHovered] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const { theme, isLightTheme } = useStore();
+	const { cell, element } = layout;
+	const [isHovered, setIsHovered] = useState(false);
+	const [showOverlay, setShowOverlay] = useState(false);
+	const [dragging, setDragging] = useState(false);
+	const { theme, isLightTheme } = useStore();
 
-  if (isDragging) {
-    console.log(`RectangleOnCanvas for ${element.id} IS DRAGGING. Received propOnDrag type: ${typeof propOnDrag}`);
-  } else if (typeof propOnDrag === 'function' && propOnDrag.toString().includes('handleDrag')) {
-    console.warn(`RectangleOnCanvas for ${element.id} NOT DRAGGING but received actual handleDrag function.`);
-  }
+	if (isDragging) {
+		console.log(
+			`RectangleOnCanvas for ${element.id} IS DRAGGING. Received propOnDrag type: ${typeof propOnDrag}`,
+		);
+	} else if (
+		typeof propOnDrag === "function" &&
+		propOnDrag.toString().includes("handleDrag")
+	) {
+		console.warn(
+			`RectangleOnCanvas for ${element.id} NOT DRAGGING but received actual handleDrag function.`,
+		);
+	}
 
-  const handleDragStartInternal = () => {
-    console.log(`INTERNAL handleDragStart for: ${element.id}`);
-    propOnDragStart(element);
-  };
+	const handleDragStartInternal = () => {
+		console.log(`INTERNAL handleDragStart for: ${element.id}`);
+		propOnDragStart(element);
+	};
 
-  const handleDragEndInternal = () => {
-    console.log(`INTERNAL handleDragEnd for: ${element.id}`);
-    propOnDragEnd(element);
-  };
+	const handleDragEndInternal = () => {
+		console.log(`INTERNAL handleDragEnd for: ${element.id}`);
+		propOnDragEnd(element);
+	};
 
-  const handleElementUpdate = (updatedElement: Rectangle, newTargets: ElementTargets) => {
-    onRectangleUpdate(updatedElement, newTargets);
-  };
+	const handleElementUpdate = (
+		updatedElement: Rectangle,
+		newTargets: ElementTargets,
+	) => {
+		onRectangleUpdate(updatedElement, newTargets);
+	};
 
-  return (
-    <motion.div
-      className={cn(
-        `absolute p-1 cursor-move select-none`,
-        isDragging ? 'z-30' : 'z-10'
-      )}
-      initial={{
-        x: cell.x,
-        y: cell.y,
-        width: cell.width,
-        height: cell.height,
-      }}
-      animate={ !dragging ? {
-        x: cell.x,
-        y: cell.y,
-        width: cell.width,
-        height: cell.height,
-      } : undefined}
-      transition={{
-        type: "tween",
-        duration: 0.2,
-      }}
-      layout
-      drag
-      dragMomentum={false}
-      onMouseDown={() => {
-        if (!dragging) {
-          setDragging(true);
-        }
-      }}
-      onDragStart={() => {
-        setDragging(true);
-        handleDragStartInternal();
-      }}
-      onDragEnd={() => {
-        setDragging(false);
-        handleDragEndInternal();
-      }}
-      onDrag={(event, info) => {
-        console.log(`MOTION.DIV onDrag FIRED for ${element.id}. isDragging: ${isDragging}. Type of propOnDrag: ${typeof propOnDrag}`);
-        if (typeof propOnDrag === 'function') {
-          propOnDrag(event, info);
-        } else {
-          console.error(`propOnDrag is NOT a function for ${element.id}! Type: ${typeof propOnDrag}.`);
-        }
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-      }}
-    >
-      <div className={cn("w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-[var(--bg-200)]/10")}>
-      {/* {(isHovered || showOverlay) && !showOverlay && (
+	return (
+		<motion.div
+			className={cn(
+				`absolute p-1 cursor-move select-none`,
+				isDragging ? "z-30" : "z-10",
+			)}
+			initial={{
+				x: cell.x,
+				y: cell.y,
+				width: cell.width,
+				height: cell.height,
+			}}
+			animate={
+				!dragging
+					? {
+							x: cell.x,
+							y: cell.y,
+							width: cell.width,
+							height: cell.height,
+						}
+					: undefined
+			}
+			transition={{
+				type: "tween",
+				duration: 0.2,
+			}}
+			layout
+			drag
+			dragMomentum={false}
+			onMouseDown={() => {
+				if (!dragging) {
+					setDragging(true);
+				}
+			}}
+			onDragStart={() => {
+				setDragging(true);
+				handleDragStartInternal();
+			}}
+			onDragEnd={() => {
+				setDragging(false);
+				handleDragEndInternal();
+			}}
+			onDrag={(event, info) => {
+				console.log(
+					`MOTION.DIV onDrag FIRED for ${element.id}. isDragging: ${isDragging}. Type of propOnDrag: ${typeof propOnDrag}`,
+				);
+				if (typeof propOnDrag === "function") {
+					propOnDrag(event, info);
+				} else {
+					console.error(
+						`propOnDrag is NOT a function for ${element.id}! Type: ${typeof propOnDrag}.`,
+					);
+				}
+			}}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => {
+				setIsHovered(false);
+			}}
+		>
+			<div
+				className={cn(
+					"w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-[var(--bg-200)]/10",
+				)}
+			>
+				{/* {(isHovered || showOverlay) && !showOverlay && (
         <button
           className={cn("absolute top-1 right-1 w-6 h-6 bg-[var(--fg-800)] text-[var(--bg-white)] rounded text-xs hover:bg-[var(--fg-700)] z-10 border border-[var(--fg-600)]")}
           onClick={(e) => {
@@ -118,13 +143,17 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         </button>
       )} */}
 
-      <div className={cn("select-none")} style={{ width: cell.width/4, }}>
-        <Logo className={cn(
-          isLightTheme ? 'text-[var(--fg-800-30)]' : 'text-[var(--fg-100-30)]'
-        )} />
-      </div>
-      
-      {/* {showOverlay && element instanceof Rectangle && (
+				<div className={cn("select-none")} style={{ width: cell.width / 4 }}>
+					<Logo
+						className={cn(
+							isLightTheme
+								? "text-[var(--fg-800-30)]"
+								: "text-[var(--fg-100-30)]",
+						)}
+					/>
+				</div>
+
+				{/* {showOverlay && element instanceof Rectangle && (
         <ElementOverlay
           element={element}
           onConfirm={handleElementUpdate}
@@ -134,10 +163,9 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
           }}
         />
       )} */}
-      </div>
-    </motion.div>
-  );
-
+			</div>
+		</motion.div>
+	);
 };
 
 export default RectangleOnCanvas;

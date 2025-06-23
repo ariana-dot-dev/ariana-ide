@@ -121,7 +121,7 @@
 
 //     for (const split of splitOptions) {
 //       const layouts = this.evaluateSplit(bounds, elements, split);
-//       const totalScore = layouts.reduce((sum, layout) => 
+//       const totalScore = layouts.reduce((sum, layout) =>
 //         sum + layout.score * layout.element.weight, 0
 //       );
 
@@ -154,7 +154,7 @@
 //       // Vertical splits (left/right)
 //       const verticalRatio = leftCount / numElements;
 //       const verticalPosition = bounds.x + bounds.width * verticalRatio;
-      
+
 //       options.push({
 //         direction: 'vertical',
 //         position: verticalPosition,
@@ -165,7 +165,7 @@
 //       // Horizontal splits (top/bottom)
 //       const horizontalRatio = leftCount / numElements;
 //       const horizontalPosition = bounds.y + bounds.height * horizontalRatio;
-      
+
 //       options.push({
 //         direction: 'horizontal',
 //         position: horizontalPosition,
@@ -229,7 +229,7 @@
 //     }));
 
 //     // Sort by preference difference to make optimal assignments
-//     elementScores.sort((a, b) => 
+//     elementScores.sort((a, b) =>
 //       Math.abs(b.leftScore - b.rightScore) - Math.abs(a.leftScore - a.rightScore)
 //     );
 
@@ -239,8 +239,8 @@
 //     // Assign elements to partitions
 //     for (let i = 0; i < elementScores.length; i++) {
 //       const { element, leftScore, rightScore } = elementScores[i];
-      
-//       if (leftElements.length < leftCount && 
+
+//       if (leftElements.length < leftCount &&
 //           (rightElements.length >= rightCount || leftScore >= rightScore)) {
 //         leftElements.push(element);
 //       } else {

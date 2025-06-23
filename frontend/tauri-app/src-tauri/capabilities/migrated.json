@@ -1,41 +1,39 @@
 {
-  "identifier": "migrated",
-  "description": "permissions that were migrated from v1",
-  "local": true,
-  "windows": [
-    "main"
-  ],
-  "permissions": [
-    "store:allow-load",
-    "store:default",
-    "fs:allow-read-text-file",
-    "fs:default",
-    "core:default",
-    "fs:allow-read-file",
-    "fs:allow-write-file",
-    "fs:allow-read-dir",
-    "fs:allow-copy-file",
-    "fs:allow-mkdir",
-    "fs:allow-remove",
-    "fs:allow-rename",
-    "fs:allow-exists",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        "$RESOURCE/**",
-        "$HOME/.ariana/*",
-        "$HOME/.ariana",
-        "$APPCONFIG/*",
-        "$APPDATA/*"
-      ]
-    },
-    "core:window:allow-maximize",
-    "core:window:allow-unmaximize",
-    "core:window:allow-minimize",
-    "core:window:allow-unminimize",
-    "core:window:allow-show",
-    "core:window:allow-hide",
-    "core:window:allow-close",
-    "core:window:allow-start-dragging"
-  ]
+	"identifier": "migrated",
+	"description": "permissions that were migrated from v1",
+	"local": true,
+	"windows": ["main"],
+	"permissions": [
+		"store:allow-load",
+		"store:default",
+		"fs:allow-read-text-file",
+		"fs:default",
+		"core:default",
+		"fs:allow-read-file",
+		"fs:allow-write-file",
+		"fs:allow-read-dir",
+		"fs:allow-copy-file",
+		"fs:allow-mkdir",
+		"fs:allow-remove",
+		"fs:allow-rename",
+		"fs:allow-exists",
+		{
+			"identifier": "fs:scope",
+			"allow": [
+				"$RESOURCE/**",
+				"$HOME/.ariana/*",
+				"$HOME/.ariana",
+				"$APPCONFIG/*",
+				"$APPDATA/*"
+			]
+		},
+		"core:window:allow-maximize",
+		"core:window:allow-unmaximize",
+		"core:window:allow-minimize",
+		"core:window:allow-unminimize",
+		"core:window:allow-show",
+		"core:window:allow-hide",
+		"core:window:allow-close",
+		"core:window:allow-start-dragging"
+	]
 }
