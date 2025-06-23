@@ -200,6 +200,12 @@ impl TerminalConnection {
             }
         };
 
+        // environment variables for image support
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+        cmd.env("TERM_PROGRAM", "iTerm.app");  // Identify as iTerm2 for IIP support
+        cmd.env("TERM_PROGRAM_VERSION", "3.0.0");
+        
         // Add environment variables
         if let Some(env_vars) = &config.environment {
             for (key, value) in env_vars {
