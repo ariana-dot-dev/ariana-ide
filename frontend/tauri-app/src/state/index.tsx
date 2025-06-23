@@ -35,6 +35,7 @@ export class Subscribeable<T> {
 export class State {
     public showOnboarding: Subscribeable<boolean> = new Subscribeable(false);
     public currentInterpreterScript: Subscribeable<string> = new Subscribeable("");
+    public currentTheme: Subscribeable<string> = new Subscribeable("semi-sky");
 
     processedCommandsStack: Command[] = [];
 
@@ -44,6 +45,9 @@ export class State {
         }
         if (command.$type === "Onboarding:hide") {
             this.showOnboarding.value = false;
+        }
+        if (command.$type === "Theme:set") {
+            this.currentTheme.value = command.themeName;
         }
         
         this.processedCommandsStack.push(command);
@@ -60,6 +64,18 @@ export class State {
         }
         if (command.$type === "Onboarding:hide") {
             this.showOnboarding.value = true;
+        }
+        if (command.$type === "Theme:set") {
+            // Find the previous theme command or default to "dark-red"
+            let previousTheme = "semi-sky";
+            for (let i = this.processedCommandsStack.length - 1; i >= 0; i--) {
+                const prevCommand = this.processedCommandsStack[i];
+                if (prevCommand.$type === "Theme:set") {
+                    previousTheme = prevCommand.themeName;
+                    break;
+                }
+            }
+            this.currentTheme.value = previousTheme;
         }
     }
 }

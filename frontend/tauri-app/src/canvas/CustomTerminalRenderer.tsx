@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import { StateContext } from '../App';
 import { customTerminalAPI, TerminalEvent, TerminalSpec, LineItem, Colors } from '../services/CustomTerminalAPI';
 import { cn } from '../utils';
+import useTheme from '../hooks/useTheme';
 
 interface CustomTerminalRendererProps {
   elementId: string;
@@ -36,6 +38,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   onTerminalReady,
   onTerminalError,
 }) => {
+  const state = useContext(StateContext);
+  const [themeName, setThemeName] = useState(state.currentTheme.value);
+  useEffect(() => {
+    const id = state.currentTheme.subscribe(setThemeName);
+    return () => state.currentTheme.unsubscribe(id);
+  }, [state]);
+
   const [terminalId, setTerminalId] = useState<string | null>(null);
   const [screen, setScreen] = useState<LineItem[][]>([]);
   const [cursorPosition, setCursorPosition] = useState({ line: 0, col: 0 });
@@ -46,6 +55,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   const terminalInnerRef = useRef<HTMLDivElement>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isResizingRef = useRef<boolean>(false);
+  const { currentTheme, isLightTheme } = useTheme();
 
   // Initialize terminal connection
   useEffect(() => {
@@ -380,99 +390,94 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     }
   }, [isConnected, handleResize]);
 
+  const baseShade = isLightTheme ? 800 : 300;
+  const brightShade = isLightTheme ? 700 : 400;
+
+  // Hex values for the Tailwind shades we need
+  const TW: Record<string, Record<number, string>> = {
+    slate:   {300:'#CBD5E1',400:'#94A3B8',700:'#334155',800:'#1E293B',900:'#0F172A'},
+    red:     {300:'#FCA5A5',400:'#F87171',700:'#B91C1C',800:'#991B1B'},
+    green:   {300:'#86EFAC',400:'#4ADE80',700:'#15803D',800:'#166534'},
+    yellow:  {300:'#FDE047',400:'#FACC15',700:'#A16207',800:'#854D0E'},
+    blue:    {300:'#93C5FD',400:'#60A5FA',700:'#1D4ED8',800:'#1E40AF'},
+    fuchsia: {300:'#F0ABFC',400:'#E879F9',700:'#A21CAF',800:'#86198F'},
+    cyan:    {300:'#67E8F9',400:'#22D3EE',700:'#0E7490',800:'#155E75'},
+  };
+
+  const BASE_TO_TW: Record<string,string> = {
+    Black:'slate',
+    Red:'red',
+    Green:'green',
+    Yellow:'yellow',
+    Blue:'blue',
+    Magenta:'fuchsia',
+    Cyan:'cyan',
+    White:'slate',
+  };
+
+  const STANDARD_COLOR_NAMES = [
+    'Black','Red','Green','Yellow','Blue','Magenta','Cyan','White',
+    'BrightBlack','BrightRed','BrightGreen','BrightYellow','BrightBlue','BrightMagenta','BrightCyan','BrightWhite'
+  ];
+
+  const getAnsiHex = (ansiName: string): string => {
+    if (ansiName === 'Default') {
+      return isLightTheme ? TW.slate[700] : TW.slate[300];
+    }
+    if (ansiName === 'BrightWhite') return '#ffffff';
+    if (ansiName === 'White')       return isLightTheme ? '#e5e5e5' : '#f8f8f8';
+
+    const isBright = ansiName.startsWith('Bright');
+    const baseName = isBright ? ansiName.substring(6) : ansiName; // remove "Bright"
+    const twBase = BASE_TO_TW[baseName as keyof typeof BASE_TO_TW];
+    if (!twBase || !TW[twBase]) return '#ff00ff';
+
+    const shade = isBright ? brightShade : baseShade;
+    const hex = TW[twBase][shade as keyof typeof TW[typeof twBase]];
+    return hex ?? '#ff00ff';
+  };
+
   const colorToCSS = (color?: any): string => {
     if (!color) return '';
 
     if (typeof color === 'string') {
-      switch (color) {
-        // Standard ANSI colors - better terminal-appropriate colors
-        case 'Default': return '#d4d4d4'; // Light gray for default text
-        case 'Black': return '#0c0c0c';   // True black
-        case 'Red': return '#cd3131';     // Proper red
-        case 'Green': return '#0dbc79';   // Proper green  
-        case 'Yellow': return '#e5e510';  // Proper yellow
-        case 'Blue': return '#2472c8';    // Proper blue
-        case 'Magenta': return '#bc3fbc'; // Proper magenta
-        case 'Cyan': return '#11a8cd';    // Proper cyan
-        case 'White': return '#e5e5e5';   // Light gray
-        
-        // Bright/Bold ANSI colors - more vivid versions
-        case 'BrightBlack': return '#666666';   // Gray
-        case 'BrightRed': return '#f14c4c';     // Bright red
-        case 'BrightGreen': return '#23d18b';   // Bright green
-        case 'BrightYellow': return '#f5f543';  // Bright yellow
-        case 'BrightBlue': return '#3b8eea';    // Bright blue
-        case 'BrightMagenta': return '#d670d6'; // Bright magenta
-        case 'BrightCyan': return '#29b8db';    // Bright cyan
-        case 'BrightWhite': return '#ffffff';   // Pure white
-        
-        default: return '#ff00ff'; // Magenta for unknown colors (debug)
-      }
+      return getAnsiHex(color);
     }
 
     if (color.Extended !== undefined) {
-      // Handle 256-color palette properly
       return ansi256ToHex(color.Extended);
     }
 
     if (color.Rgb !== undefined) {
-      // Handle RGB colors
       const [r, g, b] = color.Rgb;
-      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
     }
 
-    return '#d4d4d4'; // Default to light gray instead of arbitrary color
+    return isLightTheme ? '#334155' : '#d4d4d4';
   };
 
-  // Convert ANSI 256-color codes to hex - improved accuracy
-  const ansi256ToHex = (colorCode: number): string => {
-    if (colorCode < 16) {
-      // Standard colors (0-15) - use same colors as our string mapping for consistency
-      const colors = [
-        '#0c0c0c',   // 0: Black
-        '#cd3131',   // 1: Red
-        '#0dbc79',   // 2: Green  
-        '#e5e510',   // 3: Yellow
-        '#2472c8',   // 4: Blue
-        '#bc3fbc',   // 5: Magenta
-        '#11a8cd',   // 6: Cyan
-        '#e5e5e5',   // 7: White
-        '#666666',   // 8: Bright Black (Gray)
-        '#f14c4c',   // 9: Bright Red
-        '#23d18b',   // 10: Bright Green
-        '#f5f543',   // 11: Bright Yellow
-        '#3b8eea',   // 12: Bright Blue
-        '#d670d6',   // 13: Bright Magenta
-        '#29b8db',   // 14: Bright Cyan
-        '#ffffff'    // 15: Bright White
-      ];
-      return colors[colorCode] || '#d4d4d4';
-    } else if (colorCode < 232) {
-      // 216-color cube (16-231) - more accurate color cube
-      const n = colorCode - 16;
+  // Convert ANSI 256-color codes to hex using the same helper for the first 16 colors
+  const ansi256ToHex = (code: number): string => {
+    if (code < 16) {
+      return getAnsiHex(STANDARD_COLOR_NAMES[code]);
+    }
+    if (code < 232) {
+      const n = code - 16;
       const r = Math.floor(n / 36);
       const g = Math.floor((n % 36) / 6);
       const b = n % 6;
 
-      // More accurate ANSI color cube values
-      const convert = (val: number) => {
-        const values = [0, 95, 135, 175, 215, 255];
-        return values[val] || 0;
-      };
-      
-      const red = convert(r);
-      const green = convert(g);
-      const blue = convert(b);
-      
-      return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
-    } else {
-      // Grayscale (232-255) - improved grayscale ramp
-      const level = colorCode - 232;
-      const gray = 8 + level * 10;
-      const clampedGray = Math.min(238, gray); // Cap at 238 for better contrast
-      const hex = clampedGray.toString(16).padStart(2, '0');
-      return `#${hex}${hex}${hex}`;
+      const vals = [0, 95, 135, 175, 215, 255];
+      const red = vals[r];
+      const green = vals[g];
+      const blue = vals[b];
+      return `#${red.toString(16).padStart(2,'0')}${green.toString(16).padStart(2,'0')}${blue.toString(16).padStart(2,'0')}`;
     }
+
+    const level = code - 232;
+    const gray = 8 + level * 10;
+    const gHex = Math.min(238, gray).toString(16).padStart(2,'0');
+    return `#${gHex}${gHex}${gHex}`;
   };
 
   const renderScreenLine = (line: LineItem[], lineIndex: number, totalCols: number) => {
@@ -559,7 +564,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
               className="flex animate-pulse"
               style={{
                 color: colorToCSS(currentItem.foreground_color),
-                backgroundColor: 'var(--whitest)',
+                backgroundColor: 'var(--blackest)',
                 fontWeight: currentItem.is_bold ? 'bold' : 'normal',
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
@@ -604,7 +609,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
               className="flex min-w-1"
               style={{
                 color: colorToCSS(currentItem.foreground_color),
-                // backgroundColor: hasCursor ? 'var(--whitest)' : colorToCSS(currentItem.background_color),
+                // backgroundColor: hasCursor ? 'var(--blackest)' : colorToCSS(currentItem.background_color),
                 fontWeight: currentItem.is_bold ? 'bold' : 'normal',
                 fontStyle: currentItem.is_italic ? 'italic' : 'normal',
                 textDecoration: currentItem.is_underline ? 'underline' : 'none',
@@ -651,7 +656,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           key={currentCol}
           style={{
             color: colorToCSS(styleSource.foreground_color),
-            backgroundColor: 'var(--whitest)',
+            backgroundColor: 'var(--blackest)',
             fontWeight: styleSource.is_bold ? 'bold' : 'normal',
             fontStyle: styleSource.is_italic ? 'italic' : 'normal',
             textDecoration: styleSource.is_underline ? 'underline' : 'none',
@@ -679,7 +684,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
           {isAtCursorLine && (
             <div
               style={{
-                backgroundColor: 'var(--whitest)',
+                backgroundColor: 'var(--blackest)',
                 width: '7.45px',
                 height: '16px',
                 boxShadow: 'inset -1px 0 0 var(--fg-800-30)',
@@ -719,48 +724,16 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
     <div
       ref={terminalRef}
       className={cn(
-        "rounded-md backdrop-blur-md bg-gradient-to-b from-[var(--fg-900)]/30 to-[var(--bg-600)]/30 text-[var(--fg-50)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
+        "rounded-md backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col"
       )}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onWheel={handleWheel}
       onClick={() => terminalRef.current?.focus()}
     >
-      <div className={cn("mb-2 text-xs text-[var(--fg-400)] flex justify-between items-center")}>
-        <div>
-          Status: {isConnected ? 'Connected' : 'Disconnected'}
-          {terminalId && ` | ID: ${terminalId.slice(0, 8)}...`}
-          {isConnected && ` | Cursor: ${cursorPosition.line},${cursorPosition.col}`}
-          {` | Size: ${terminalDimensions.cols}x${terminalDimensions.rows}`}
-        </div>
-
-        <div className={cn("flex gap-1")}>
-          <button
-            onClick={() => customTerminalAPI.sendScrollUp(terminalId!, 1)}
-            className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
-            title="Scroll Up"
-          >
-            ↑
-          </button>
-          <button
-            onClick={() => customTerminalAPI.sendScrollDown(terminalId!, 1)}
-            className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
-            title="Scroll Down"
-          >
-            ↓
-          </button>
-          <button
-            onClick={() => sendRawInput('\x0C')}
-            className={cn("px-2 py-1 bg-[var(--bg-700)] hover:bg-[var(--bg-600)] rounded text-xs")}
-            title="Clear Screen (Ctrl+L)"
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-
-      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded bg-[var(--bg-900)] overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
-        <div className={cn("absolute top-0 left-0 w-full h-fit p-2")}>
+      {baseShade} {currentTheme}
+      <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
+        <div className={cn("absolute top-0 left-0 w-full h-fit")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {
             const line = screen[rowIndex] || [];
             return renderScreenLine(line, rowIndex, terminalDimensions.cols);

@@ -9,8 +9,7 @@ import Onboarding from './Onboarding';
 import Repl from './Repl';
 import CanvasView from './CanvasView';
 import { cn } from './utils';
-
-
+import useTheme from './hooks/useTheme';
 
 const state = new State();
 export const StateContext = React.createContext(state);
@@ -21,6 +20,7 @@ function App() {
     const [isMaximized, setIsMaximized] = useState(false);
     const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
     const [showTitlebar, setShowTitlebar] = useState(false);
+    const { currentTheme } = useTheme(state);
 
     useEffect(() => {
         // Initialize user email listener immediately for better UX
@@ -82,7 +82,8 @@ function App() {
             <InterpreterContext value={interpreter}>
                 <div className={cn(
                     "relative font-mono h-screen w-screen bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col overflow-hidden",
-                    isMaximized ? 'rounded-none' : 'rounded-lg'
+                    isMaximized ? 'rounded-none' : 'rounded-lg',
+                    `theme-${currentTheme}`
                 )}>
                     <div className={cn("h-full w-full text-[var(--bg-200)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg")}>
                         {/* Custom Titlebar */}
@@ -122,7 +123,7 @@ function App() {
 
                         <div className={cn("flex-1 font-mono flex items-center justify-center")}>
                             <Onboarding userEmail={userEmail} />
-                            {/* <Repl /> */}
+                            <Repl />
                         </div>
                     </div>
                 </div>

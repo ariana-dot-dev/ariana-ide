@@ -22,18 +22,39 @@ from pathlib import Path
 from typing import Dict, Tuple
 
 # ---------------------------------------------------------------------------
-# Configuration – base colours expressed in 6-digit sRGB hex
+# Configuration – themes with base colours expressed in 6-digit sRGB hex
 # ---------------------------------------------------------------------------
-BASE_COLOURS: Dict[str, str] = {
-    "--fg-500": "#7e2a0c",
-    # "--bg-500": "#51a2ff",  # ~ oklch(82.8% 0.111 230.318)
-    "--bg-500": "#460809",
-    # "--whitest": "#ecfeff",
-    # "--blackest": "#1e1a4d",
-    "--whitest": "#fafaf9",
-    "--blackest": "#0c0a09",
-    "--positive-500": "#30D48A",  # green
-    "--negative-500": "#D84B32",  # red
+THEMES: Dict[str, Dict[str, str]] = {
+    "dark-red": {
+        "--fg-500": "#7e2a0c",
+        "--bg-500": "#460809",
+        "--blackest": "#fafaf9",
+        "--whitest": "#0c0a09",
+        "--positive-500": "#30D48A",  # green
+        "--negative-500": "#D84B32",  # red
+        "--border-radius": "4px",
+        "--border-thickness": "1px",
+    },
+    "semi-sky": {
+        "--fg-500": "#0284C7",  # blue equivalent
+        "--bg-500": "#0EA5E9",  # ~ oklch(82.8% 0.111 230.318)
+        "--blackest": "#ECFEFF",
+        "--whitest": "#130127",
+        "--positive-500": "#30D48A",  # green
+        "--negative-500": "#D84B32",  # red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
+    },
+    "light-sand": {
+        "--fg-500": "#FEF9C3",  # blue equivalent
+        "--bg-500": "#E7E5E4",  # ~ oklch(82.8% 0.111 230.318)
+        "--whitest": "#ffffff",
+        "--blackest": "#1C1917",
+        "--positive-500": "#30D48A",  # green
+        "--negative-500": "#D84B32",  # red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
+    }
 }
 
 # Derived ramps to create: (prefix, base, target, stops)
@@ -97,22 +118,26 @@ def mix(c1: str, c2: str, p: float) -> str:
 # Compute palette
 # ---------------------------------------------------------------------------
 
-def build_palette() -> Dict[str, str]:
-    palette: Dict[str, str] = BASE_COLOURS.copy()
+def build_palette(theme_colors: Dict[str, str]) -> Dict[str, str]:
+    palette: Dict[str, str] = theme_colors.copy()
 
     # lighter (50–450) and darker (550–950) ramps
     for prefix, base_ref, target_ref, stops in DERIVED_SCALES:
-        base = BASE_COLOURS[base_ref]
-        target = BASE_COLOURS[target_ref]
+        base = theme_colors[base_ref]
+        target = theme_colors[target_ref]
         for suffix, delta in stops:
             weight = 1 - delta  # weight = 1 is base, 0 is target
             palette[f"{prefix}-{suffix}"] = mix(base, target, 1 - weight)
+    
     # -------------------------------------------------------------------
-    # Generate opacity variants (05–100 in 5 % steps)
+    # Generate opacity variants (05–100 in 5 % steps) only for color vars
     # -------------------------------------------------------------------
     op_steps = list(range(5, 105, 5))  # 5…100
     full_palette = palette.copy()
     for name, hex_value in palette.items():
+        # Skip non-color variables like border-radius and border-thickness
+        if not hex_value.startswith("#") and not hex_value.startswith("rgb"):
+            continue
         r, g, b = hex_to_rgb(hex_value)
         for pct in op_steps:
             alpha = pct / 100.0
@@ -124,12 +149,26 @@ def build_palette() -> Dict[str, str]:
 # Emit files
 # ---------------------------------------------------------------------------
 
-def emit_css(palette: Dict[str, str]) -> str:
-    lines = [":root {"]
-    for name, value in sorted(palette.items()):
-        lines.append(f"  {name}: {value};")
-    lines.append("}")
-    return "\n".join(lines) + "\n"
+def emit_css(themes_palettes: Dict[str, Dict[str, str]]) -> str:
+    lines = []
+    
+    # # Add :root with default theme (dark-red)
+    # lines.append(":root {")
+    # default_palette = themes_palettes["dark-red"]
+    # for name, value in sorted(default_palette.items()):
+    #     lines.append(f"  {name}: {value};")
+    # lines.append("}")
+    # lines.append("")
+    
+    # Add theme classes
+    for theme_name, palette in themes_palettes.items():
+        lines.append(f".theme-{theme_name} {{")
+        for name, value in sorted(palette.items()):
+            lines.append(f"  {name}: {value};")
+        lines.append("}")
+        lines.append("")
+    
+    return "\n".join(lines)
 
 
 def emit_ts(palette: Dict[str, str]) -> str:
@@ -141,13 +180,21 @@ def emit_ts(palette: Dict[str, str]) -> str:
 
 
 def main() -> None:
-    palette = build_palette()
+    themes_palettes = {}
+    total_vars = 0
+    
+    for theme_name, theme_colors in THEMES.items():
+        palette = build_palette(theme_colors)
+        themes_palettes[theme_name] = palette
+        total_vars += len(palette)
+    
     OUT_CSS.parent.mkdir(parents=True, exist_ok=True)
     OUT_TS.parent.mkdir(parents=True, exist_ok=True)
 
-    OUT_CSS.write_text(emit_css(palette))
-    OUT_TS.write_text(emit_ts(palette))
-    print(f"wrote {OUT_CSS} and {OUT_TS} – {len(palette)} vars")
+    OUT_CSS.write_text(emit_css(themes_palettes))
+    # For TS, use the default theme palette
+    OUT_TS.write_text(emit_ts(themes_palettes["dark-red"]))
+    print(f"wrote {OUT_CSS} and {OUT_TS} – {len(THEMES)} themes, {total_vars} total vars")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,9 @@ export type Command = {
     $type: "Onboarding:hide"
 } | {
     $type: "Onboarding:show"
+} | {
+    $type: "Theme:set"
+    themeName: string
 }
 
 let __result: Command[] = [];
@@ -30,6 +33,19 @@ class Onboarding {
         }
         __result.push({ $type: "Onboarding:hide" });
         Onboarding.exists = false;
+    }
+// </hide>
+}
+
+class Theme {
+// <hide>
+    static currentTheme: string = "dark-red";
+// </hide>
+    static setTheme(name: string): void 
+// <hide>
+    {
+        __result.push({ $type: "Theme:set", themeName: name });
+        Theme.currentTheme = name;
     }
 // </hide>
 }

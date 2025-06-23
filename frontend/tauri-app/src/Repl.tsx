@@ -15,7 +15,8 @@ const Repl = () => {
         });
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'p') {
+            if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+                event.preventDefault();
                 setIsScriptContainerVisible(prevState => !prevState);
             }
         };
@@ -30,7 +31,7 @@ const Repl = () => {
         return null;
     }
     return (
-        <div id="scriptContainer" className={cn('absolute left-2 bottom-2 flex flex-col z-10 p-3 rounded-md backdrop-blur-sm font-mono bg-[var(--fg-800)]/10 w-[42ch] min-h-[40ch]')}>
+        <div id="scriptContainer" className={cn('absolute text-[var(--blackest)] left-2 bottom-2 flex flex-col z-10 p-3 rounded-md backdrop-blur-sm font-mono bg-[var(--fg-800)]/10 w-[42ch] min-h-[40ch]')}>
             <div className={cn('px-3 py-2 flex-1')}>
                 <code className={cn('whitespace-pre-wrap')}>{script}</code>
             </div>

@@ -4,6 +4,8 @@ import { CanvasElement, ElementLayout, ElementTargets } from './types';
 import { Rectangle } from './Rectangle';
 import ElementOverlay from './ElementOverlay';
 import { cn } from '../utils';
+import Logo from '../components/Logo';
+import useTheme from '../hooks/useTheme';
 
 interface RectangleOnCanvasProps {
   layout: ElementLayout;
@@ -28,6 +30,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const { currentTheme, isLightTheme } = useTheme();
 
   if (isDragging) {
     console.log(`RectangleOnCanvas for ${element.id} IS DRAGGING. Received propOnDrag type: ${typeof propOnDrag}`);
@@ -115,7 +118,12 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         </button>
       )} */}
 
-      <img src="./assets/app-icon.png" className={cn("select-none opacity-20")} style={{ width: cell.width/4, }} />
+      {`isLightTheme: ${isLightTheme} currentTheme: ${currentTheme}`}
+      <div className={cn("select-none")} style={{ width: cell.width/4, }}>
+        <Logo className={cn(
+          isLightTheme ? 'text-red-500' : 'text-[var(--fg-100-30)]'
+        )} />
+      </div>
       
       {/* {showOverlay && element instanceof Rectangle && (
         <ElementOverlay
