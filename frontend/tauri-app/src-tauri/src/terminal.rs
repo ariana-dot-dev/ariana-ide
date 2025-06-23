@@ -29,6 +29,12 @@ pub enum TerminalKind {
         #[serde(rename = "workingDirectory")]
         working_directory: Option<String>,
     },
+    #[serde(rename = "local-shell")]
+    LocalShell {
+        shell: Option<String>, // bash, zsh, fish, etc.
+        #[serde(rename = "workingDirectory")]
+        working_directory: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,44 +117,86 @@ impl TerminalConnection {
                             break;
                         }
                     }
-                    
+
                     let mut cmd = cmd.ok_or_else(|| anyhow!("Git Bash not found"))?;
                     cmd.arg("--login");
                     cmd.arg("-i"); // Force interactive mode
-                    
+
                     if let Some(working_dir) = working_directory {
                         cmd.cwd(working_dir);
                     }
-                    
+
                     cmd
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
                     return Err(anyhow!("Git Bash is only available on Windows"));
                 }
-            },
-            TerminalKind::Wsl { distribution, working_directory } => {
+            }
+            TerminalKind::Wsl {
+                distribution,
+                working_directory,
+            } => {
                 #[cfg(target_os = "windows")]
                 {
                     let mut cmd = CommandBuilder::new("wsl");
-                    
+
                     if let Some(distribution) = distribution {
                         cmd.arg("-d");
                         cmd.arg(distribution);
                     }
-                    
+
                     if let Some(working_dir) = working_directory {
                         cmd.arg("--cd");
                         cmd.arg(working_dir);
                     }
-                    
+
                     cmd
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
                     return Err(anyhow!("WSL is only available on Windows"));
                 }
-            },
+            }
+            TerminalKind::LocalShell {
+                shell,
+                working_directory,
+            } => {
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                {
+                    // Detect default shell or use provided one
+                    let shell_path = if let Some(shell) = shell {
+                        shell.clone()
+                    } else {
+                        // Try to get default shell from environment
+                        std::env::var("SHELL").unwrap_or_else(|_| {
+                            // Fallback priority: zsh (macOS default) -> bash -> sh
+                            if std::path::Path::new("/bin/zsh").exists() {
+                                "/bin/zsh".to_string()
+                            } else if std::path::Path::new("/bin/bash").exists() {
+                                "/bin/bash".to_string()
+                            } else {
+                                "/bin/sh".to_string()
+                            }
+                        })
+                    };
+
+                    let mut cmd = CommandBuilder::new(shell_path);
+                    cmd.arg("-l"); // Login shell
+
+                    if let Some(working_dir) = working_directory {
+                        cmd.cwd(working_dir);
+                    }
+
+                    cmd
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    return Err(anyhow!(
+                        "Local Shell is not available on Windows. Use Git Bash or WSL instead."
+                    ));
+                }
+            }
         };
 
         // Add environment variables
@@ -300,66 +348,82 @@ impl TerminalManager {
         let mut connections = self.connections.lock().unwrap();
         let mut writers = self.writers.lock().unwrap();
         let mut dead_connections = Vec::new();
-        
+
         // Find dead connections
         for (id, connection) in connections.iter_mut() {
             if !connection.is_alive() {
                 dead_connections.push(id.clone());
             }
         }
-        
+
         // Remove dead connections
         for id in dead_connections {
             println!("Cleaning up dead terminal connection: {}", id);
-            
+
             // Cleanup writer
             if let Some(mut writer) = writers.remove(&id) {
                 let _ = writer.flush();
                 drop(writer);
             }
-            
+
             // Cleanup connection
             if let Some(connection) = connections.remove(&id) {
                 drop(connection.pty_pair);
             }
         }
-        
+
         Ok(())
     }
 
     pub fn get_available_terminal_types() -> Vec<String> {
         let mut types = vec!["ssh".to_string()];
-        
+
         #[cfg(target_os = "windows")]
         {
             // Check for Git Bash
             let git_bash_paths = [
                 "C:\\Program Files\\Git\\bin\\bash.exe",
-                "C:\\Program Files (x86)\\Git\\bin\\bash.exe", 
+                "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
                 "C:\\Git\\bin\\bash.exe",
             ];
-            
+
             for path in &git_bash_paths {
                 if std::path::Path::new(path).exists() {
                     types.push("git-bash".to_string());
                     break;
                 }
             }
-            
+
             // Check for WSL
-            if std::process::Command::new("wsl").arg("--status").output().is_ok() {
+            if std::process::Command::new("wsl")
+                .arg("--status")
+                .output()
+                .is_ok()
+            {
                 types.push("wsl".to_string());
             }
         }
-        
+
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            // Always available on Unix-like systems
+            types.push("local-shell".to_string());
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // Check for iTerm2
+            if std::path::Path::new("/Applications/iTerm.app").exists() {
+                types.push("iterm".to_string());
+            }
+        }
+
         types
     }
 
     pub fn validate_config(config: &TerminalConfig) -> bool {
         match &config.kind {
-            TerminalKind::Ssh { host, username, .. } => {
-                !host.is_empty() && !username.is_empty()
-            },
+            TerminalKind::Ssh { host, username, .. } => !host.is_empty() && !username.is_empty(),
             TerminalKind::GitBash { .. } => {
                 #[cfg(target_os = "windows")]
                 {
@@ -379,6 +443,16 @@ impl TerminalManager {
                     std::process::Command::new("wsl").arg("--status").output().is_ok()
                 }
                 #[cfg(not(target_os = "windows"))]
+                {
+                    false
+                }
+            },
+            TerminalKind::LocalShell { .. } => {
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                {
+                    true
+                }
+                #[cfg(not(any(target_os = "macos", target_os = "linux")))]
                 {
                     false
                 }
