@@ -94,9 +94,13 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 			fontSize: terminal.config.fontSize || 14,
 			fontFamily: terminal.config.fontFamily
 				? `"${terminal.config.fontFamily}"`
-				: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+				: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", Monaco, Menlo, "Ubuntu Mono", monospace',
 			cursorBlink: true,
 			allowTransparency: true,
+			allowProposedApi: true,
+			fontWeight: 'normal',
+			fontWeightBold: 'bold',
+			minimumContrastRatio: 1,
 		});
 
 		const fitAddon = new FitAddon();
