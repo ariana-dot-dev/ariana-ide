@@ -15,6 +15,7 @@ import {
 	Colors,
 } from "../services/CustomTerminalAPI";
 import { cn } from "../utils";
+import { motion } from "framer-motion";
 
 interface CustomTerminalRendererProps {
 	elementId: string;
@@ -176,14 +177,16 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					}
 					break;
 				case "cursorMove":
-					if (event.cursor_line !== undefined && event.cursor_col !== undefined) {
-						setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
+					if (event.line !== undefined && event.col !== undefined) {
+						setCursorPosition({ line: event.line, col: event.col });
 					}
 					break;
 				case "patch":
 					if (event.items !== undefined && event.line !== undefined) {
 						// Update the ref data (no re-render)
 						screenDataRef.current[event.line!] = event.items!;
+						const cululatedLexeme = event.items!.map(item => item.lexeme);
+						console.log("cululatedLexeme: ", cululatedLexeme);
 						// Notify only the specific row
 						listenersRef.current.get(event.line!)?.(event.items!);
 					}
@@ -605,8 +608,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		}, [row, terminalId]); // getCurrentLineData is stable and doesn't need to be a dependency
 	
 		return (
-			<div className={cn("flex font-mono")}>
-				<span className={cn("w-10")}>{row} </span>
+			<div className={cn("relative flex font-mono")}>
+				<span className={cn("w-0 opacity-0")}>{row} </span>
 				{items.map((item, index) => (
 					<span 
 						key={index} 
@@ -620,7 +623,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 							whiteSpace: "pre-wrap",
 						}}
 					>
-						{item.lexeme}
+						{item.lexeme == '' ? ' ' : item.lexeme}
 					</span>
 				))}
 			</div>
@@ -649,19 +652,33 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			onKeyDown={handleKeyDown}
 			onClick={() => terminalRef.current?.focus()}
 		>
+			{cursorPosition.col} * {cursorPosition.line}
 			<div
 				ref={terminalInnerRef}
 				className={cn(
 					"terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text",
 				)}
 			>
-				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto scrollbar-thin")}>
+				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto")}>
 					{/* {Array.from({ length: windowDimensions.rows }, (_, rowIndex) => {
 						const line = screen[rowIndex] || [];
 						return renderScreenLine(line, rowIndex, windowDimensions.cols);
 					})} */}
 					
 					{AllRows}
+					<motion.div
+						className={cn("absolute whitespace-pre-wrap w-fit h-fit bg-[var(--blackest)] animate-pulse")}
+						animate={{
+							left: `${cursorPosition.col * 7.35}px`,
+							top: `${cursorPosition.line * 16}px`,
+						}}
+						transition={{
+							ease: "linear",
+							duration: 0.05,
+						}}
+					>
+						{' '}
+					</motion.div>
 				</div>
 			</div>
 		</div>

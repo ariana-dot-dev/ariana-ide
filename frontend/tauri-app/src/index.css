@@ -1,4 +1,24 @@
 @import "tailwindcss";
+
+/* Custom thin scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-300-20);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--fg-500);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--fg-600);
+}
+
 @import "./generated/colors.css";
 @import "./xterm-tweaks.css";
 
