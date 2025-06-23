@@ -38,14 +38,10 @@ class Onboarding {
 }
 
 class Theme {
-// <hide>
-    static currentTheme: string = "dark-red";
-// </hide>
-    static setTheme(name: string): void 
+    static set(name: string): void 
 // <hide>
     {
         __result.push({ $type: "Theme:set", themeName: name });
-        Theme.currentTheme = name;
     }
 // </hide>
 }

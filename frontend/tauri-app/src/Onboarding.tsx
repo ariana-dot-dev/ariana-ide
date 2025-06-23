@@ -1,18 +1,11 @@
 import { useContext, useEffect, useState } from "react";
-import { StateContext } from "./App";
 import { InterpreterContext } from "./App";
 import { cn } from "./utils";
+import { useStore } from "./state";
 
 const Onboarding = ({ userEmail }: { userEmail: string }) => {
-    const state = useContext(StateContext);
+    const { showOnboarding } = useStore();
     const interpreter = useContext(InterpreterContext);
-    const [showOnboarding, setShowOnboarding] = useState(state.showOnboarding.value);
-
-    useEffect(() => {
-        state.showOnboarding.subscribe((value) => {
-            setShowOnboarding(value);
-        });
-    }, [])
 
     if (!showOnboarding) {
         return null;

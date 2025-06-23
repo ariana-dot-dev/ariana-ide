@@ -6,8 +6,9 @@ use std::thread;
 use anyhow::{Result, anyhow};
 use portable_pty::{PtySize, CommandBuilder, Child, PtyPair};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use uuid::Uuid;
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "$type")]
@@ -175,7 +176,7 @@ impl TerminalConnection {
                     Ok(n) => {
                         let data = String::from_utf8_lossy(&buffer[..n]).to_string();
                         println!("Backend received from PTY: {:?}", data);
-                        if let Err(e) = app_handle.emit_all(&format!("terminal-data-{}", connection_id), &data) {
+                        if let Err(e) = app_handle.emit(&format!("terminal-data-{}", connection_id), &data) {
                             eprintln!("Failed to emit terminal data: {}", e);
                             break;
                         }
@@ -188,7 +189,7 @@ impl TerminalConnection {
             }
             
             // Emit disconnect event
-            let _ = app_handle.emit_all(&format!("terminal-disconnect-{}", connection_id), ());
+            let _ = app_handle.emit(&format!("terminal-disconnect-{}", connection_id), ());
         });
 
         Ok(())

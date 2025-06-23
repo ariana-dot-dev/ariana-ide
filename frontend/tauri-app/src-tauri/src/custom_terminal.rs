@@ -15,7 +15,8 @@ use std::{
 use anyhow::{anyhow, Result};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+use tauri::Emitter;
 use unicode_width::UnicodeWidthStr;
 use uuid::Uuid;
 use vt100::{Cell, Color as VtColor, Parser};
@@ -516,7 +517,7 @@ impl CustomTerminalConnection {
             for event in event_rx {
                 println!("Terminal connection {id_clone} received event: {}", event.r#type());
                 if app
-                    .emit_all(&format!("custom-terminal-event-{id_clone}"), &event)
+                    .emit(&format!("custom-terminal-event-{id_clone}"), &event)
                     .is_err()
                 {
                     println!("Terminal connection {id_clone} disconnected (emit failure)");
@@ -526,7 +527,7 @@ impl CustomTerminalConnection {
 
             // Channel closed – reader thread stopped. Notify the frontend once.
             println!("Terminal connection {id_clone} disconnected");
-            let _ = app.emit_all(&format!("custom-terminal-disconnect-{id_clone}"), ());
+            let _ = app.emit(&format!("custom-terminal-disconnect-{id_clone}"), ());
         });
 
         thread::spawn(move || {
@@ -567,7 +568,7 @@ impl CustomTerminalConnection {
             let ev = state.screen_event();
             let _ = self
                 .app_handle
-                .emit_all(&format!("custom-terminal-event-{}", self.id), &ev);
+                .emit(&format!("custom-terminal-event-{}", self.id), &ev);
         }
         Ok(())
     }
@@ -583,7 +584,7 @@ impl CustomTerminalConnection {
             let ev = state.screen_event();
             let _ = self
                 .app_handle
-                .emit_all(&format!("custom-terminal-event-{}", self.id), &ev);
+                .emit(&format!("custom-terminal-event-{}", self.id), &ev);
         }
         Ok(())
     }
@@ -692,7 +693,7 @@ impl CustomTerminalManager {
             let mut state = conn.terminal_state.lock().unwrap();
             let ev = state.screen_event();
             conn.app_handle
-                .emit_all(&format!("custom-terminal-event-{id}"), &ev)?;
+                .emit(&format!("custom-terminal-event-{id}"), &ev)?;
         }
         Ok(())
     }

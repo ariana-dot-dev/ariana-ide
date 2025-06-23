@@ -7,15 +7,19 @@ license = ""
 repository = ""
 edition = "2021"
 
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2.2.0", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.5", features = [ "window-hide", "window-start-dragging", "window-maximize", "window-close", "window-unmaximize", "window-unminimize", "window-minimize", "window-show", "fs-all", "path-all", "shell-open"] }
+tauri = { version = "2.5.1", features = [] }
 window-vibrancy = "0.6.0"
 tokio = { version = "1.0", features = ["full"] }
 portable-pty = "0.8"
@@ -25,6 +29,8 @@ async-trait = "0.1"
 # anes = { version = "0.2", features = ["parser"] }
 vt100          = "0.15" 
 unicode-width  = "0.1"
+tauri-plugin-store = "2"
+tauri-plugin-fs = "2"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

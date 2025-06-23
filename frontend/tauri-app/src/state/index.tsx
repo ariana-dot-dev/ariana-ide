@@ -1,81 +1,134 @@
-import { Command } from "../scripting/baseScript";
+import { createContext, useContext, useState, useMemo, ReactNode, useEffect } from 'react';
+import { load, Store } from '@tauri-apps/plugin-store';
+import { Command } from '../scripting/baseScript';
 
-export class Subscribeable<T> {
-    innerValue: T;
-    subscribers: Map<string, (value: T) => void> = new Map<string, (value: T) => void>();
-
-    constructor(initialValue: T) {
-        this.innerValue = initialValue;
-    }
-
-    set value(v : T) {
-        this.innerValue = v;
-        this.notifySubscribers(v);
-    }
-
-    get value() : T {
-        return this.innerValue;
-    }
-
-    subscribe(subscriber: (value: T) => void): string {
-        let randomUUID = crypto.randomUUID();
-        this.subscribers.set(randomUUID, subscriber);
-        return randomUUID;
-    }
-
-    unsubscribe(subscriberId: string) {
-        this.subscribers.delete(subscriberId);
-    }
-
-    private notifySubscribers(value: T) {
-        this.subscribers.forEach(s => s(value));
-    }
+// Define the shape of the state
+interface AppState {
+    theme: string;
+    showOnboarding: boolean;
+    currentInterpreterScript: string;
 }
 
-export class State {
-    public showOnboarding: Subscribeable<boolean> = new Subscribeable(false);
-    public currentInterpreterScript: Subscribeable<string> = new Subscribeable("");
-    public currentTheme: Subscribeable<string> = new Subscribeable("semi-sky");
+// Define the shape of the store, including state and actions
+export interface IStore extends AppState {
+    setTheme: (theme: string) => void;
+    setShowOnboarding: (show: boolean) => void;
+    setCurrentInterpreterScript: (script: string) => void;
+    isLightTheme: boolean;
+    processCommand: (command: Command) => void;
+    revertCommand: () => void;
+}
 
-    processedCommandsStack: Command[] = [];
+// Create the context
+const StoreContext = createContext<IStore | null>(null);
 
-    processCommand(command: Command) {
+// Provider component
+export function StoreProvider({ children }: { children: ReactNode }) {
+    const [theme, setThemeState] = useState('semi-sky');
+    const [showOnboarding, setShowOnboardingState] = useState(false);
+    const [currentInterpreterScript, setCurrentInterpreterScriptState] = useState('');
+    const [processedCommandsStack, setProcessedCommandsStack] = useState<Command[]>([]);
+    const [tauriStore, setTauriStore] = useState<Store | null>(null);
+
+    // Load state from disk on initial render
+    useEffect(() => {
+        const loadState = async () => {
+            try {
+                const tauriStore = await load('store.json', { autoSave: false });
+                setTauriStore(tauriStore);
+                const savedState = await tauriStore.get<AppState>('appState');
+                if (savedState) {
+                    setThemeState(savedState.theme);
+                    setShowOnboardingState(savedState.showOnboarding);
+                    setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
+                }
+            } catch (error) {
+                console.error('Failed to load state:', error);
+            }
+        };
+        loadState();
+    }, []);
+
+    // Save state to disk whenever it changes
+    useEffect(() => {
+        const saveState = async () => {
+            try {
+                if (!tauriStore) return;
+                const stateToSave: AppState = { theme, showOnboarding, currentInterpreterScript };
+                await tauriStore.set('appState', stateToSave);
+                await tauriStore.save();
+            } catch (error) {
+                console.error('Failed to save state:', error);
+            }
+        };
+        saveState();
+    }, [theme, showOnboarding, currentInterpreterScript]);
+
+    const setTheme = (newTheme: string) => setThemeState(newTheme);
+    const setShowOnboarding = (show: boolean) => setShowOnboardingState(show);
+    const setCurrentInterpreterScript = (script: string) => setCurrentInterpreterScriptState(script);
+
+    const isLightTheme = useMemo(() => theme.startsWith('light'), [theme]);
+
+    const processCommand = (command: Command) => {
+        setProcessedCommandsStack(prev => [...prev, command]);
         if (command.$type === "Onboarding:show") {
-            this.showOnboarding.value = true;
+            setShowOnboarding(true);
         }
         if (command.$type === "Onboarding:hide") {
-            this.showOnboarding.value = false;
+            setShowOnboarding(false);
         }
         if (command.$type === "Theme:set") {
-            this.currentTheme.value = command.themeName;
+            setTheme(command.themeName);
         }
-        
-        this.processedCommandsStack.push(command);
-    }
+    };
 
-    revertCommand() {
-        if (this.processedCommandsStack.length === 0) {
-            return;
+    const revertCommand = () => {
+        if (processedCommandsStack.length === 0) return;
+
+        const newStack = [...processedCommandsStack];
+        const commandToRevert = newStack.pop()!;
+        setProcessedCommandsStack(newStack);
+
+        if (commandToRevert.$type === "Onboarding:show") {
+            setShowOnboarding(false);
         }
-        
-        const command = this.processedCommandsStack.pop()!;
-        if (command.$type === "Onboarding:show") {
-            this.showOnboarding.value = false;
+        if (commandToRevert.$type === "Onboarding:hide") {
+            setShowOnboarding(true);
         }
-        if (command.$type === "Onboarding:hide") {
-            this.showOnboarding.value = true;
-        }
-        if (command.$type === "Theme:set") {
-            // Find the previous theme command or default to "dark-red"
+        if (commandToRevert.$type === "Theme:set") {
             let previousTheme = "semi-sky";
-            for (let i = this.processedCommandsStack.length - 1; i >= 0; i--) {
-                const prevCommand = this.processedCommandsStack[i];
+            for (let i = newStack.length - 1; i >= 0; i--) {
+                const prevCommand = newStack[i];
                 if (prevCommand.$type === "Theme:set") {
                     previousTheme = prevCommand.themeName;
                     break;
                 }
             }
-            this.currentTheme.value = previousTheme;
+            setTheme(previousTheme);
         }
+    };
+
+    const store: IStore = {
+        theme,
+        setTheme,
+        showOnboarding,
+        setShowOnboarding,
+        currentInterpreterScript,
+        setCurrentInterpreterScript,
+        isLightTheme,
+        processCommand,
+        revertCommand,
+    };
+
+    return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
+}
+
+// Custom hook to access the store
+export function useStore() {
+    const context = useContext(StoreContext);
+    if (!context) {
+        throw new Error('useStore must be used within a StoreProvider');
     }
+    return context;
 }

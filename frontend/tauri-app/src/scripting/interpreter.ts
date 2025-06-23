@@ -1,8 +1,8 @@
 import { Output, transformSync } from "@swc/wasm-web";
-import { readTextFile } from '@tauri-apps/api/fs';
+import { readTextFile } from '@tauri-apps/plugin-fs';
 import { resolveResource } from '@tauri-apps/api/path';
 import { Command } from "./baseScript";
-import { State } from "../state";
+import { IStore } from "../state";
 
 class Script {
     baseScript: string = "";
@@ -21,13 +21,13 @@ class Script {
 export class Interpreter {
     script: Script;
     lastResult: Command[] = [];
-    state: State;
+    store: IStore;
     notHiddenTopScript: string = "";
     initialContent: string = "";
     
-    constructor(state: State) {
+    constructor(store: IStore) {
         this.script = new Script("", []);
-        this.state = state;
+        this.store = store;
     }
 
     async init() {        
@@ -74,12 +74,11 @@ export class Interpreter {
         console.log("Initial Result:", result);
 
         this.lastResult = result;
-
-        result.forEach(command => this.state.processCommand(command));
-
+        
         const rawScriptForFormatting = this.notHiddenTopScript + '\n' + this.initialContent + '\n' + this.script.appendix.join('\n');
         const nicelyFormattedCurrentScript = this._formatScriptForDisplay(rawScriptForFormatting);
-        this.state.currentInterpreterScript.value = nicelyFormattedCurrentScript;
+        this.store.setCurrentInterpreterScript(nicelyFormattedCurrentScript);
+        result.forEach(command => this.store.processCommand(command));
     }
 
     async tryRunInstruction(instruction: string) {
@@ -115,12 +114,11 @@ export class Interpreter {
 
         this.lastResult = result;
 
-        newCommands.forEach(command => this.state.processCommand(command));
+        newCommands.forEach(command => this.store.processCommand(command));
 
-        
         const rawScriptForFormatting = this.notHiddenTopScript + '\n' + this.initialContent + '\n' + this.script.appendix.join('\n');
         const nicelyFormattedCurrentScript = this._formatScriptForDisplay(rawScriptForFormatting);
-        this.state.currentInterpreterScript.value = nicelyFormattedCurrentScript;
+        this.store.setCurrentInterpreterScript(nicelyFormattedCurrentScript);
     }
 
     private _formatScriptForDisplay(scriptContent: string): string {

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
-import { StateContext } from '../App';
+import { useStore } from '../state';
 import { customTerminalAPI, TerminalEvent, TerminalSpec, LineItem, Colors } from '../services/CustomTerminalAPI';
 import { cn } from '../utils';
-import useTheme from '../hooks/useTheme';
 
 interface CustomTerminalRendererProps {
   elementId: string;
@@ -38,12 +37,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   onTerminalReady,
   onTerminalError,
 }) => {
-  const state = useContext(StateContext);
-  const [themeName, setThemeName] = useState(state.currentTheme.value);
-  useEffect(() => {
-    const id = state.currentTheme.subscribe(setThemeName);
-    return () => state.currentTheme.unsubscribe(id);
-  }, [state]);
+  const { theme, isLightTheme } = useStore();
 
   const [terminalId, setTerminalId] = useState<string | null>(null);
   const [screen, setScreen] = useState<LineItem[][]>([]);
@@ -55,7 +49,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
   const terminalInnerRef = useRef<HTMLDivElement>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isResizingRef = useRef<boolean>(false);
-  const { currentTheme, isLightTheme } = useTheme();
 
   // Initialize terminal connection
   useEffect(() => {
@@ -731,7 +724,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
       onWheel={handleWheel}
       onClick={() => terminalRef.current?.focus()}
     >
-      {baseShade} {currentTheme}
       <div ref={terminalInnerRef} className={cn("terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text")}>
         <div className={cn("absolute top-0 left-0 w-full h-fit")}>
           {Array.from({ length: terminalDimensions.rows }, (_, rowIndex) => {

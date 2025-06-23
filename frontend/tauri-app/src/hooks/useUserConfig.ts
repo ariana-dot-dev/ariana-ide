@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { readTextFile } from '@tauri-apps/api/fs';
-import { homeDir } from '@tauri-apps/api/path';
+import { readTextFile } from '@tauri-apps/plugin-fs';
+import { homeDir, join } from '@tauri-apps/api/path';
 
 interface UserConfig {
     email: string;
@@ -17,7 +17,7 @@ export function useUserConfig() {
         const loadUserConfig = async () => {
             try {
                 const homePath = await homeDir();
-                const configPath = `${homePath}.ariana${homePath.includes('\\') ? '\\' : '/'}config.json`;
+                const configPath = await join(homePath, '.ariana', 'config.json');
 
                 const configContent = await readTextFile(configPath);
                 const config: UserConfig = JSON.parse(configContent);

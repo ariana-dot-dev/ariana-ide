@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { CanvasElement, ElementLayout, ElementTargets } from './types';
 import { Rectangle } from './Rectangle';
 import ElementOverlay from './ElementOverlay';
 import { cn } from '../utils';
 import Logo from '../components/Logo';
-import useTheme from '../hooks/useTheme';
+import { useStore } from '../state';
 
 interface RectangleOnCanvasProps {
   layout: ElementLayout;
@@ -30,7 +30,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const { currentTheme, isLightTheme } = useTheme();
+  const { theme, isLightTheme } = useStore();
 
   if (isDragging) {
     console.log(`RectangleOnCanvas for ${element.id} IS DRAGGING. Received propOnDrag type: ${typeof propOnDrag}`);
@@ -103,7 +103,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         setIsHovered(false);
       }}
     >
-      <div className={cn("w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-gradient-to-b from-[var(--fg-900)]/30 to-[var(--bg-600)]/30")}>
+      <div className={cn("w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-[var(--bg-200)]/10")}>
       {/* {(isHovered || showOverlay) && !showOverlay && (
         <button
           className={cn("absolute top-1 right-1 w-6 h-6 bg-[var(--fg-800)] text-[var(--bg-white)] rounded text-xs hover:bg-[var(--fg-700)] z-10 border border-[var(--fg-600)]")}
@@ -118,10 +118,9 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
         </button>
       )} */}
 
-      {`isLightTheme: ${isLightTheme} currentTheme: ${currentTheme}`}
       <div className={cn("select-none")} style={{ width: cell.width/4, }}>
         <Logo className={cn(
-          isLightTheme ? 'text-red-500' : 'text-[var(--fg-100-30)]'
+          isLightTheme ? 'text-[var(--fg-800-30)]' : 'text-[var(--fg-100-30)]'
         )} />
       </div>
       

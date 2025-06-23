@@ -46,10 +46,10 @@ THEMES: Dict[str, Dict[str, str]] = {
         "--border-thickness": "2px",
     },
     "light-sand": {
-        "--fg-500": "#FEF9C3",  # blue equivalent
-        "--bg-500": "#E7E5E4",  # ~ oklch(82.8% 0.111 230.318)
-        "--whitest": "#ffffff",
-        "--blackest": "#1C1917",
+        "--fg-500": "#edc198",
+        "--bg-500": "#ffdea8",
+        "--whitest": "#fffffc",
+        "--blackest": "#362e2b",
         "--positive-500": "#30D48A",  # green
         "--negative-500": "#D84B32",  # red
         "--border-radius": "8px",
