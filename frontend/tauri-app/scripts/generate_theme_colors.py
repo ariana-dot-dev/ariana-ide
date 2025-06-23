@@ -26,32 +26,32 @@ from typing import Dict, Tuple
 # ---------------------------------------------------------------------------
 THEMES: Dict[str, Dict[str, str]] = {
     "dark-red": {
-        "--fg-500": "#7e2a0c",
-        "--bg-500": "#460809",
-        "--blackest": "#fafaf9",
-        "--whitest": "#0c0a09",
-        "--positive-500": "#30D48A",  # green
-        "--negative-500": "#D84B32",  # red
-        "--border-radius": "4px",
-        "--border-thickness": "1px",
+        "--fg-500": "#b33831",  # blue equivalent
+        "--bg-500": "#6e2727",  # ~ oklch(82.8% 0.111 230.318)
+        "--whitest": "#45293f",
+        "--blackest": "#ffffff",
+        "--positive-500": "#1ebc73",  # green
+        "--negative-500": "#a24b6f",  # red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
     },
     "semi-sky": {
-        "--fg-500": "#0284C7",  # blue equivalent
-        "--bg-500": "#0EA5E9",  # ~ oklch(82.8% 0.111 230.318)
-        "--blackest": "#ECFEFF",
-        "--whitest": "#130127",
-        "--positive-500": "#30D48A",  # green
-        "--negative-500": "#D84B32",  # red
+        "--fg-500": "#4d65b4",  # blue equivalent
+        "--bg-500": "#4d9be6",  # ~ oklch(82.8% 0.111 230.318)
+        "--blackest": "#2e222f",
+        "--whitest": "#ffffff",
+        "--positive-500": "#1ebc73",  # green
+        "--negative-500": "#e83b3b",  # red
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
     "light-sand": {
-        "--fg-500": "#edc198",
-        "--bg-500": "#ffdea8",
-        "--whitest": "#fffffc",
-        "--blackest": "#362e2b",
-        "--positive-500": "#30D48A",  # green
-        "--negative-500": "#D84B32",  # red
+        "--fg-500": "#ab947a",
+        "--bg-500": "#c7dcd0",
+        "--blackest": "#3e3546",
+        "--whitest": "#ffffff",
+        "--positive-500": "#1ebc73",  # green
+        "--negative-500": "#e83b3b",  # red
         "--border-radius": "8px",
         "--border-thickness": "2px",
     }

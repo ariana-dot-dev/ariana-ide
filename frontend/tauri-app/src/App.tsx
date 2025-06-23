@@ -98,7 +98,7 @@ function App() {
 			>
 				<div
 					className={cn(
-						"h-full w-full text-[var(--bg-200)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg",
+						"h-full w-full text-[var(--blackest)] bg-gradient-to-b from-[var(--fg-600)] to-[var(--bg-400)] flex flex-col rounded-lg",
 					)}
 				>
 					{/* Custom Titlebar */}

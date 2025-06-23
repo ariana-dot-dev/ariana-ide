@@ -1,4 +1,48 @@
 @import "tailwindcss";
+@import "./generated/colors.css";
+@import "./xterm-tweaks.css";
+
+@font-face {
+  font-family: 'MapleMono';
+  src: url('./assets/fonts/MapleMono-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'MapleMono';
+  src: url('./assets/fonts/MapleMono-Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'MapleMono';
+  src: url('./assets/fonts/MapleMono-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'MapleMono';
+  src: url('./assets/fonts/MapleMono-LightItalic.ttf') format('truetype');
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'MapleMono';
+  src: url('./assets/fonts/MapleMono-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'MapleMono';
+  src: url('./assets/fonts/MapleMono-BoldItalic.ttf') format('truetype');
+  font-weight: bold;
+  font-style: italic;
+}
 
 /* Custom thin scrollbar */
 ::-webkit-scrollbar {
@@ -7,7 +51,8 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-300-20);
+	border-radius: 4px;
+  	background: var(--bg-300-20);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -17,23 +62,6 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--fg-600);
-}
-
-@import "./generated/colors.css";
-@import "./xterm-tweaks.css";
-
-@font-face {
-	font-family: "Commit Mono";
-	src: url("/fonts/CommitMono-400-Regular.otf") format("opentype");
-	font-weight: 400;
-	font-style: normal;
-}
-
-@font-face {
-	font-family: "Commit Mono";
-	src: url("/fonts/CommitMono-400-Regular.otf") format("opentype");
-	font-weight: 700;
-	font-style: normal;
 }
 
 * {
@@ -56,8 +84,7 @@ body {
 
 @theme {
 	--font-sans: "Satoshi", sans-serif;
-	--font-mono: "Space Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",
-		Consolas, "Courier New", monospace;
+	--font-mono: "MapleMono";
 }
 
 @keyframes fadeIn {

@@ -63,6 +63,9 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		rows: 24,
 		cols: 80,
 	});
+	const [charDimensions, setCharDimensions] = useState({ width: 7.35, height: 16 });
+
+	const phantomCharRef = useRef<HTMLSpanElement>(null);
 	const listenersRef = useRef<Map<number, (items: LineItem[]) => void>>(new Map());
 
 	const terminalRef = useRef<HTMLDivElement>(null);
@@ -71,6 +74,25 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const isResizingRef = useRef<boolean>(false);
 	const hasScrolledRef = useRef<boolean>(false);
+
+	useEffect(() => {
+		if (!phantomCharRef.current) return;
+
+		const observer = new ResizeObserver(entries => {
+			for (let entry of entries) {
+				const { width, height } = entry.contentRect;
+				if (width > 0 && height > 0) {
+					setCharDimensions({ width, height });
+				}
+			}
+		});
+
+		observer.observe(phantomCharRef.current);
+
+		return () => {
+			observer.disconnect();
+		};
+	}, []);
 
 	const getCurrentLineData = useCallback((rowIndex: number): LineItem[] => {
 		return screenDataRef.current[rowIndex] || [];
@@ -344,12 +366,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				return;
 			}
 
-			// Use more precise character measurements for monospace fonts
-			const charWidth = 8.5; // Slightly wider for better accuracy
-			const charHeight = 18; // Better line height
+			const { width: charWidth, height: charHeight } = charDimensions;
 
-			const cols = Math.max(20, Math.floor(containerRect.width / charWidth));
-			const lines = Math.max(5, Math.floor(containerRect.height / charHeight));
+			const cols = Math.max(20, Math.floor(containerRect.width / (charWidth * 1.07)));
+			const lines = Math.max(5, Math.floor(containerRect.height / (charHeight * 1.07)));
 			// const lines = 100;
 
 			// Only resize if dimensions actually changed
@@ -382,6 +402,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		windowDimensions.cols,
 		windowDimensions.rows,
 		isConnected,
+		charDimensions,
 	]);
 
 	const handleResize = debouncedResize;
@@ -463,71 +484,31 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		}
 	}, [isConnected, handleResize]);
 
-	const baseShade = isLightTheme ? 800 : 300;
-	const brightShade = isLightTheme ? 700 : 400;
 
-	// Hex values for the Tailwind shades we need
-	const TW: Record<string, Record<number, string>> = {
-		slate: {
-			300: "#CBD5E1",
-			400: "#94A3B8",
-			700: "#334155",
-			800: "#1E293B",
-			900: "#0F172A",
-		},
-		red: { 300: "#FCA5A5", 400: "#F87171", 700: "#B91C1C", 800: "#991B1B" },
-		green: { 300: "#86EFAC", 400: "#4ADE80", 700: "#15803D", 800: "#166534" },
-		yellow: { 300: "#FDE047", 400: "#FACC15", 700: "#A16207", 800: "#854D0E" },
-		blue: { 300: "#93C5FD", 400: "#60A5FA", 700: "#1D4ED8", 800: "#1E40AF" },
-		fuchsia: { 300: "#F0ABFC", 400: "#E879F9", 700: "#A21CAF", 800: "#86198F" },
-		cyan: { 300: "#67E8F9", 400: "#22D3EE", 700: "#0E7490", 800: "#155E75" },
+	const COLORS: Record<string, string> = {
+		"Black": isLightTheme ? "#2e222f" : "#2e222f",
+		"Red": isLightTheme ? "#ae2334" : "#e83b3b",
+		"Green": isLightTheme ? "#239063" : "#1ebc73",
+		"Yellow": isLightTheme ? "#f79617" : "#f9c22b",
+		"Blue": isLightTheme ? "#4d65b4" : "#4d9be6",
+		"Magenta": isLightTheme ? "#6b3e75" : "#905ea9",
+		"Cyan": isLightTheme ? "#0b8a8f" : "#0eaf9b",
+		"White": isLightTheme ? "#c7dcd0" : "#ffffff",
+		"BrightBlack": isLightTheme ? "mix(#2e222f, #c7dcd0, 0.2)" : "mix(#2e222f, #c7dcd0, 0.2)",
+		"BrightRed": isLightTheme ? "mix(#ae2334, #c7dcd0, 0.2)" : "mix(#e83b3b, #c7dcd0, 0.2)",
+		"BrightGreen": isLightTheme ? "mix(#239063, #c7dcd0, 0.2)" : "mix(#1ebc73, #c7dcd0, 0.2)",
+		"BrightYellow": isLightTheme ? "mix(#f79617, #c7dcd0, 0.2)" : "mix(#f9c22b, #c7dcd0, 0.2)",
+		"BrightBlue": isLightTheme ? "mix(#4d65b4, #c7dcd0, 0.2)" : "mix(#4d9be6, #c7dcd0, 0.2)",
+		"BrightMagenta": isLightTheme ? "mix(#6b3e75, #c7dcd0, 0.2)" : "mix(#905ea9, #c7dcd0, 0.2)",
+		"BrightCyan": isLightTheme ? "mix(#0b8a8f, #c7dcd0, 0.2)" : "mix(#0eaf9b, #c7dcd0, 0.2)",
+		"BrightWhite": isLightTheme ? "mix(#c7dcd0, #c7dcd0, 0.2)" : "#ffffff",
 	};
-
-	const BASE_TO_TW: Record<string, string> = {
-		Black: "slate",
-		Red: "red",
-		Green: "green",
-		Yellow: "yellow",
-		Blue: "blue",
-		Magenta: "fuchsia",
-		Cyan: "cyan",
-		White: "slate",
-	};
-
-	const STANDARD_COLOR_NAMES = [
-		"Black",
-		"Red",
-		"Green",
-		"Yellow",
-		"Blue",
-		"Magenta",
-		"Cyan",
-		"White",
-		"BrightBlack",
-		"BrightRed",
-		"BrightGreen",
-		"BrightYellow",
-		"BrightBlue",
-		"BrightMagenta",
-		"BrightCyan",
-		"BrightWhite",
-	];
 
 	const getAnsiHex = (ansiName: string): string => {
 		if (ansiName === "Default") {
-			return isLightTheme ? TW.slate[700] : TW.slate[300];
+			return isLightTheme ? COLORS["Black"] : COLORS["White"];
 		}
-		if (ansiName === "BrightWhite") return "#ffffff";
-		if (ansiName === "White") return isLightTheme ? "#e5e5e5" : "#f8f8f8";
-
-		const isBright = ansiName.startsWith("Bright");
-		const baseName = isBright ? ansiName.substring(6) : ansiName; // remove "Bright"
-		const twBase = BASE_TO_TW[baseName as keyof typeof BASE_TO_TW];
-		if (!twBase || !TW[twBase]) return "#ff00ff";
-
-		const shade = isBright ? brightShade : baseShade;
-		const hex = TW[twBase][shade as keyof (typeof TW)[typeof twBase]];
-		return hex ?? "#ff00ff";
+		return COLORS[ansiName];
 	};
 
 	const colorToCSS = (color?: any): string => {
@@ -552,7 +533,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	// Convert ANSI 256-color codes to hex using the same helper for the first 16 colors
 	const ansi256ToHex = (code: number): string => {
 		if (code < 16) {
-			return getAnsiHex(STANDARD_COLOR_NAMES[code]);
+			return getAnsiHex(COLORS[code]);
 		}
 		if (code < 232) {
 			const n = code - 16;
@@ -607,6 +588,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			}
 		}, [row, terminalId]); // getCurrentLineData is stable and doesn't need to be a dependency
 	
+		const lexemeMap: Record<string, string> = {
+			'': ' ',
+		}
+
 		return (
 			<div className={cn("relative flex font-mono")}>
 				<span className={cn("w-0 opacity-0")}>{row} </span>
@@ -621,9 +606,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 							textDecoration: item.is_underline ? "underline" : "none",
 							fontStyle: item.is_italic ? "italic" : "normal",
 							whiteSpace: "pre-wrap",
+							width: "",
 						}}
 					>
-						{item.lexeme == '' ? ' ' : item.lexeme}
+						{lexemeMap[item.lexeme] ? lexemeMap[item.lexeme] : item.lexeme}
 					</span>
 				))}
 			</div>
@@ -646,13 +632,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		<div
 			ref={terminalRef}
 			className={cn(
-				"rounded-md backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono text-xs p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				"rounded-md text-xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
 			)}
 			tabIndex={0}
 			onKeyDown={handleKeyDown}
 			onClick={() => terminalRef.current?.focus()}
 		>
-			{cursorPosition.col} * {cursorPosition.line}
+			{/* {cursorPosition.col} * {cursorPosition.line} */}
 			<div
 				ref={terminalInnerRef}
 				className={cn(
@@ -667,18 +653,22 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					
 					{AllRows}
 					<motion.div
-						className={cn("absolute whitespace-pre-wrap w-fit h-fit bg-[var(--blackest)] animate-pulse")}
+						className={cn("absolute text-2xl whitespace-pre-wrap animate-pulse")}
 						animate={{
-							left: `${cursorPosition.col * 7.35}px`,
-							top: `${cursorPosition.line * 16}px`,
+							left: `${cursorPosition.col * charDimensions.width}px`,
+							top: `${cursorPosition.line * charDimensions.height}px`,
+							width: `${charDimensions.width}px`,
+							height: `${charDimensions.height}px`,
+							filter: "contrast(2)"
 						}}
 						transition={{
 							ease: "linear",
 							duration: 0.05,
 						}}
 					>
-						{' '}
+						{'😎'}
 					</motion.div>
+					<span ref={phantomCharRef} className="absolute -left-full -top-full">A</span>
 				</div>
 			</div>
 		</div>

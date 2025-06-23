@@ -13,21 +13,21 @@ const createDemoElements = (): CanvasElement[] => {
 	const isLinux = navigator.platform.includes("Linux");
 
 	return isWindows ? [
-		Rectangle.canvasElement(
-			{ size: "large", aspectRatio: 1 / 1, area: "center" },
-			1,
-		),
-		CustomTerminal.canvasElement(
-			{
-				kind: {
-					$type: "git-bash",
-				},
-				workingDir: "$HOME",
-				lines: 5,
-				cols: 10,
-			},
-			1,
-		),
+		// Rectangle.canvasElement(
+		// 	{ size: "large", aspectRatio: 1 / 1, area: "center" },
+		// 	1,
+		// ),
+		// CustomTerminal.canvasElement(
+		// 	{
+		// 		kind: {
+		// 			$type: "git-bash",
+		// 		},
+		// 		workingDir: "$HOME",
+		// 		lines: 5,
+		// 		cols: 10,
+		// 	},
+		// 	1,
+		// ),
 		CustomTerminal.canvasElement(
 			{
 				kind: {
