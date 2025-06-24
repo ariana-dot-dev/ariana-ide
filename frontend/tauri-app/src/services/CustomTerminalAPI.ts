@@ -49,6 +49,16 @@ export interface LineItem {
 	foreground_color?: Color;
 }
 
+export function defaultLineItem(): LineItem {
+	return {
+		lexeme: "",
+		width: 1,
+		is_underline: false,
+		is_bold: false,
+		is_italic: false,
+	};
+}
+
 export type ScrollDirection = "Up" | "Down";
 
 export interface TerminalEvent {

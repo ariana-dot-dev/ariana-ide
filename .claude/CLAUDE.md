@@ -30,6 +30,7 @@
 ## Tauri
 
 ## Frontend
+- run `just build-frontend` in the git root to build the frontend
 
 - when running `cargo` commands directly, make sure to be under `frontend/tauri-app/src-tauri`
 - to run tauri in `frontend`: `npm run dev-tauri`

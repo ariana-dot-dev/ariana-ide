@@ -3,8 +3,6 @@ import React, {
 	useEffect,
 	useRef,
 	useCallback,
-	useContext,
-	useMemo,
 } from "react";
 import { useStore } from "../state";
 import {
@@ -12,7 +10,7 @@ import {
 	TerminalEvent,
 	TerminalSpec,
 	LineItem,
-	Colors,
+	defaultLineItem,
 } from "../services/CustomTerminalAPI";
 import { cn } from "../utils";
 import { motion } from "framer-motion";
@@ -54,11 +52,9 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	const { isLightTheme } = useStore();
 
 	const [terminalId, setTerminalId] = useState<string | null>(null);
-	const screenDataRef = useRef<LineItem[][]>([]);
-	const [screenLength, setScreenLength] = useState(6);
+	const [screen, setScreen] = useState<LineItem[][]>([]);
 	const [cursorPosition, setCursorPosition] = useState({ line: 0, col: 0 });
 	const [isConnected, setIsConnected] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [windowDimensions, setWindowDimensions] = useState({
 		rows: 24,
 		cols: 80,
@@ -94,10 +90,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		};
 	}, []);
 
-	const getCurrentLineData = useCallback((rowIndex: number): LineItem[] => {
-		return screenDataRef.current[rowIndex] || [];
-	}, []);
-
 	// Initialize terminal connection
 	useEffect(() => {
 		let mounted = true;
@@ -113,7 +105,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				);
 				setTerminalId(existingTerminalId);
 				setIsConnected(true);
-				setError(null);
 
 				// Set up event listeners for existing connection
 				await customTerminalAPI.onTerminalEvent(
@@ -149,7 +140,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 				setTerminalId(id);
 				setIsConnected(true);
-				setError(null);
 
 				// Set up event listeners
 				await customTerminalAPI.onTerminalEvent(id, handleTerminalEvent);
@@ -162,7 +152,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			} catch (err) {
 				if (!mounted) return;
 				const errorMessage = err instanceof Error ? err.message : String(err);
-				setError(errorMessage);
 				onTerminalError?.(errorMessage);
 			}
 		};
@@ -175,54 +164,72 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		};
 	}, [elementId]);
 
-	// Cleanup on unmount (when component is actually destroyed)
-	useEffect(() => {
-		return () => {
-			// This runs when the component is actually unmounted
-			// We keep the terminal connection alive for potential reuse
-			console.log(`CustomTerminalRenderer unmounting for element ${elementId}`);
-		};
-	}, []);
+	const scrollDown = () => {
+		setTimeout(() => {
+			const scrollableDiv = scrollableRef.current;
+			if (!scrollableDiv) return;
+
+			const isNearBottom = () => {
+				const scrollTop = scrollableDiv.scrollTop;
+				const scrollHeight = scrollableDiv.scrollHeight;
+				const clientHeight = scrollableDiv.clientHeight;
+				return scrollHeight - scrollTop - clientHeight <= 10; // Within 10px of bottom
+			};
+
+			// Scroll to bottom if no scroll has happened or user is near bottom
+			if (true) {
+				scrollableDiv.scrollTop = scrollableDiv.scrollHeight;
+			}
+		}, 10)
+	}
 
 	const handleTerminalEvent = useCallback((events: TerminalEvent[]) => {
-		for (const event of events) {
-			switch (event.type) {
-				case "screenUpdate":
-					if (
-						event.screen &&
-						event.cursor_line !== undefined &&
-						event.cursor_col !== undefined
-					) {
-						screenDataRef.current = event.screen;
-						setScreenLength(event.screen.length);
-						setCursorPosition({ line: event.cursor_line, col: event.cursor_col });
+		const screenUpdates = events.filter((e) => {
+			return e.type == "screenUpdate" || e.type == "newLines" || e.type == "patch"
+		});
+		const cursorUpdates = events.filter((e) => {
+			return e.type == "cursorMove" || e.type == "screenUpdate"
+		});
+
+		console.log(events.map((e) => (`${e.type}, ${e.line}`)));
+
+		if (screenUpdates.length > 0) {
+			setScreen((oldScreen) => {
+				let newScreen = screenUpdates.reduce((acc, event) => {
+					if (event.type == "screenUpdate") {
+						// console.log("screenUpdate", event.screen);
+						return event.screen!;
+					} else if (event.type == "newLines") {
+						// console.log("newLines", event.lines);
+						return [...acc, ...event.lines!];
+					} else if (event.type == "patch") {
+						// console.log("patch", event.items);
+						while (event.line! >= acc.length) {
+							acc.push(Array.from({ length: windowDimensions.cols }, () => defaultLineItem()));
+						}
+						acc[event.line!] = [...event.items!];
+						return acc;
 					}
-					break;
-				case "cursorMove":
-					if (event.line !== undefined && event.col !== undefined) {
-						setCursorPosition({ line: event.line, col: event.col });
+					return acc;
+				}, oldScreen);
+				if (newScreen.length != oldScreen.length) {
+					scrollDown();
+				}
+				return newScreen;
+			})
+		}
+
+		if (cursorUpdates.length > 0) {
+			setCursorPosition((oldPosition) => {
+				return cursorUpdates.reduce((acc, event) => {
+					if (event.type == "screenUpdate") {
+						acc = { line: event.cursor_line!, col: event.cursor_col! };
+					} else if (event.type == "cursorMove") {
+						acc = { line: event.line!, col: event.col! }
 					}
-					break;
-				case "patch":
-					if (event.items !== undefined && event.line !== undefined) {
-						// Update the ref data (no re-render)
-						screenDataRef.current[event.line!] = event.items!;
-						const cululatedLexeme = event.items!.map(item => item.lexeme);
-						console.log("cululatedLexeme: ", cululatedLexeme);
-						// Notify only the specific row
-						listenersRef.current.get(event.line!)?.(event.items!);
-					}
-					break;
-				case "newLines":
-					if (event.lines !== undefined) {
-						// Update ref data
-						screenDataRef.current.push(...event.lines!);
-					
-						// Update screenLength (this will trigger re-render for new rows)
-						setScreenLength((prevLength) => prevLength + event.lines!.length);
-					}
-					break;
-			}
+					return acc;
+				}, oldPosition);
+			})
 		}
 	}, []);
 
@@ -385,6 +392,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			);
 
 			isResizingRef.current = true;
+			scrollDown();
+
 			try {
 				await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
 				// Update our tracked dimensions only after successful resize
@@ -446,26 +455,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		};
 	}, [isConnected]);
 
-	// Auto-scroll to bottom when screenLength increases
-	useEffect(() => {
-		setTimeout(() => {
-			const scrollableDiv = scrollableRef.current;
-			if (!scrollableDiv) return;
-
-			const isNearBottom = () => {
-				const scrollTop = scrollableDiv.scrollTop;
-				const scrollHeight = scrollableDiv.scrollHeight;
-				const clientHeight = scrollableDiv.clientHeight;
-				return scrollHeight - scrollTop - clientHeight <= 10; // Within 10px of bottom
-			};
-
-			// Scroll to bottom if no scroll has happened or user is near bottom
-			if (true) {//(!hasScrolledRef.current || isNearBottom()) {
-				scrollableDiv.scrollTop = scrollableDiv.scrollHeight;
-			}
-		}, 150);
-	}, [screenLength]);
-
 	// Auto-focus the terminal and set initial size
 	useEffect(() => {
 		if (terminalRef.current && isConnected) {
@@ -484,8 +473,125 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		}
 	}, [isConnected, handleResize]);
 
+	return (
+		<div
+			ref={terminalRef}
+			className={cn(
+				"rounded-md text-sm backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+			)}
+			tabIndex={0}
+			onKeyDown={handleKeyDown}
+			onClick={() => terminalRef.current?.focus()}
+		>
+			<div
+				ref={terminalInnerRef}
+				className={cn(
+					"terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text",
+				)}
+			>
+				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto")}>
+					{
+						screen.map((line, index) => (
+							<Row
+								key={`row-${index}`}
+								row={index}
+								line={line}
+								isLightTheme={isLightTheme}
+								charDimensions={charDimensions}
+							/>
+						))
+					}
+					<motion.div
+						className={cn("absolute whitespace-pre-wrap animate-pulse")}
+						style={{
+							left: `${cursorPosition.col * charDimensions.width}px`,
+							top: `${cursorPosition.line * charDimensions.height}px`,
+							width: `${charDimensions.width}px`,
+							height: `${charDimensions.height}px`,
+							filter: "contrast(2)"
+						}}
+						// transition={{
+						// 	ease: "linear",
+						// 	duration: 0.05,
+						// }}
+					>
+						<div 
+						    className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs"
+						>
+							{' '}
+						</div>
+						{/* <div className="absolute flex items-center justify-center top-0 left-0 h-full w-[200%] opacity-80">
+						<div>{'🚀'}</div> */}
+						{/* </div> */}
+					</motion.div>
+					<span ref={phantomCharRef} className="absolute -left-full -top-full">A</span>
+				</div>
+			</div>
+		</div>
+	);
+};
 
-	const COLORS: Record<string, string> = {
+export default CustomTerminalRenderer;
+
+const Row = React.memo(({ line, row, isLightTheme, charDimensions }: {
+	line: LineItem[],
+	row: number,
+	isLightTheme: boolean,
+	charDimensions: {
+		width: number,
+		height: number,
+	}
+}) => {
+	const lexemeMap: Record<string, string> = {
+		'': ' ',
+	}
+
+	console.log(row, " rerendered");
+
+	return (
+		<div className={cn("relative flex font-mono")}>
+			{/* <span className={cn("w-10 opacity-50")}>{row} </span> */}
+			{line.map((item, index) => (
+				<span
+					key={index}
+					className={cn("")}
+					style={{
+						backgroundColor: colorToCSS(item.background_color, isLightTheme),
+						color: colorToCSS(item.foreground_color, isLightTheme),
+						fontWeight: item.is_bold ? "bold" : "normal",
+						textDecoration: item.is_underline ? "underline" : "none",
+						fontStyle: item.is_italic ? "italic" : "normal",
+						whiteSpace: "pre-wrap",
+						width: "",
+					}}
+				>
+					{lexemeMap[item.lexeme] ? lexemeMap[item.lexeme] : item.lexeme}
+				</span>
+			))}
+		</div>
+	);
+}, (prevProps, nextProps) => {
+	// deep compare
+	if (prevProps.row !== nextProps.row) return false;
+	if (prevProps.isLightTheme !== nextProps.isLightTheme) return false;
+	if (prevProps.charDimensions !== nextProps.charDimensions) return false;
+
+	for (let i = 0; i < prevProps.line.length; i++) {
+		if (prevProps.line[i].lexeme !== nextProps.line[i].lexeme 
+			|| prevProps.line[i].width !== nextProps.line[i].width 
+			|| prevProps.line[i].is_bold !== nextProps.line[i].is_bold 
+			|| prevProps.line[i].is_italic !== nextProps.line[i].is_italic 
+			|| prevProps.line[i].is_underline !== nextProps.line[i].is_underline 
+			|| prevProps.line[i].foreground_color !== nextProps.line[i].foreground_color 
+			|| prevProps.line[i].background_color !== nextProps.line[i].background_color) {
+			return false;
+		}
+	}
+	return true;
+});
+
+const colorMap = (color: string, isLightTheme: boolean) => {
+	const colors: Record<string, string> = {
 		"Black": isLightTheme ? "#2e222f" : "#2e222f",
 		"Red": isLightTheme ? "#ae2334" : "#e83b3b",
 		"Green": isLightTheme ? "#239063" : "#1ebc73",
@@ -504,175 +610,55 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		"BrightWhite": isLightTheme ? "mix(#c7dcd0, #c7dcd0, 0.2)" : "#ffffff",
 	};
 
-	const getAnsiHex = (ansiName: string): string => {
-		if (ansiName === "Default") {
-			return isLightTheme ? COLORS["Black"] : COLORS["White"];
-		}
-		return COLORS[ansiName];
-	};
+	return colors[color];
+}
 
-	const colorToCSS = (color?: any): string => {
-		if (!color) return "";
-
-		if (typeof color === "string") {
-			return getAnsiHex(color);
-		}
-
-		if (color.Extended !== undefined) {
-			return ansi256ToHex(color.Extended);
-		}
-
-		if (color.Rgb !== undefined) {
-			const [r, g, b] = color.Rgb;
-			return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-		}
-
-		return isLightTheme ? "#334155" : "#d4d4d4";
-	};
-
-	// Convert ANSI 256-color codes to hex using the same helper for the first 16 colors
-	const ansi256ToHex = (code: number): string => {
-		if (code < 16) {
-			return getAnsiHex(COLORS[code]);
-		}
-		if (code < 232) {
-			const n = code - 16;
-			const r = Math.floor(n / 36);
-			const g = Math.floor((n % 36) / 6);
-			const b = n % 6;
-
-			const vals = [0, 95, 135, 175, 215, 255];
-			const red = vals[r];
-			const green = vals[g];
-			const blue = vals[b];
-			return `#${red.toString(16).padStart(2, "0")}${green.toString(16).padStart(2, "0")}${blue.toString(16).padStart(2, "0")}`;
-		}
-
-		const level = code - 232;
-		const gray = 8 + level * 10;
-		const gHex = Math.min(238, gray).toString(16).padStart(2, "0");
-		return `#${gHex}${gHex}${gHex}`;
-	};
-
-	if (error) {
-		return (
-			<div
-				className={cn(
-					"p-4 bg-[var(--bg-900)]/20 border border-[var(--bg-500)] rounded-md",
-				)}
-			>
-				<div className={cn("text-[var(--bg-400)] font-mono text-sm")}>
-					Terminal Error: {error}
-				</div>
-			</div>
-		);
+const getAnsiHex = (ansiName: string, isLightTheme: boolean): string => {
+	if (ansiName === "Default") {
+		return isLightTheme ? colorMap("Black", isLightTheme) : colorMap("White", isLightTheme);
 	}
-
-	const Row = React.memo(({ row, terminalId, getCurrentLineData }: { 
-		row: number, 
-		terminalId: string,
-		getCurrentLineData: (rowIndex: number) => LineItem[]
-	}) => {
-		// Initialize state directly from the ref to prevent flickering.
-		// This lazy initializer runs only on the first render.
-		const [items, setItems] = useState<LineItem[]>(() => getCurrentLineData(row));
-	
-		useEffect(() => {
-			// This listener handles live 'patch' updates to the row after it has mounted.
-			listenersRef.current.set(row, (newItems: LineItem[]) => {
-				setItems(newItems);
-			});
-			
-			return () => {
-				listenersRef.current.delete(row);
-			}
-		}, [row, terminalId]); // getCurrentLineData is stable and doesn't need to be a dependency
-	
-		const lexemeMap: Record<string, string> = {
-			'': ' ',
-		}
-
-		return (
-			<div className={cn("relative flex font-mono")}>
-				<span className={cn("w-0 opacity-0")}>{row} </span>
-				{items.map((item, index) => (
-					<span 
-						key={index} 
-						className={cn("")} 
-						style={{ 
-							backgroundColor: colorToCSS(item.background_color),
-							color: colorToCSS(item.foreground_color),
-							fontWeight: item.is_bold ? "bold" : "normal",
-							textDecoration: item.is_underline ? "underline" : "none",
-							fontStyle: item.is_italic ? "italic" : "normal",
-							whiteSpace: "pre-wrap",
-							width: "",
-						}}
-					>
-						{lexemeMap[item.lexeme] ? lexemeMap[item.lexeme] : item.lexeme}
-					</span>
-				))}
-			</div>
-		);
-	});
-
-	const AllRows = useMemo(() => 
-		Array.from({ length: screenLength }, (_, rowIndex) => (
-			<Row 
-				key={`row-${rowIndex}`} 
-				row={rowIndex} 
-				terminalId={terminalId || "unknown"}
-				getCurrentLineData={getCurrentLineData}
-			/>
-		)), 
-		[screenLength, terminalId, getCurrentLineData]
-	);
-
-	return (
-		<div
-			ref={terminalRef}
-			className={cn(
-				"rounded-md text-2xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
-			)}
-			tabIndex={0}
-			onKeyDown={handleKeyDown}
-			onClick={() => terminalRef.current?.focus()}
-		>
-			{/* {cursorPosition.col} * {cursorPosition.line} */}
-			<div
-				ref={terminalInnerRef}
-				className={cn(
-					"terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text",
-				)}
-			>
-				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto")}>
-					{/* {Array.from({ length: windowDimensions.rows }, (_, rowIndex) => {
-						const line = screen[rowIndex] || [];
-						return renderScreenLine(line, rowIndex, windowDimensions.cols);
-					})} */}
-					
-					{AllRows}
-					<motion.div
-						className={cn("absolute text-3xl whitespace-pre-wrap animate-pulse")}
-						animate={{
-							left: `${cursorPosition.col * charDimensions.width}px`,
-							top: `${cursorPosition.line * charDimensions.height}px`,
-							width: `${charDimensions.width}px`,
-							height: `${charDimensions.height}px`,
-							filter: "contrast(2)"
-						}}
-						transition={{
-							ease: "linear",
-							duration: 0.05,
-						}}
-					>
-						{'😎'}
-					</motion.div>
-					<span ref={phantomCharRef} className="absolute -left-full -top-full">A</span>
-				</div>
-			</div>
-		</div>
-	);
+	return colorMap(ansiName, isLightTheme);
 };
 
-export default CustomTerminalRenderer;
+const colorToCSS = (color: any, isLightTheme: boolean): string => {
+	if (!color) return "";
+
+	if (typeof color === "string") {
+		return getAnsiHex(color, isLightTheme);
+	}
+
+	if (color.Extended !== undefined) {
+		return ansi256ToHex(color.Extended, isLightTheme);
+	}
+
+	if (color.Rgb !== undefined) {
+		const [r, g, b] = color.Rgb;
+		return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+	}
+
+	return isLightTheme ? "#334155" : "#d4d4d4";
+};
+
+// Convert ANSI 256-color codes to hex using the same helper for the first 16 colors
+const ansi256ToHex = (code: number, isLightTheme: boolean): string => {
+	if (code < 16) {
+		return "#ffffff";
+	}
+	if (code < 232) {
+		const n = code - 16;
+		const r = Math.floor(n / 36);
+		const g = Math.floor((n % 36) / 6);
+		const b = n % 6;
+
+		const vals = [0, 95, 135, 175, 215, 255];
+		const red = vals[r];
+		const green = vals[g];
+		const blue = vals[b];
+		return `#${red.toString(16).padStart(2, "0")}${green.toString(16).padStart(2, "0")}${blue.toString(16).padStart(2, "0")}`;
+	}
+
+	const level = code - 232;
+	const gray = 8 + level * 10;
+	const gHex = Math.min(238, gray).toString(16).padStart(2, "0");
+	return `#${gHex}${gHex}${gHex}`;
+};

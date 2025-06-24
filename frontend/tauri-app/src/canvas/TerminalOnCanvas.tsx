@@ -6,6 +6,7 @@ import type { IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
+import { ImageAddon } from "@xterm/addon-image";
 import "@xterm/xterm/css/xterm.css";
 import { CanvasElement, ElementLayout } from "./types";
 import { Terminal, TerminalConfig } from "./Terminal";
@@ -94,23 +95,36 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 			fontSize: terminal.config.fontSize || 14,
 			fontFamily: terminal.config.fontFamily
 				? `"${terminal.config.fontFamily}"`
-				: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+				: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", Monaco, Menlo, "Ubuntu Mono", monospace',
 			cursorBlink: true,
 			allowTransparency: true,
+			allowProposedApi: true,
+			fontWeight: 'normal',
+			fontWeightBold: 'bold',
+			minimumContrastRatio: 1,
 		});
 
 		const fitAddon = new FitAddon();
 		const webLinksAddon = new WebLinksAddon();
 		const searchAddon = new SearchAddon();
+		const imageAddon = new ImageAddon({
+			enableSizeReports: true,    
+			sixelSupport: true,         
+			sixelScrolling: true,       // Enable scrolling for images
+			iipSupport: true,           // Enable iTerm2 inline images
+			pixelLimit: 16777216,       // Max 16MB per image
+			showPlaceholder: true       // Show placeholder for evicted images
+		});
 
 		xterm.loadAddon(fitAddon);
 		xterm.loadAddon(webLinksAddon);
 		xterm.loadAddon(searchAddon);
+		xterm.loadAddon(imageAddon);
 
 		xterm.open(terminalRef.current);
 
 		// Clipboard integration using xterm's custom key handler
-		const clipboardHandler = xterm.attachCustomKeyEventHandler(
+		const _clipboardHandler = xterm.attachCustomKeyEventHandler(
 			(ev: KeyboardEvent) => {
 				if (!ev.ctrlKey || ev.altKey || ev.metaKey) {
 					return true; // let xterm handle
@@ -120,9 +134,11 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 					const sel = xterm.getSelection();
 					if (sel) {
 						navigator.clipboard.writeText(sel).catch(() => {});
+						return false; // Block only when copying text
+					} else {
+						// No selection - allow Ctrl+C to send SIGINT to terminal
+						return true;
 					}
-					// don't cancel; allow normal copy as well but avoid ^C char
-					return false;
 				}
 				if (key === "v") {
 					ev.preventDefault();

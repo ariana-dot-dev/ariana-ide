@@ -8,9 +8,7 @@
 		"dev": "uv run ./scripts/generate_theme_colors.py && vite",
 		"build": "uv run ./scripts/generate_theme_colors.py && vite build",
 		"preview": "uv run ./scripts/generate_theme_colors.py && vite preview",
-		"tauri": "tauri",
-		"tauri:dev": "tauri dev",
-		"tauri:build": "tauri build"
+		"tauri": "tauri dev"
 	},
 	"keywords": [
 		"tauri",
@@ -25,6 +23,7 @@
 		"@tauri-apps/plugin-fs": "^2.3.0",
 		"@tauri-apps/plugin-store": "^2.2.1",
 		"@xterm/addon-fit": "^0.10.0",
+		"@xterm/addon-image": "^0.8.0",
 		"@xterm/addon-search": "^0.15.0",
 		"@xterm/addon-web-links": "^0.11.0",
 		"@xterm/xterm": "^5.5.0",

@@ -285,10 +285,10 @@ impl TerminalState {
                 if row_in_rows_state < self.rows_state.len() as isize && row_in_rows_state >= 0 {
                     let old_line = self.rows_state[row_in_rows_state as usize].clone();
                     let new_line = row.clone();
-                    if old_line.0 != new_line.0 || old_line.1 != new_line.1 {
+                    if find_one_diff_items_deep(&old_line.1, &new_line.1) {
                         changed_lines.push((row_in_rows_state as usize, new_line));
+                        self.rows_state[row_in_rows_state as usize] = row.clone();
                     }
-                    self.rows_state[row_in_rows_state as usize] = row.clone();
                 } else if row_in_rows_state >= 0 {
                     added_lines.push(row.clone());
                     self.rows_state.push(row.clone());
@@ -319,11 +319,26 @@ impl TerminalState {
             for (line, items) in changed_lines {
                 events.push(TerminalEvent::Patch { line, items: items.1 });
             }
-            events.push(TerminalEvent::NewLines { lines: added_lines.into_iter().map(|(_, row)| row).collect() });
+            if added_lines.len() > 0 {
+                events.push(TerminalEvent::NewLines { lines: added_lines.into_iter().map(|(_, row)| row).collect() });
+            }
         }
 
         events
     }
+}
+
+fn find_one_diff_items_deep(old_line: &Vec<LineItem>, new_line: &Vec<LineItem>) -> bool {
+    old_line.iter().zip(new_line.iter()).any(|(old_item, new_item)| !items_equal(old_item, new_item))
+}
+
+fn items_equal(old_item: &LineItem, new_item: &LineItem) -> bool {
+    old_item.lexeme == new_item.lexeme
+        && old_item.is_bold == new_item.is_bold
+        && old_item.is_italic == new_item.is_italic
+        && old_item.is_underline == new_item.is_underline
+        && old_item.foreground_color == new_item.foreground_color
+        && old_item.background_color == new_item.background_color
 }
 
 fn similarities_count(s1: &str, s2: &str) -> usize {
