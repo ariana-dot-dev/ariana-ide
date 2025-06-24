@@ -124,7 +124,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		xterm.open(terminalRef.current);
 
 		// Clipboard integration using xterm's custom key handler
-		const clipboardHandler = xterm.attachCustomKeyEventHandler(
+		const _clipboardHandler = xterm.attachCustomKeyEventHandler(
 			(ev: KeyboardEvent) => {
 				if (!ev.ctrlKey || ev.altKey || ev.metaKey) {
 					return true; // let xterm handle
@@ -134,9 +134,11 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 					const sel = xterm.getSelection();
 					if (sel) {
 						navigator.clipboard.writeText(sel).catch(() => {});
+						return false; // Block only when copying text
+					} else {
+						// No selection - allow Ctrl+C to send SIGINT to terminal
+						return true;
 					}
-					// don't cancel; allow normal copy as well but avoid ^C char
-					return false;
 				}
 				if (key === "v") {
 					ev.preventDefault();
