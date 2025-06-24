@@ -64,6 +64,34 @@
   background-color: var(--fg-600);
 }
 
+@font-face {
+	font-family: "JetBrainsMono Nerd Font";
+	src: url("/fonts/JetBrainsMonoNerdFont-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: "JetBrainsMono Nerd Font";
+	src: url("/fonts/JetBrainsMonoNerdFont-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: "FiraCode Nerd Font";
+	src: url("/fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: "FiraCode Nerd Font";
+	src: url("/fonts/FiraCodeNerdFont-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+}
+
 * {
 	box-sizing: border-box;
 }
@@ -84,7 +112,8 @@ body {
 
 @theme {
 	--font-sans: "Satoshi", sans-serif;
-	--font-mono: "MapleMono";
+	--font-mono: "JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MapleMono", "Hack Nerd Font", "MesloLGS NF", "Space Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",
+		Consolas, "Courier New", monospace;
 }
 
 @keyframes fadeIn {
