@@ -36,18 +36,18 @@ THEMES: Dict[str, Dict[str, str]] = {
         "--border-thickness": "2px",
     },
     "semi-sky": {
-        "--fg-500": "#4d65b4",  # blue equivalent
+        "--fg-500": "#8fd3ff",  # blue equivalent
         "--bg-500": "#4d9be6",  # ~ oklch(82.8% 0.111 230.318)
-        "--blackest": "#2e222f",
-        "--whitest": "#ffffff",
+        "--whitest": "#2e222f",
+        "--blackest": "#ffffff",
         "--positive-500": "#1ebc73",  # green
         "--negative-500": "#e83b3b",  # red
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
     "light-sand": {
-        "--fg-500": "#ab947a",
-        "--bg-500": "#c7dcd0",
+        "--bg-500": "#ab947a",
+        "--fg-500": "#c7dcd0",
         "--blackest": "#3e3546",
         "--whitest": "#ffffff",
         "--positive-500": "#1ebc73",  # green

@@ -13,6 +13,12 @@ const appWindow = getCurrentWebviewWindow();
 
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
+const THEMES = [
+	"dark-red",
+	"semi-sky",
+	"light-sand"
+]
+
 function App() {
 	const store = useStore();
 	const { userEmail, loading, error, setUserEmail } = useUserConfig();
@@ -162,6 +168,20 @@ function App() {
 					>
 						<Onboarding userEmail={userEmail} />
 						<Repl />
+					</div>
+
+					<div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex rounded-t-4 p-4 justify-center gap-3 z-20">
+						{THEMES.map((theme) => (
+							<button
+								key={theme}
+								className={cn(
+									`theme-${theme}`,
+									"rounded-full w-6 h-6 cursor-pointer  bg-gradient-to-br from-[var(--bg-500)] to-[var(--fg-500)] hover:outline-4 hover:outline-[var(--fg-600)] transition-all",
+									theme === store.theme ? "opacity-100" : "opacity-50",
+								)}
+								onClick={() => store.setTheme(theme)}
+							/>
+						))}
 					</div>
 				</div>
 			</div>

@@ -632,7 +632,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		<div
 			ref={terminalRef}
 			className={cn(
-				"rounded-md text-xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				"rounded-md text-2xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
 			)}
 			tabIndex={0}
 			onKeyDown={handleKeyDown}
@@ -653,7 +653,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					
 					{AllRows}
 					<motion.div
-						className={cn("absolute text-2xl whitespace-pre-wrap animate-pulse")}
+						className={cn("absolute text-3xl whitespace-pre-wrap animate-pulse")}
 						animate={{
 							left: `${cursorPosition.col * charDimensions.width}px`,
 							top: `${cursorPosition.line * charDimensions.height}px`,
