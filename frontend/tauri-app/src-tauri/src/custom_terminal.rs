@@ -93,27 +93,45 @@ pub struct LineItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventMetadata {
+    #[serde(rename = "sessionId")]
+    pub session_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum TerminalEvent {
     #[serde(rename = "newLines")]
-    NewLines { lines: Vec<Vec<LineItem>> },
+    NewLines { 
+        lines: Vec<Vec<LineItem>>,
+        metadata: Option<EventMetadata>,
+    },
     #[serde(rename = "patch")]
     Patch {
         line: usize,
         items: Vec<LineItem>,
+        metadata: Option<EventMetadata>,
     },
     #[serde(rename = "cursorMove")]
-    CursorMove { line: usize, col: usize },
+    CursorMove { 
+        line: usize, 
+        col: usize,
+        metadata: Option<EventMetadata>,
+    },
     #[serde(rename = "scroll")]
     Scroll {
         direction: ScrollDirection,
         amount: usize,
+        metadata: Option<EventMetadata>,
     },
     #[serde(rename = "screenUpdate")]
     ScreenUpdate {
         screen: Vec<Vec<LineItem>>,
         cursor_line: usize,
         cursor_col: usize,
+        metadata: Option<EventMetadata>,
     },
 }
 
@@ -125,6 +143,16 @@ impl TerminalEvent {
             TerminalEvent::CursorMove { .. } => "cursorMove",
             TerminalEvent::Scroll { .. } => "scroll",
             TerminalEvent::ScreenUpdate { .. } => "screenUpdate",
+        }
+    }
+
+    pub fn metadata(&self) -> &Option<EventMetadata> {
+        match self {
+            TerminalEvent::NewLines { metadata, .. } => metadata,
+            TerminalEvent::Patch { metadata, .. } => metadata,
+            TerminalEvent::CursorMove { metadata, .. } => metadata,
+            TerminalEvent::Scroll { metadata, .. } => metadata,
+            TerminalEvent::ScreenUpdate { metadata, .. } => metadata,
         }
     }
 }
@@ -162,6 +190,7 @@ impl TerminalState {
             rows_state: Vec::new(),
         }
     }
+
 
     pub fn resize(&mut self, rows: u16, cols: u16) {
         self.parser.set_size(rows.into(), cols.into());
@@ -304,6 +333,7 @@ impl TerminalState {
         let cursor_line = (self.rows_state.len() - self.rows as usize) + cursor_line as usize;
         let cursor_col = cursor_col as usize;
 
+
         if full {
             events.push(TerminalEvent::ScreenUpdate { 
                 screen: self
@@ -312,15 +342,27 @@ impl TerminalState {
                     .map(|(_, row)| row.clone())
                     .collect(), 
                 cursor_line, 
-                cursor_col 
+                cursor_col,
+                metadata: None,
             });
         } else {
-            events.push(TerminalEvent::CursorMove { line: cursor_line, col: cursor_col });
+            events.push(TerminalEvent::CursorMove { 
+                line: cursor_line, 
+                col: cursor_col,
+                metadata: None,
+            });
             for (line, items) in changed_lines {
-                events.push(TerminalEvent::Patch { line, items: items.1 });
+                events.push(TerminalEvent::Patch { 
+                    line, 
+                    items: items.1,
+                    metadata: None,
+                });
             }
             if added_lines.len() > 0 {
-                events.push(TerminalEvent::NewLines { lines: added_lines.into_iter().map(|(_, row)| row).collect() });
+                events.push(TerminalEvent::NewLines { 
+                    lines: added_lines.into_iter().map(|(_, row)| row).collect(),
+                    metadata: None,
+                });
             }
         }
 
@@ -546,6 +588,7 @@ impl CustomTerminalConnection {
             let _ = app.emit(&format!("custom-terminal-disconnect-{id_clone}"), ());
         });
 
+        let app_clone = self.app_handle.clone();
         thread::spawn(move || {
             let mut buf = [0u8; 4096];
             loop {
@@ -664,7 +707,6 @@ impl CustomTerminalManager {
 
     pub fn send_raw_input(&self, id: &str, data: &str) -> Result<()> {
         if let Some(w) = self.writers.lock().unwrap().get_mut(id) {
-            // println!("Sending raw input: {}", data);
             w.write_all(data.as_bytes())?;
             w.flush()?;
             Ok(())

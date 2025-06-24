@@ -123,16 +123,18 @@ body {
 
 @keyframes fadeIn {
 	from {
+		transform: scale(0.99);
 		opacity: 0;
 	}
 
 	to {
+		transform: scale(1);
 		opacity: 1;
 	}
 }
 
 .animate-fade-in {
-	animation: fadeIn 1s ease-out forwards;
+	animation: fadeIn 0.5s ease-out forwards;
 }
 
 @plugin 'tailwind-scrollbar';

@@ -72,6 +72,10 @@ export interface TerminalEvent {
 	screen?: LineItem[][];
 	cursor_line?: number;
 	cursor_col?: number;
+	metadata?: {
+		sessionId?: string;
+		[key: string]: any;
+	};
 }
 
 export class CustomTerminalAPI {

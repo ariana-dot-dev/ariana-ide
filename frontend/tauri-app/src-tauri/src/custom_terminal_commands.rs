@@ -1,4 +1,4 @@
-use crate::custom_terminal::{CustomTerminalManager, TerminalSpec, ScrollDirection};
+use crate::custom_terminal::{CustomTerminalManager, TerminalSpec};
 use std::sync::Mutex;
 use tauri::{AppHandle, State};
 

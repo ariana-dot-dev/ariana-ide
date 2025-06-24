@@ -26,6 +26,8 @@ function App() {
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
 	const { isLightTheme } = store;
+	const [isSwcInitialized, setIsSwcInitialized] = useState(false);
+
 
 	useEffect(() => {
 		const unlistenUserEmail = listen<string>(
@@ -94,7 +96,7 @@ function App() {
 		<InterpreterContext value={interpreter}>
 			<div
 				className={cn(
-					"relative font-mono h-screen w-screen flex flex-col overflow-hidden",
+					"relative font-mono h-screen w-screen flex flex-col overflow-hidden selection:bg-[var(--fg-600)]",
 					isLightTheme
 						? "bg-gradient-to-t from-[var(--bg-300)] to-[var(--bg-200)]"
 						: "bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)]",

@@ -13,7 +13,7 @@ import {
 	defaultLineItem,
 } from "../services/CustomTerminalAPI";
 import { cn } from "../utils";
-import { motion } from "framer-motion";
+import { useInView, motion } from "motion/react"
 
 interface CustomTerminalRendererProps {
 	elementId: string;
@@ -62,8 +62,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	const [charDimensions, setCharDimensions] = useState({ width: 7.35, height: 16 });
 
 	const phantomCharRef = useRef<HTMLSpanElement>(null);
-	const listenersRef = useRef<Map<number, (items: LineItem[]) => void>>(new Map());
-
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const terminalInnerRef = useRef<HTMLDivElement>(null);
 	const scrollableRef = useRef<HTMLDivElement>(null);
@@ -90,6 +88,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		};
 	}, []);
 
+
 	// Initialize terminal connection
 	useEffect(() => {
 		let mounted = true;
@@ -100,9 +99,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				TerminalConnectionManager.getConnection(elementId);
 
 			if (existingTerminalId && !terminalId) {
-				console.log(
-					`Reusing existing terminal connection ${existingTerminalId} for element ${elementId}`,
-				);
 				setTerminalId(existingTerminalId);
 				setIsConnected(true);
 
@@ -122,14 +118,9 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 			// Don't create new connection if we already have one
 			if (terminalId && isConnected) {
-				console.log("Terminal already connected, skipping reconnection");
 				return;
 			}
 
-			console.log(
-				`Creating new terminal connection for element ${elementId}:`,
-				spec,
-			);
 
 			try {
 				const id = await customTerminalAPI.connectTerminal(spec);
@@ -164,26 +155,23 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		};
 	}, [elementId]);
 
-	const scrollDown = () => {
-		setTimeout(() => {
-			const scrollableDiv = scrollableRef.current;
-			if (!scrollableDiv) return;
+	const scrollDown = useCallback(() => {
+		const scrollableDiv = scrollableRef.current;
+		if (!scrollableDiv) return;
 
-			const isNearBottom = () => {
-				const scrollTop = scrollableDiv.scrollTop;
-				const scrollHeight = scrollableDiv.scrollHeight;
-				const clientHeight = scrollableDiv.clientHeight;
-				return scrollHeight - scrollTop - clientHeight <= 10; // Within 10px of bottom
-			};
+		// Check if user is already at the bottom before auto-scrolling
+		const isAtBottom = Math.abs(scrollableDiv.scrollTop + scrollableDiv.clientHeight - scrollableDiv.scrollHeight) < 5;
 
-			// Scroll to bottom if no scroll has happened or user is near bottom
-			if (true) {
+		if (isAtBottom) {
+			// Use requestAnimationFrame for smoother scrolling
+			requestAnimationFrame(() => {
 				scrollableDiv.scrollTop = scrollableDiv.scrollHeight;
-			}
-		}, 10)
-	}
+			});
+		}
+	}, []);
 
 	const handleTerminalEvent = useCallback((events: TerminalEvent[]) => {
+		// Batch multiple events together to reduce React renders
 		const screenUpdates = events.filter((e) => {
 			return e.type == "screenUpdate" || e.type == "newLines" || e.type == "patch"
 		});
@@ -191,19 +179,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			return e.type == "cursorMove" || e.type == "screenUpdate"
 		});
 
-		console.log(events.map((e) => (`${e.type}, ${e.line}`)));
-
 		if (screenUpdates.length > 0) {
 			setScreen((oldScreen) => {
 				let newScreen = screenUpdates.reduce((acc, event) => {
 					if (event.type == "screenUpdate") {
-						// console.log("screenUpdate", event.screen);
 						return event.screen!;
 					} else if (event.type == "newLines") {
-						// console.log("newLines", event.lines);
 						return [...acc, ...event.lines!];
 					} else if (event.type == "patch") {
-						// console.log("patch", event.items);
 						while (event.line! >= acc.length) {
 							acc.push(Array.from({ length: windowDimensions.cols }, () => defaultLineItem()));
 						}
@@ -212,16 +195,18 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					}
 					return acc;
 				}, oldScreen);
+
 				if (newScreen.length != oldScreen.length) {
 					scrollDown();
 				}
+
 				return newScreen;
 			})
 		}
 
 		if (cursorUpdates.length > 0) {
 			setCursorPosition((oldPosition) => {
-				return cursorUpdates.reduce((acc, event) => {
+				const newPosition = cursorUpdates.reduce((acc, event) => {
 					if (event.type == "screenUpdate") {
 						acc = { line: event.cursor_line!, col: event.cursor_col! };
 					} else if (event.type == "cursorMove") {
@@ -229,12 +214,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					}
 					return acc;
 				}, oldPosition);
+
+				return newPosition;
 			})
 		}
 	}, []);
 
 	const handleTerminalDisconnect = useCallback(() => {
-		console.log(`Terminal disconnected for element ${elementId}`);
 		TerminalConnectionManager.removeConnection(elementId);
 		setIsConnected(false);
 		setTerminalId(null);
@@ -246,7 +232,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			if (!terminalId || !isConnected) return;
 
 			try {
-				console.log("Sending raw input:", JSON.stringify(input));
 				await customTerminalAPI.sendRawInput(terminalId, input);
 			} catch (err) {
 				console.error("Error sending input:", err);
@@ -263,12 +248,28 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			try {
 				if (event.ctrlKey) {
 					if (event.key === "c") {
+						// If text is selected, let the browser handle copy.
+						const selection = window.getSelection()?.toString();
+						if (selection && selection.length > 0) {
+							return;
+						}
 						await customTerminalAPI.sendCtrlC(terminalId);
 						event.preventDefault();
 						return;
 					}
 					if (event.key === "d") {
 						await customTerminalAPI.sendCtrlD(terminalId);
+						event.preventDefault();
+						return;
+					}
+					// Handle Ctrl+Arrow keys for word-wise navigation
+					if (event.key === "ArrowLeft") {
+						await sendRawInput("\x1b[1;5D"); // Ctrl+Left
+						event.preventDefault();
+						return;
+					}
+					if (event.key === "ArrowRight") {
+						await sendRawInput("\x1b[1;5C"); // Ctrl+Right
 						event.preventDefault();
 						return;
 					}
@@ -358,7 +359,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 			// Prevent concurrent resizes
 			if (isResizingRef.current) {
-				console.log("Resize skipped: already resizing");
 				return;
 			}
 
@@ -366,17 +366,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 			// Don't resize if container doesn't have proper dimensions yet
 			if (containerRect.width < 100 || containerRect.height < 80) {
-				console.log(
-					"Terminal resize skipped: container too small",
-					containerRect,
-				);
 				return;
 			}
 
 			const { width: charWidth, height: charHeight } = charDimensions;
 
-			const cols = Math.max(20, Math.floor(containerRect.width / (charWidth * 1.07)));
-			const lines = Math.max(5, Math.floor(containerRect.height / (charHeight * 1.07)));
+			const cols = Math.max(20, Math.floor(containerRect.width / (charWidth * 1.03)));
+			const lines = Math.max(5, Math.floor(containerRect.height / (charHeight * 1.0)));
 			// const lines = 100;
 
 			// Only resize if dimensions actually changed
@@ -387,9 +383,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				return;
 			}
 
-			console.log(
-				`Terminal resize: ${cols}x${lines} (container: ${containerRect.width}x${containerRect.height})`,
-			);
 
 			isResizingRef.current = true;
 			scrollDown();
@@ -398,7 +391,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
 				// Update our tracked dimensions only after successful resize
 				setWindowDimensions({ rows: lines, cols });
-				console.log(`Terminal resize successful: ${cols}x${lines}`);
 			} catch (err) {
 				console.error("Error resizing terminal:", err);
 				// Don't update dimensions on error
@@ -489,13 +481,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					"terminal-screen relative rounded overflow-hidden max-h-full h-full font-mono cursor-text select-text",
 				)}
 			>
-				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto")}>
+				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto flex flex-col")}>
+					{/* iterate windows of size 10 */}
 					{
-						screen.map((line, index) => (
-							<Row
-								key={`row-${index}`}
-								row={index}
-								line={line}
+						Array.from({ length: Math.ceil(screen.length / 50) }, (_, i) => (
+							<Chunk
+								start={i * 50}
+								key={i}
+								lines={screen.slice(i * 50, (i + 1) * 50)}
 								isLightTheme={isLightTheme}
 								charDimensions={charDimensions}
 							/>
@@ -503,20 +496,20 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					}
 					<motion.div
 						className={cn("absolute whitespace-pre-wrap animate-pulse")}
-						style={{
+						animate={{
 							left: `${cursorPosition.col * charDimensions.width}px`,
 							top: `${cursorPosition.line * charDimensions.height}px`,
 							width: `${charDimensions.width}px`,
 							height: `${charDimensions.height}px`,
 							filter: "contrast(2)"
 						}}
-						// transition={{
-						// 	ease: "linear",
-						// 	duration: 0.05,
-						// }}
+					transition={{
+						ease: "easeInOut",
+						duration: 0.1,
+					}}
 					>
-						<div 
-						    className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs"
+						<div
+							className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs"
 						>
 							{' '}
 						</div>
@@ -533,6 +526,59 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 export default CustomTerminalRenderer;
 
+const Chunk = React.memo(({ start, lines, isLightTheme, charDimensions }: {
+	start: number,
+	lines: LineItem[][],
+	isLightTheme: boolean,
+	charDimensions: {
+		width: number,
+		height: number,
+	}
+}) => {
+	const ref = useRef<HTMLDivElement>(null);
+	const isInView = useInView(ref);
+
+	return (
+		<div ref={ref} className={cn("flex flex-col w-full")}>
+			{
+				isInView ? lines.map((line, index) => (
+					<Row
+						key={`row-${index + start}`}
+						row={index + start}
+						line={line}
+						isLightTheme={isLightTheme}
+						charDimensions={charDimensions}
+					/>
+				)) : (
+					<div style={{ height: `${charDimensions.height * lines.length}px` }} className={cn("flex flex-col w-full")}>
+					</div>
+				)
+			}
+		</div>
+	);
+}, (prevProps, nextProps) => {
+	// deep compare
+	if (prevProps.start !== nextProps.start) return false;
+	if (prevProps.lines.length !== nextProps.lines.length) return false;
+	if (prevProps.isLightTheme !== nextProps.isLightTheme) return false;
+	if (prevProps.charDimensions !== nextProps.charDimensions) return false;
+
+	for (let i = 0; i < prevProps.lines.length; i++) {
+		for (let j = 0; j < prevProps.lines[i].length; j++) {
+			if (prevProps.lines[i][j].lexeme !== nextProps.lines[i][j].lexeme
+				|| prevProps.lines[i][j].width !== nextProps.lines[i][j].width
+				|| prevProps.lines[i][j].is_bold !== nextProps.lines[i][j].is_bold
+				|| prevProps.lines[i][j].is_italic !== nextProps.lines[i][j].is_italic
+				|| prevProps.lines[i][j].is_underline !== nextProps.lines[i][j].is_underline
+				|| prevProps.lines[i][j].foreground_color !== nextProps.lines[i][j].foreground_color
+				|| prevProps.lines[i][j].background_color !== nextProps.lines[i][j].background_color) {
+				return false;
+			}
+		}
+	}
+	return true;
+});
+
 const Row = React.memo(({ line, row, isLightTheme, charDimensions }: {
 	line: LineItem[],
 	row: number,
@@ -542,15 +588,42 @@ const Row = React.memo(({ line, row, isLightTheme, charDimensions }: {
 		height: number,
 	}
 }) => {
+	const [hasAnimated, setHasAnimated] = useState(false);
+	const [isMounted, setIsMounted] = useState(false);
+
+	const isEmpty = line.map(l => l.lexeme).join('').trim() === '';
+
+	useEffect(() => {
+		if (isEmpty) {
+			setHasAnimated(false);
+			setIsMounted(false);
+		} else {
+			const timer = setTimeout(() => setIsMounted(true), 10);
+			return () => clearTimeout(timer);
+		}
+	}, [isEmpty]);
+
+	const shouldAnimate = !isEmpty && !hasAnimated && isMounted;
+
 	const lexemeMap: Record<string, string> = {
 		'': ' ',
 	}
 
-	console.log(row, " rerendered");
-
 	return (
-		<div className={cn("relative flex font-mono")}>
-			{/* <span className={cn("w-10 opacity-50")}>{row} </span> */}
+		<div
+			style={{ height: `${charDimensions.height}px` }}
+			className={cn(
+				"relative flex font-mono",
+				// A line is invisible if it's empty, or if it's new and hasn't finished animating.
+				(isEmpty || (!hasAnimated && !isEmpty)) && "opacity-0",
+				shouldAnimate && "animate-fade-in"
+			)}
+			onAnimationEnd={() => {
+				if (shouldAnimate) {
+					setHasAnimated(true);
+				}
+			}}
+		>
 			{line.map((item, index) => (
 				<span
 					key={index}
@@ -562,7 +635,7 @@ const Row = React.memo(({ line, row, isLightTheme, charDimensions }: {
 						textDecoration: item.is_underline ? "underline" : "none",
 						fontStyle: item.is_italic ? "italic" : "normal",
 						whiteSpace: "pre-wrap",
-						width: "",
+						width: `${charDimensions.width}px`,
 					}}
 				>
 					{lexemeMap[item.lexeme] ? lexemeMap[item.lexeme] : item.lexeme}
@@ -577,12 +650,12 @@ const Row = React.memo(({ line, row, isLightTheme, charDimensions }: {
 	if (prevProps.charDimensions !== nextProps.charDimensions) return false;
 
 	for (let i = 0; i < prevProps.line.length; i++) {
-		if (prevProps.line[i].lexeme !== nextProps.line[i].lexeme 
-			|| prevProps.line[i].width !== nextProps.line[i].width 
-			|| prevProps.line[i].is_bold !== nextProps.line[i].is_bold 
-			|| prevProps.line[i].is_italic !== nextProps.line[i].is_italic 
-			|| prevProps.line[i].is_underline !== nextProps.line[i].is_underline 
-			|| prevProps.line[i].foreground_color !== nextProps.line[i].foreground_color 
+		if (prevProps.line[i].lexeme !== nextProps.line[i].lexeme
+			|| prevProps.line[i].width !== nextProps.line[i].width
+			|| prevProps.line[i].is_bold !== nextProps.line[i].is_bold
+			|| prevProps.line[i].is_italic !== nextProps.line[i].is_italic
+			|| prevProps.line[i].is_underline !== nextProps.line[i].is_underline
+			|| prevProps.line[i].foreground_color !== nextProps.line[i].foreground_color
 			|| prevProps.line[i].background_color !== nextProps.line[i].background_color) {
 			return false;
 		}
