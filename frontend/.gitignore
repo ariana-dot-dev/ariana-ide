@@ -3,3 +3,5 @@
 .ariana_saved_traces/
 .vault_secret_key
 gen
+tauri-app/src/generated/colors.*
+
