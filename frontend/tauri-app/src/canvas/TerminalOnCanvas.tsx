@@ -6,6 +6,7 @@ import type { IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
+import { ImageAddon } from "@xterm/addon-image";
 import "@xterm/xterm/css/xterm.css";
 import { CanvasElement, ElementLayout } from "./types";
 import { Terminal, TerminalConfig } from "./Terminal";
@@ -106,10 +107,19 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		const fitAddon = new FitAddon();
 		const webLinksAddon = new WebLinksAddon();
 		const searchAddon = new SearchAddon();
+		const imageAddon = new ImageAddon({
+			enableSizeReports: true,    
+			sixelSupport: true,         
+			sixelScrolling: true,       // Enable scrolling for images
+			iipSupport: true,           // Enable iTerm2 inline images
+			pixelLimit: 16777216,       // Max 16MB per image
+			showPlaceholder: true       // Show placeholder for evicted images
+		});
 
 		xterm.loadAddon(fitAddon);
 		xterm.loadAddon(webLinksAddon);
 		xterm.loadAddon(searchAddon);
+		xterm.loadAddon(imageAddon);
 
 		xterm.open(terminalRef.current);
 
