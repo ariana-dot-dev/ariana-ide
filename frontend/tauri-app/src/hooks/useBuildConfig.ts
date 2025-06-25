@@ -5,7 +5,6 @@ import { resourceDir, join } from "@tauri-apps/api/path";
 interface BuildConfig {
 	buildParams: {
 		executableName: string;
-		version: string;
 	};
 	runtimeParams: {
 		serverUrl: string;
@@ -33,8 +32,7 @@ export function useBuildConfig() {
 				// Set default config if file doesn't exist
 				setBuildConfig({
 					buildParams: {
-						executableName: "ariana-ide",
-						version: "0.1.0"
+						executableName: "ariana-ide"
 					},
 					runtimeParams: {
 						serverUrl: "https://api.ariana.dev"

@@ -4,7 +4,14 @@
       "Bash(grep:*)",
       "Bash(ls:*)",
       "Bash(node:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(chmod:*)",
+      "Bash(just:*)",
+      "Bash(npm install)",
+      "Bash(uv run:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

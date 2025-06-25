@@ -28,7 +28,6 @@ async function configureBuild(configPath) {
     const configContent = JSON.parse(await fs.readFile(targetConfigPath, 'utf8'));
     console.log('\n📦 Build Configuration:');
     console.log(`   Executable Name: ${configContent.buildParams.executableName}`);
-    console.log(`   Version: ${configContent.buildParams.version}`);
     console.log(`   Server URL: ${configContent.runtimeParams.serverUrl}`);
     console.log('\nYou can now run: node build-package.js');
     
@@ -38,8 +37,7 @@ async function configureBuild(configPath) {
     console.log('\nExample config.json:');
     console.log(JSON.stringify({
       "buildParams": {
-        "executableName": "ariana-beta",
-        "version": "0.2.0-beta.1"
+        "executableName": "ariana-beta"
       },
       "runtimeParams": {
         "serverUrl": "https://beta-api.ariana.dev"

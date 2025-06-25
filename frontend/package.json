@@ -1,10 +1,10 @@
 {
-  "name": "ariana-beta",
-  "version": "0.2.0-beta.1",
+  "name": "ariana-ide",
+  "version": "0.1.0",
   "description": "ariana IDE - A modern development environment",
   "main": "dist/cli.js",
   "bin": {
-    "ariana-beta": "./dist/cli.js"
+    "ariana-ide": "./dist/cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -16,10 +16,10 @@
     "build-tauri": "cd tauri-app && npm run build",
     "dev-tauri": "cd tauri-app && npm run tauri dev",
     "postinstall": "node dist/cli.js install",
-    "build:windows": "powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1",
-    "build:linux": "powershell -ExecutionPolicy Bypass -File scripts/build_linux.ps1",
+    "build:linux": "bash scripts/build_linux.sh",
     "build:macos": "sh ./scripts/build_macos.sh",
-    "build:all": "npm run build:windows && npm run build:linux && npm run build:macos"
+    "build:simple": "bash scripts/build_simple.sh",
+    "build:all": "npm run build:linux && npm run build:macos"
   },
   "keywords": [
     "ide",

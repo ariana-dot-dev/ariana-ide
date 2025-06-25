@@ -21,15 +21,15 @@ async function buildWithConfig() {
     const configPath = path.join(distDir, 'config.json');
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
     
-    // Update package.json with build params
+    // Read package.json to get the version (ground truth)
     const packageJsonPath = path.join(__dirname, 'frontend', 'package.json');
     const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
     
-    // Update name and version from buildParams
-    packageJson.name = initialConfig.buildParams.executableName;
-    packageJson.version = initialConfig.buildParams.version;
+    // Store original package.json for restoration
+    const originalPackageJson = { ...packageJson };
     
-    // Update bin entry to use the executable name
+    // Update only name and bin for build process
+    packageJson.name = initialConfig.buildParams.executableName;
     packageJson.bin = {
       [initialConfig.buildParams.executableName]: "./dist/cli.js"
     };
@@ -38,9 +38,13 @@ async function buildWithConfig() {
     
     console.log(`✅ Build configuration updated:`);
     console.log(`   - Executable name: ${initialConfig.buildParams.executableName}`);
-    console.log(`   - Version: ${initialConfig.buildParams.version}`);
+    console.log(`   - Version: ${packageJson.version} (from package.json)`);
     console.log(`   - Server URL: ${initialConfig.runtimeParams.serverUrl}`);
     console.log(`   - Config copied to: ${configPath}`);
+    
+    // Store original package.json for restoration after build
+    const backupPath = path.join(__dirname, 'frontend', '.package.json.backup');
+    await fs.writeFile(backupPath, JSON.stringify(originalPackageJson, null, 2));
     
   } catch (error) {
     console.error('❌ Error building with config:', error.message);

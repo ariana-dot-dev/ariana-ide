@@ -41,14 +41,19 @@ async function buildPackage() {
     const tauriConfigPath = path.join(tauriResourcesPath, 'config.json');
     await fs.copyFile(configPath, tauriConfigPath);
     
+    
     // Step 4: Build Tauri app
     console.log('🏗️  Building Tauri app...');
     execSync('npm run build', { stdio: 'inherit', cwd: path.join(__dirname, 'frontend', 'tauri-app') });
     
+    // Get version from backup (since we modified package.json during build)
+    const backupPath = path.join(__dirname, 'frontend', '.package.json.backup');
+    const originalPackageJson = JSON.parse(await fs.readFile(backupPath, 'utf8'));
+    
     // Step 5: Create a new package.json for the distribution
     const distPackageJson = {
       name: executableName,
-      version: version,
+      version: originalPackageJson.version,
       description: "Ariana IDE - A modern development environment",
       main: "dist/cli.js",
       bin: {
@@ -84,7 +89,11 @@ async function buildPackage() {
       license: "AGPL-3.0-or-later"
     };
     
-    // Step 6: Create dist directory structure
+    // Step 6: Restore original package.json
+    console.log('🔄 Restoring package.json...');
+    execSync('node ../restore-package.js', { stdio: 'inherit', cwd: path.join(__dirname, 'frontend') });
+    
+    // Step 7: Create dist directory structure
     const distDir = path.join(__dirname, 'dist');
     await fs.mkdir(distDir, { recursive: true });
     
@@ -118,7 +127,7 @@ async function buildPackage() {
     console.log(`✅ Package built successfully!`);
     console.log(`📁 Distribution created in: ${distDir}`);
     console.log(`📦 Package name: ${executableName}`);
-    console.log(`🏷️  Version: ${version}`);
+    console.log(`🏷️  Version: ${originalPackageJson.version}`);
     console.log(`🔗 Server URL: ${initialConfig.runtimeParams.serverUrl}`);
     console.log('');
     console.log('To install locally:');

@@ -20,7 +20,6 @@ interface Config {
 interface BuildConfig {
 	buildParams: {
 		executableName: string;
-		version: string;
 	};
 	runtimeParams: {
 		serverUrl: string;
@@ -312,13 +311,22 @@ async function install(): Promise<void> {
 	console.log("Ariana setup complete.");
 }
 
-// Get version and description from build config or defaults
+// Get version from package.json (ground truth) and description
 async function getVersionAndDescription(): Promise<{version: string, description: string}> {
-	const buildConfig = await loadBuildConfig();
-	return {
-		version: buildConfig?.buildParams?.version || "0.1.0",
-		description: "ariana IDE - A modern development environment"
-	};
+	try {
+		const packageJsonPath = path.join(__dirname, "..", "package.json");
+		const packageJsonContent = await fs.readFile(packageJsonPath, "utf8");
+		const packageJson = JSON.parse(packageJsonContent);
+		return {
+			version: packageJson.version || "0.1.0",
+			description: "ariana IDE - A modern development environment"
+		};
+	} catch {
+		return {
+			version: "0.1.0",
+			description: "ariana IDE - A modern development environment"
+		};
+	}
 }
 
 // Main CLI logic
