@@ -1,0 +1,9 @@
+{
+  "buildParams": {
+    "executableName": "ariana-test",
+    "version": "0.1.0-test"
+  },
+  "runtimeParams": {
+    "serverUrl": "http://localhost:8080"
+  }
+}
