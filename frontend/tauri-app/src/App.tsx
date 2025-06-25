@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from "react";
-import { Event, listen } from "@tauri-apps/api/event";
-import { useUserConfig } from "./hooks/useUserConfig";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import initSwc from "@swc/wasm-web";
-import { Interpreter } from "./scripting/interpreter";
-import { useStore } from "./state";
+import { invoke } from "@tauri-apps/api/core";
+import { type Event, listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import React, { useEffect, useState } from "react";
+import CanvasView from "./CanvasView";
+import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
+import type { CanvasElement } from "./canvas/types";
+import { useUserConfig } from "./hooks/useUserConfig";
 import Onboarding from "./Onboarding";
 import Repl from "./Repl";
-import CanvasView from "./CanvasView";
+import { Interpreter } from "./scripting/interpreter";
+import { useStore } from "./state";
 import { cn } from "./utils";
+
 const appWindow = getCurrentWebviewWindow();
 
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
-const THEMES = [
-	"dark-red",
-	"semi-sky",
-	"semi-sun",
-	"light-sand"
-]
+const THEMES = ["dark-red", "semi-sky", "semi-sun", "light-sand"];
 
 function App() {
 	const store = useStore();
-	const { userEmail, loading, error, setUserEmail } = useUserConfig();
+	const { userEmail, loading, error: _error, setUserEmail } = useUserConfig();
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
 	const { isLightTheme } = store;
+	const addElementRef = React.useRef<((element: CanvasElement) => void) | null>(
+		null,
+	);
 
 	useEffect(() => {
 		const unlistenUserEmail = listen<string>(
@@ -79,6 +81,25 @@ function App() {
 	};
 	const handleClose = () => appWindow.close();
 
+	const openFileTree = async () => {
+		try {
+			const currentDir = await invoke<string>("get_current_dir");
+			const fileTreeElement = FileTreeCanvas.canvasElement(
+				{
+					size: "medium",
+					aspectRatio: 0.6,
+					area: "left",
+				},
+				currentDir,
+				1,
+			);
+
+			addElementRef.current?.(fileTreeElement);
+		} catch (error) {
+			console.error("Failed to get current directory:", error);
+		}
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -109,10 +130,11 @@ function App() {
 					)}
 				>
 					{/* Custom Titlebar */}
+					{/** biome-ignore lint/a11y/noStaticElementInteractions: <explanation> */}
 					<div
 						onMouseEnter={() => setShowTitlebar(true)}
-						onClick={() => setShowTitlebar(true)}
 						onMouseLeave={() => setShowTitlebar(false)}
+						// onClick={() => setShowTitlebar(true)}
 						className={cn(
 							"h-10 flex items-center justify-center px-4 select-none relative z-50",
 						)}
@@ -129,18 +151,30 @@ function App() {
 								</span>
 								<div className={cn("absolute right-4 gap-2 flex items-center")}>
 									<button
+										type="button"
+										onClick={openFileTree}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-2 py-1 text-xs bg-[var(--bg-600)] hover:bg-[var(--bg-700)] rounded transition-colors cursor-pointer mr-2",
+										)}
+									>
+										📁
+									</button>
+									<button
+										type="button"
 										onClick={handleMinimize}
 										className={cn(
 											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-yellow-400 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 									<button
+										type="button"
 										onClick={handleMaximize}
 										className={cn(
 											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-green-400 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 									<button
+										type="button"
 										onClick={handleClose}
 										className={cn(
 											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-gradient-to-bl from-[var(--fg-600)] to-red-400 hover:opacity-100 transition-colors cursor-pointer",
@@ -162,7 +196,7 @@ function App() {
 						</div>
 					)}
 
-					<CanvasView />
+					<CanvasView onAddElementRef={addElementRef} />
 
 					<div
 						className={cn("flex-1 font-mono flex items-center justify-center")}
@@ -174,6 +208,7 @@ function App() {
 					<div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex rounded-t-4 pb-2 justify-center gap-2 z-20">
 						{THEMES.map((theme) => (
 							<button
+								type="button"
 								key={theme}
 								className={cn(
 									`theme-${theme}`,

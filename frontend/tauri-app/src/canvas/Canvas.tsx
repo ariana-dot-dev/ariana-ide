@@ -7,6 +7,8 @@ import { Terminal, TerminalConfig } from "./Terminal";
 import RectangleOnCanvas from "./RectangleOnCanvas";
 import TerminalOnCanvas from "./TerminalOnCanvas";
 import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas";
+import FileTreeOnCanvas from "./FileTreeOnCanvas";
+import { FileTreeCanvas } from "./FileTreeCanvas";
 import { cn } from "../utils";
 
 interface CanvasProps {
@@ -49,6 +51,7 @@ const Canvas: React.FC<CanvasProps> = ({
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const workerRef = useRef<Worker | null>(null);
 	const previousLayoutsRef = useRef<ElementLayout[]>([]);
+	const elementsRef = useRef<CanvasElement[]>(elements);
 
 	// Update canvas size when window resizes
 	const updateCanvasSize = useCallback(() => {
@@ -65,21 +68,50 @@ const Canvas: React.FC<CanvasProps> = ({
 		const handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
 			if (event.data.type === "GRID_OPTIMIZED") {
 				const newWorkerLayouts = event.data.payload.layouts;
-				const newLayouts = newWorkerLayouts
-					.map((layout) => {
-						let element = elements.find((e) => e.id === layout.element.id);
-						if (!element) return null;
-						return {
-							element,
-							cell: layout.cell,
-							score: layout.score,
-							previousCell: layout.previousCell,
-						} satisfies ElementLayout;
-					})
-					.filter((l) => l !== null);
+				console.log(
+					"Canvas: Worker returned layouts for elements:",
+					newWorkerLayouts.map((l) => l.element.id),
+				);
 
-				setLayouts(newLayouts);
-				previousLayoutsRef.current = newLayouts;
+				// Use a function to get the current elements to avoid stale closure
+				setLayouts((currentLayouts) => {
+					// Get the current elements array from ref
+					const currentElements = elementsRef.current;
+					console.log(
+						"Canvas: Current elements array has IDs:",
+						currentElements.map((e) => e.id),
+					);
+
+					const newLayouts = newWorkerLayouts
+						.map((layout) => {
+							let element = currentElements.find(
+								(e) => e.id === layout.element.id,
+							);
+							if (!element) {
+								console.warn(
+									"Canvas: Could not find element for layout:",
+									layout.element.id,
+								);
+								return null;
+							}
+							console.log(
+								"Canvas: Found element for layout:",
+								layout.element.id,
+								Object.keys(element.kind)[0],
+							);
+							return {
+								element,
+								cell: layout.cell,
+								score: layout.score,
+								previousCell: layout.previousCell,
+							} satisfies ElementLayout;
+						})
+						.filter((l) => l !== null);
+
+					console.log("Canvas: Setting new layouts count:", newLayouts.length);
+					previousLayoutsRef.current = newLayouts;
+					return newLayouts;
+				});
 			}
 		};
 
@@ -128,6 +160,11 @@ const Canvas: React.FC<CanvasProps> = ({
 		}
 	}
 
+	// Update elements ref whenever elements change
+	useEffect(() => {
+		elementsRef.current = elements;
+	}, [elements]);
+
 	// Optimize grid when elements or canvas size changes
 	useEffect(() => {
 		optimizeElements();
@@ -137,13 +174,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
 	// Drag and drop handlers
 	const handleDragStart = useCallback((element: CanvasElement) => {
-		console.log("Drag start 2:", element);
 		setDraggedElement(element);
 	}, []);
 
 	const handleDrag = useCallback(
 		(event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-			console.log("Drag event:", event);
 			const canvasRect = canvasRef.current?.getBoundingClientRect();
 			if (!canvasRect || !draggedElement) return;
 
@@ -162,8 +197,6 @@ const Canvas: React.FC<CanvasProps> = ({
 				);
 			});
 
-			console.log("Target layout:", targetLayout);
-
 			const newTarget = targetLayout ? targetLayout.element : null;
 			if (newTarget?.id !== dragTarget?.id) {
 				setDragTarget(newTarget);
@@ -173,13 +206,6 @@ const Canvas: React.FC<CanvasProps> = ({
 	);
 
 	const handleDragEnd = useCallback(() => {
-		console.log(
-			"Drag end:",
-			draggedElement,
-			dragTarget,
-			draggedElement?.id,
-			dragTarget?.id,
-		);
 		if (draggedElement && dragTarget && draggedElement.id !== dragTarget.id) {
 			// Swap the elements
 			const newElements = [...elements];
@@ -191,7 +217,6 @@ const Canvas: React.FC<CanvasProps> = ({
 			);
 
 			if (draggedIndex !== -1 && targetIndex !== -1) {
-				console.log("Swapping elements:", draggedElement.id, dragTarget.id);
 				[newElements[draggedIndex], newElements[targetIndex]] = [
 					newElements[targetIndex],
 					newElements[draggedIndex],
@@ -238,6 +263,15 @@ const Canvas: React.FC<CanvasProps> = ({
 		[elements, onElementsChange],
 	);
 
+	const handleFileTreeUpdate = useCallback(
+		(element: FileTreeCanvas, newTargets: ElementTargets) => {
+			element.updateTargets(newTargets);
+			// Trigger re-optimization by updating the elements array
+			onElementsChange([...elements]);
+		},
+		[elements, onElementsChange],
+	);
+
 	return (
 		<div className={cn("flex w-full h-full p-2")}>
 			<div className={cn("relative w-full h-full rounded-md overflow-hidden")}>
@@ -247,7 +281,7 @@ const Canvas: React.FC<CanvasProps> = ({
 						"absolute top-0 left-0 w-full h-full overflow-hidden m-0 p-0",
 					)}
 				>
-					{layouts.map((layout, index) => {
+					{layouts.map((layout) => {
 						if ("rectangle" in layout.element.kind) {
 							return (
 								<RectangleOnCanvas
@@ -256,11 +290,7 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement
-											? handleDrag
-											: () => {
-													console.log("No drag");
-												}
+										layout.element === draggedElement ? handleDrag : undefined
 									}
 									onRectangleUpdate={handleRectangleUpdate}
 									isDragTarget={layout.element === dragTarget}
@@ -275,11 +305,7 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement
-											? handleDrag
-											: () => {
-													console.log("No drag");
-												}
+										layout.element === draggedElement ? handleDrag : undefined
 									}
 									onTerminalUpdate={handleTerminalUpdate}
 									isDragTarget={layout.element === dragTarget}
@@ -295,12 +321,27 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement
-											? handleDrag
-											: () => {
-													console.log("No drag");
-												}
+										layout.element === draggedElement ? handleDrag : undefined
 									}
+									isDragTarget={layout.element === dragTarget}
+									isDragging={layout.element === draggedElement}
+								/>
+							);
+						} else if ("fileTree" in layout.element.kind) {
+							console.log(
+								"Canvas: Rendering FileTreeOnCanvas for element:",
+								layout.element.id,
+							);
+							return (
+								<FileTreeOnCanvas
+									key={`${layout.element.id}`}
+									layout={layout}
+									onDragStart={handleDragStart}
+									onDragEnd={handleDragEnd}
+									onDrag={
+										layout.element === draggedElement ? handleDrag : undefined
+									}
+									onFileTreeUpdate={handleFileTreeUpdate}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}
 								/>
