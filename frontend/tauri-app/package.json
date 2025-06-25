@@ -20,6 +20,7 @@
 	"author": "",
 	"license": "AGPL-3.0-or-later",
 	"dependencies": {
+		"@swc/wasm-web": "^1.12.6",
 		"@tailwindcss/vite": "^4.1.10",
 		"@tauri-apps/api": "^2.5.0",
 		"@tauri-apps/plugin-fs": "^2.3.0",

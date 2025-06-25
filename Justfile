@@ -8,6 +8,9 @@ default:
 dev-backend:
     @echo "🔧 Installing and running backend..."
     cp backend/.env.example backend/.env
+    cargo install sqlx-cli
+    cd backend && sqlx db create
+    cd backend && sqlx migrate run
     cd backend && cargo run
 
 # 🎨 Install and run frontend (Tauri app only, no CLI login required)
@@ -15,7 +18,7 @@ dev-frontend:
     @echo "🔧 Installing frontend dependencies..."
     cd frontend/tauri-app && npm install
     @echo "🚀 Starting Tauri development server..."
-    cd frontend/tauri-app && npm run dev
+    cd frontend && npm run dev-tauri
 
 # 🔐 Install and run frontend via CLI (requires backend running)
 dev-cli:
