@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getIcon } from "material-file-icons";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -49,9 +50,23 @@ const FileTreeItem: React.FC<{
 						{isExpanded ? "▼" : "▶"}
 					</span>
 				)}
-				<span>
-					{node.isDirectory ? "📁" : "📄"} {node.name}
-				</span>
+				{node.isDirectory ? (
+					<span>📁</span>
+				) : (
+					<span
+						// biome-ignore lint/security/noDangerouslySetInnerHtml: ive never done this but its working...
+						dangerouslySetInnerHTML={{
+							__html: getIcon(node.name).svg,
+						}}
+						style={{
+							width: "16px",
+							height: "16px",
+							display: "inline-block",
+							verticalAlign: "middle",
+						}}
+					/>
+				)}
+				<span>{node.name}</span>
 			</div>
 			{isExpanded && node.children && (
 				<div>
