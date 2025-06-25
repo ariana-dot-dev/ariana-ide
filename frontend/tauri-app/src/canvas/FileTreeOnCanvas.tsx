@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { motion, PanInfo } from "framer-motion";
-import { CanvasElement, ElementLayout, ElementTargets } from "./types";
-import { FileTreeCanvas } from "./FileTreeCanvas";
-import { cn } from "../utils";
-import { useStore } from "../state";
+import { motion, type PanInfo } from "framer-motion";
+import type React from "react";
+import { useState } from "react";
 import { FileTree } from "../components/FileTree";
+import { useStore } from "../state";
+import { cn } from "../utils";
+import type { FileTreeCanvas } from "./FileTreeCanvas";
+import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
 interface FileTreeOnCanvasProps {
 	layout: ElementLayout;
@@ -18,6 +19,7 @@ interface FileTreeOnCanvasProps {
 		element: FileTreeCanvas,
 		newTargets: ElementTargets,
 	) => void;
+	onRemoveElement: (elementId: string) => void;
 	isDragTarget: boolean;
 	isDragging: boolean;
 }
@@ -28,6 +30,7 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
 	onFileTreeUpdate,
+	onRemoveElement,
 	isDragTarget,
 	isDragging,
 }) => {
@@ -119,17 +122,17 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
-					<span className="text-xs font-medium text-[var(--fg-200)]">
-						📁 Files
-					</span>
+					<span className="text-xs font-medium">📁 Files</span>
 					<button
+						type="button"
 						onClick={(e) => {
+							e.preventDefault();
 							e.stopPropagation();
-							changeDirectory();
+							onRemoveElement(element.id);
 						}}
-						className="text-xs px-1 py-0.5 bg-[var(--bg-600)] hover:bg-[var(--bg-700)] rounded transition-colors text-[var(--fg-300)]"
+						className="text-xs w-6 h-6 bg-[var(--fg-800)] hover:bg-[var(--fg-700)] rounded transition-colors text-[var(--bg-white)] flex items-center justify-center"
 					>
-						📂
+						×
 					</button>
 				</div>
 
@@ -138,11 +141,7 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 					<div className="text-xs text-[var(--fg-400)] mb-1 px-1 truncate">
 						{rootPath}
 					</div>
-					<div
-						className="text-xs"
-						onClick={(e) => e.stopPropagation()}
-						onMouseDown={(e) => e.stopPropagation()}
-					>
+					<div className="text-xs">
 						<FileTree rootPath={rootPath} onFileSelect={handleFileSelect} />
 					</div>
 				</div>

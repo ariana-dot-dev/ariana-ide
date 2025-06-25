@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { PanInfo } from "framer-motion";
-import { CanvasElement, ElementLayout, ElementTargets } from "./types";
-import { createGridWorker, WorkerMessage, WorkerResponse } from "./gridWorker";
-import { Rectangle } from "./Rectangle";
-import { Terminal, TerminalConfig } from "./Terminal";
-import RectangleOnCanvas from "./RectangleOnCanvas";
-import TerminalOnCanvas from "./TerminalOnCanvas";
-import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas";
-import FileTreeOnCanvas from "./FileTreeOnCanvas";
-import { FileTreeCanvas } from "./FileTreeCanvas";
+import type { PanInfo } from "framer-motion";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../utils";
+import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas";
+import type { FileTreeCanvas } from "./FileTreeCanvas";
+import FileTreeOnCanvas from "./FileTreeOnCanvas";
+import {
+	createGridWorker,
+	type WorkerMessage,
+	type WorkerResponse,
+} from "./gridWorker";
+import type { Rectangle } from "./Rectangle";
+import RectangleOnCanvas from "./RectangleOnCanvas";
+import type { Terminal, TerminalConfig } from "./Terminal";
+import TerminalOnCanvas from "./TerminalOnCanvas";
+import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
 interface CanvasProps {
 	elements: CanvasElement[];
@@ -29,7 +34,7 @@ const simpleHash = (str: string): number => {
 };
 
 // Generate a stable color based on element ID
-const getColorForId = (id: string): string => {
+const _getColorForId = (id: string): string => {
 	const hash = simpleHash(id);
 	const hue = (hash % 120) + 180; // Blueish colors (180-300)
 	const saturation = 60 + (hash % 20); // 60-80%
@@ -74,7 +79,7 @@ const Canvas: React.FC<CanvasProps> = ({
 				);
 
 				// Use a function to get the current elements to avoid stale closure
-				setLayouts((currentLayouts) => {
+				setLayouts((_currentLayouts) => {
 					// Get the current elements array from ref
 					const currentElements = elementsRef.current;
 					console.log(
@@ -84,7 +89,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
 					const newLayouts = newWorkerLayouts
 						.map((layout) => {
-							let element = currentElements.find(
+							const element = currentElements.find(
 								(e) => e.id === layout.element.id,
 							);
 							if (!element) {
@@ -178,7 +183,7 @@ const Canvas: React.FC<CanvasProps> = ({
 	}, []);
 
 	const handleDrag = useCallback(
-		(event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+		(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
 			const canvasRect = canvasRef.current?.getBoundingClientRect();
 			if (!canvasRect || !draggedElement) return;
 
@@ -272,14 +277,21 @@ const Canvas: React.FC<CanvasProps> = ({
 		[elements, onElementsChange],
 	);
 
+	const handleRemoveElement = useCallback(
+		(elementId: string) => {
+			const newElements = elements.filter((el) => el.id !== elementId);
+			onElementsChange(newElements);
+		},
+		[elements, onElementsChange],
+	);
+
 	return (
 		<div className={cn("flex w-full h-full p-2")}>
 			<div className={cn("relative w-full h-full rounded-md overflow-hidden")}>
 				<div
 					ref={canvasRef}
-					className={cn(
-						"absolute top-0 left-0 w-full h-full overflow-hidden m-0 p-0",
-					)}
+					className={cn("absolute left-0 w-full overflow-hidden m-0 p-0")}
+					style={{ top: "30px", height: "calc(100% - 30px)" }}
 				>
 					{layouts.map((layout) => {
 						if ("rectangle" in layout.element.kind) {
@@ -290,7 +302,7 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement ? handleDrag : undefined
+										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									onRectangleUpdate={handleRectangleUpdate}
 									isDragTarget={layout.element === dragTarget}
@@ -305,7 +317,7 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement ? handleDrag : undefined
+										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									onTerminalUpdate={handleTerminalUpdate}
 									isDragTarget={layout.element === dragTarget}
@@ -321,7 +333,7 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement ? handleDrag : undefined
+										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}
@@ -339,9 +351,10 @@ const Canvas: React.FC<CanvasProps> = ({
 									onDragStart={handleDragStart}
 									onDragEnd={handleDragEnd}
 									onDrag={
-										layout.element === draggedElement ? handleDrag : undefined
+										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									onFileTreeUpdate={handleFileTreeUpdate}
+									onRemoveElement={handleRemoveElement}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}
 								/>
