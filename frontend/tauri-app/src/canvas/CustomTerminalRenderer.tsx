@@ -156,18 +156,23 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	}, [elementId]);
 
 	const scrollDown = useCallback(() => {
-		const scrollableDiv = scrollableRef.current;
-		if (!scrollableDiv) return;
+		const inner = () => {
+			const scrollableDiv = scrollableRef.current;
+			if (!scrollableDiv) return;
 
-		// Check if user is already at the bottom before auto-scrolling
-		const isAtBottom = Math.abs(scrollableDiv.scrollTop + scrollableDiv.clientHeight - scrollableDiv.scrollHeight) < 5;
+			// Check if user is already at the bottom before auto-scrolling
+			const isAtBottom = Math.abs(scrollableDiv.scrollTop + scrollableDiv.clientHeight - scrollableDiv.scrollHeight) < 5;
 
-		if (isAtBottom) {
-			// Use requestAnimationFrame for smoother scrolling
-			requestAnimationFrame(() => {
-				scrollableDiv.scrollTop = scrollableDiv.scrollHeight;
-			});
-		}
+			if (true) {
+				// Use requestAnimationFrame for smoother scrolling
+				requestAnimationFrame(() => {
+					scrollableDiv.scrollTop = scrollableDiv.scrollHeight;
+				});
+			}
+		};
+		inner();
+		setTimeout(inner, 10);
+		setTimeout(inner, 50);
 	}, []);
 
 	const handleTerminalEvent = useCallback((events: TerminalEvent[]) => {
@@ -469,7 +474,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		<div
 			ref={terminalRef}
 			className={cn(
-				"rounded-md text-sm backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				"rounded-md text-2xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
 			)}
 			tabIndex={0}
 			onKeyDown={handleKeyDown}
@@ -484,11 +489,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				<div ref={scrollableRef} className={cn("absolute top-0 left-0 w-full h-full overflow-y-auto flex flex-col")}>
 					{/* iterate windows of size 10 */}
 					{
-						Array.from({ length: Math.ceil(screen.length / 50) }, (_, i) => (
+						Array.from({ length: Math.ceil(screen.length / 10) }, (_, i) => (
 							<Chunk
-								start={i * 50}
+								start={i * 10}
 								key={i}
-								lines={screen.slice(i * 50, (i + 1) * 50)}
+								lines={screen.slice(i * 10, (i + 1) * 10)}
 								isLightTheme={isLightTheme}
 								charDimensions={charDimensions}
 							/>
@@ -666,12 +671,12 @@ const Row = React.memo(({ line, row, isLightTheme, charDimensions }: {
 const colorMap = (color: string, isLightTheme: boolean) => {
 	const colors: Record<string, string> = {
 		"Black": isLightTheme ? "#2e222f" : "#2e222f",
-		"Red": isLightTheme ? "#ae2334" : "#e83b3b",
-		"Green": isLightTheme ? "#239063" : "#1ebc73",
-		"Yellow": isLightTheme ? "#f79617" : "#f9c22b",
-		"Blue": isLightTheme ? "#4d65b4" : "#4d9be6",
-		"Magenta": isLightTheme ? "#6b3e75" : "#905ea9",
-		"Cyan": isLightTheme ? "#0b8a8f" : "#0eaf9b",
+		"Red": isLightTheme ? "#ae2334" : "#733e39",
+		"Green": isLightTheme ? "#239063" : "#733e39",
+		"Yellow": isLightTheme ? "#f79617" : "#733e39",
+		"Blue": isLightTheme ? "#4d65b4" : "#124e89",
+		"Magenta": isLightTheme ? "#6b3e75" : "#733e39",
+		"Cyan": isLightTheme ? "#0b8a8f" : "#733e39",
 		"White": isLightTheme ? "#c7dcd0" : "#ffffff",
 		"BrightBlack": isLightTheme ? "mix(#2e222f, #c7dcd0, 0.2)" : "mix(#2e222f, #c7dcd0, 0.2)",
 		"BrightRed": isLightTheme ? "mix(#ae2334, #c7dcd0, 0.2)" : "mix(#e83b3b, #c7dcd0, 0.2)",

@@ -16,6 +16,7 @@ export const InterpreterContext = React.createContext<Interpreter | null>(null);
 const THEMES = [
 	"dark-red",
 	"semi-sky",
+	"semi-sun",
 	"light-sand"
 ]
 
@@ -26,8 +27,6 @@ function App() {
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
 	const { isLightTheme } = store;
-	const [isSwcInitialized, setIsSwcInitialized] = useState(false);
-
 
 	useEffect(() => {
 		const unlistenUserEmail = listen<string>(
@@ -80,14 +79,14 @@ function App() {
 	};
 	const handleClose = () => appWindow.close();
 
-	if (loading || error) {
+	if (loading) {
 		return (
 			<div
 				className={cn(
 					"h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden",
 				)}
 			>
-				{loading ? "Loading user config..." : `Error: ${error}`}
+				Loading user config...
 			</div>
 		);
 	}
@@ -172,13 +171,13 @@ function App() {
 						<Repl />
 					</div>
 
-					<div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex rounded-t-4 p-4 justify-center gap-3 z-20">
+					<div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex rounded-t-4 pb-2 justify-center gap-2 z-20">
 						{THEMES.map((theme) => (
 							<button
 								key={theme}
 								className={cn(
 									`theme-${theme}`,
-									"rounded-full w-6 h-6 cursor-pointer  bg-gradient-to-br from-[var(--bg-500)] to-[var(--fg-500)] hover:outline-4 hover:outline-[var(--fg-600)] transition-all",
+									"rounded-full w-4 h-4 cursor-pointer  bg-gradient-to-br from-[var(--bg-500)] to-[var(--fg-500)] hover:outline-2 outline-[var(--fg-600)] transition-all",
 									theme === store.theme ? "opacity-100" : "opacity-50",
 								)}
 								onClick={() => store.setTheme(theme)}
