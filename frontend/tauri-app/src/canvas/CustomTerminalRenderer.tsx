@@ -269,6 +269,19 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 						event.preventDefault();
 						return;
 					}
+					if (event.key === "v") {
+						// Handle paste by reading from clipboard
+						try {
+							const text = await navigator.clipboard.readText();
+							if (text) {
+								await sendRawInput(text);
+							}
+						} catch (clipboardErr) {
+							console.error("Error reading clipboard:", clipboardErr);
+						}
+						event.preventDefault();
+						return;
+					}
 					if (event.key === "d") {
 						await customTerminalAPI.sendCtrlD(terminalId);
 						event.preventDefault();
@@ -485,7 +498,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			className={cn(
 				"rounded-md text-2xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
 			)}
-			tabIndex={0}
+			tabIndex={-1}
 			onKeyDown={handleKeyDown}
 			onClick={() => terminalRef.current?.focus()}
 		>
