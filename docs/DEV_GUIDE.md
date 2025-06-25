@@ -7,6 +7,17 @@ Use these simple one-command operations for development:
 - Node.js (>= 24.2.0)
 - Rust (latest)
 
+### WSL & Linux
+
+```
+sudo apt install pkg-config \
+  libdbus-1-dev \
+  libgtk-3-dev \
+  libsoup2.4-dev \
+  libjavascriptcoregtk-4.1-dev \
+  libwebkit2gtk-4.1-dev
+```
+
 ## Install Just
 
 ```bash
@@ -19,6 +30,7 @@ npm install -g just
 
 ```bash
 # 🚀 Run backend server (installs deps + runs)
+# Before first time: edit backend/.env
 just dev-backend
 
 # 🎨 Run frontend Tauri app only (no CLI login needed)

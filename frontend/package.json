@@ -18,6 +18,7 @@
     "postinstall": "node dist/cli.js install",
     "build:linux": "bash scripts/build_linux.sh",
     "build:macos": "sh ./scripts/build_macos.sh",
+    "build:windows": "powershell.exe ./scripts/build_windows.ps1",
     "build:simple": "bash scripts/build_simple.sh",
     "build:all": "npm run build:linux && npm run build:macos"
   },

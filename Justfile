@@ -7,6 +7,7 @@ default:
 # 🚀 Install and run backend server in development mode
 dev-backend:
     @echo "🔧 Installing and running backend..."
+    cp backend/.env.example backend/.env
     cd backend && cargo run
 
 # 🎨 Install and run frontend (Tauri app only, no CLI login required)

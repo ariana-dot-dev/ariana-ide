@@ -39,6 +39,7 @@ npm install -g just
 ### Development
 ```bash
 # Start backend
+# Before first time: edit backend/.env
 just dev-backend
 
 # Start frontend (separate terminal)
