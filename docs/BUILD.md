@@ -2,6 +2,21 @@
 
 This guide covers how to build Ariana IDE for distribution, including the configurable build system that allows creating multiple branded versions.
 
+## Prerequisites
+
+- Node.js (>= 24.2.0)
+- Rust (latest)
+
+## Install Just
+
+```bash
+# Install Just
+
+npm install -g just
+```
+
+## Look at the DEV_GUIDE.md for installing other dependencies
+
 ## Quick Build
 
 ```bash

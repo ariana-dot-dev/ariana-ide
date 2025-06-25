@@ -2,6 +2,19 @@
 
 Use these simple one-command operations for development:
 
+## Prerequisites
+
+- Node.js (>= 24.2.0)
+- Rust (latest)
+
+## Install Just
+
+```bash
+# Install Just
+
+npm install -g just
+```
+
 ## Development Commands
 
 ```bash
