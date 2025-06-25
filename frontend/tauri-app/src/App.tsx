@@ -5,6 +5,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import React, { useEffect, useState } from "react";
 import CanvasView from "./CanvasView";
 import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
+import { Terminal } from "./canvas/Terminal";
 import type { CanvasElement } from "./canvas/types";
 import { useUserConfig } from "./hooks/useUserConfig";
 import Onboarding from "./Onboarding";
@@ -100,6 +101,11 @@ function App() {
 		}
 	};
 
+	const openNewTerminal = () => {
+		const terminalElement = Terminal.createLocalShell();
+		addElementRef.current?.(terminalElement);
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -130,11 +136,9 @@ function App() {
 					)}
 				>
 					{/* Custom Titlebar */}
-					{/** biome-ignore lint/a11y/noStaticElementInteractions: <explanation> */}
 					<div
 						onMouseEnter={() => setShowTitlebar(true)}
 						onMouseLeave={() => setShowTitlebar(false)}
-						// onClick={() => setShowTitlebar(true)}
 						className={cn(
 							"h-10 flex items-center justify-center px-4 select-none relative z-50",
 						)}
@@ -158,6 +162,15 @@ function App() {
 										)}
 									>
 										📁
+									</button>
+									<button
+										type="button"
+										onClick={openNewTerminal}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-2 py-1 text-xs bg-[var(--bg-600)] hover:bg-[var(--bg-700)] rounded transition-colors cursor-pointer mr-2",
+										)}
+									>
+										💻
 									</button>
 									<button
 										type="button"

@@ -115,7 +115,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
 									path: node.path,
 								});
 								return { ...node, children };
-							} catch (err) {
+							} catch {
 								return node;
 							}
 						} else if (node.children) {

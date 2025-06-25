@@ -305,6 +305,7 @@ const Canvas: React.FC<CanvasProps> = ({
 										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									onRectangleUpdate={handleRectangleUpdate}
+									onRemoveElement={handleRemoveElement}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}
 								/>
@@ -320,6 +321,7 @@ const Canvas: React.FC<CanvasProps> = ({
 										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									onTerminalUpdate={handleTerminalUpdate}
+									onRemoveElement={handleRemoveElement}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}
 								/>

@@ -1,11 +1,11 @@
-import React, { useContext, useState } from "react";
-import { motion, PanInfo } from "framer-motion";
-import { CanvasElement, ElementLayout, ElementTargets } from "./types";
-import { Rectangle } from "./Rectangle";
-import ElementOverlay from "./ElementOverlay";
-import { cn } from "../utils";
+import { motion, type PanInfo } from "framer-motion";
+import type React from "react";
+import { useState } from "react";
 import Logo from "../components/Logo";
 import { useStore } from "../state";
+import { cn } from "../utils";
+import type { Rectangle } from "./Rectangle";
+import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
 interface RectangleOnCanvasProps {
 	layout: ElementLayout;
@@ -16,6 +16,7 @@ interface RectangleOnCanvasProps {
 		info: PanInfo,
 	) => void;
 	onRectangleUpdate: (element: Rectangle, newTargets: ElementTargets) => void;
+	onRemoveElement: (elementId: string) => void;
 	isDragTarget: boolean;
 	isDragging: boolean;
 }
@@ -26,6 +27,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
 	onRectangleUpdate,
+	onRemoveElement,
 	isDragTarget,
 	isDragging,
 }) => {
@@ -126,31 +128,36 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 		>
 			<div
 				className={cn(
-					"w-full h-full flex items-center justify-center rounded-md backdrop-blur-md bg-[var(--bg-200)]/10",
+					"w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-400)]/90 border border-[var(--fg-600)]/20 overflow-hidden flex flex-col",
 				)}
 			>
-				{/* {(isHovered || showOverlay) && !showOverlay && (
-        <button
-          className={cn("absolute top-1 right-1 w-6 h-6 bg-[var(--fg-800)] text-[var(--bg-white)] rounded text-xs hover:bg-[var(--fg-700)] z-10 border border-[var(--fg-600)]")}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Gear button clicked for', element.id);
-            setShowOverlay(true);
-          }}
-        >
-          ⚙
-        </button>
-      )} */}
+				{/* Header */}
+				<div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
+					<span className="text-xs font-medium">✨ Ariana</span>
+					<button
+						type="button"
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							onRemoveElement(element.id);
+						}}
+						className="text-xs w-6 h-6 bg-[var(--fg-800)] hover:bg-[var(--fg-700)] rounded transition-colors text-[var(--bg-white)] flex items-center justify-center"
+					>
+						×
+					</button>
+				</div>
 
-				<div className={cn("select-none")} style={{ width: cell.width / 4 }}>
-					<Logo
-						className={cn(
-							isLightTheme
-								? "text-[var(--fg-800-30)]"
-								: "text-[var(--fg-100-30)]",
-						)}
-					/>
+				{/* Logo Content */}
+				<div className={cn("flex-1 flex items-center justify-center")}>
+					<div className={cn("select-none")} style={{ width: cell.width / 4 }}>
+						<Logo
+							className={cn(
+								isLightTheme
+									? "text-[var(--fg-800-30)]"
+									: "text-[var(--fg-100-30)]",
+							)}
+						/>
+					</div>
 				</div>
 
 				{/* {showOverlay && element instanceof Rectangle && (

@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useRef } from "react";
-import { resolveColor } from "../utils/colors";
-import { motion, PanInfo } from "framer-motion";
-import { Terminal as XTerm } from "@xterm/xterm";
-import type { IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
-import { SearchAddon } from "@xterm/addon-search";
 import { ImageAddon } from "@xterm/addon-image";
+import { SearchAddon } from "@xterm/addon-search";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import type { IDisposable } from "@xterm/xterm";
+import { Terminal as XTerm } from "@xterm/xterm";
+import { motion, type PanInfo } from "framer-motion";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { resolveColor } from "../utils/colors";
 import "@xterm/xterm/css/xterm.css";
-import { CanvasElement, ElementLayout } from "./types";
-import { Terminal, TerminalConfig } from "./Terminal";
-import { cn } from "../utils";
 import { TerminalService } from "../services/TerminalService";
+import { cn } from "../utils";
+import type { Terminal, TerminalConfig } from "./Terminal";
+import type { CanvasElement, ElementLayout } from "./types";
 
 interface TerminalOnCanvasProps {
 	layout: ElementLayout;
@@ -22,6 +23,7 @@ interface TerminalOnCanvasProps {
 		info: PanInfo,
 	) => void;
 	onTerminalUpdate: (element: Terminal, newConfig: TerminalConfig) => void;
+	onRemoveElement: (elementId: string) => void;
 	isDragTarget: boolean;
 	isDragging: boolean;
 }
@@ -32,6 +34,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
 	onTerminalUpdate,
+	onRemoveElement,
 	isDragTarget,
 	isDragging,
 }) => {
@@ -99,8 +102,8 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 			cursorBlink: true,
 			allowTransparency: true,
 			allowProposedApi: true,
-			fontWeight: 'normal',
-			fontWeightBold: 'bold',
+			fontWeight: "normal",
+			fontWeightBold: "bold",
 			minimumContrastRatio: 1,
 		});
 
@@ -108,12 +111,12 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		const webLinksAddon = new WebLinksAddon();
 		const searchAddon = new SearchAddon();
 		const imageAddon = new ImageAddon({
-			enableSizeReports: true,    
-			sixelSupport: true,         
-			sixelScrolling: true,       // Enable scrolling for images
-			iipSupport: true,           // Enable iTerm2 inline images
-			pixelLimit: 16777216,       // Max 16MB per image
-			showPlaceholder: true       // Show placeholder for evicted images
+			enableSizeReports: true,
+			sixelSupport: true,
+			sixelScrolling: true, // Enable scrolling for images
+			iipSupport: true, // Enable iTerm2 inline images
+			pixelLimit: 16777216, // Max 16MB per image
+			showPlaceholder: true, // Show placeholder for evicted images
 		});
 
 		xterm.loadAddon(fitAddon);
@@ -293,58 +296,70 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 				duration: 0.2,
 			}}
 			layout
-			// drag
-			// dragMomentum={false}
-			// onMouseDown={() => {
-			//   if (!dragging) {
-			//     setDragging(true);
-			//   }
-			// }}
-			// onDragStart={() => {
-			//   setDragging(true);
-			//   handleDragStartInternal();
-			// }}
-			// onDragEnd={() => {
-			//   setDragging(false);
-			//   handleDragEndInternal();
-			// }}
-			// onDrag={(event, info) => {
-			//   if (typeof propOnDrag === 'function') {
-			//     propOnDrag(event, info);
-			//   }
-			// }}
-			// onMouseEnter={() => setIsHovered(true)}
-			// onMouseLeave={() => {
-			//   setIsHovered(false);
-			// }}
+			drag
+			dragMomentum={false}
+			onMouseDown={() => {
+				if (!dragging) {
+					setDragging(true);
+				}
+			}}
+			onDragStart={() => {
+				setDragging(true);
+				handleDragStartInternal();
+			}}
+			onDragEnd={() => {
+				setDragging(false);
+				handleDragEndInternal();
+			}}
+			onDrag={(event, info) => {
+				if (typeof propOnDrag === "function") {
+					propOnDrag(event, info);
+				}
+			}}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => {
+				setIsHovered(false);
+			}}
 		>
 			<div
 				className={cn(
-					"w-full h-full rounded-md bg-gradient-to-b from-bg-[var(--fg-900)]/30 to-bg-[var(--bg-600)]/30 backdrop-blur-md relative p-4 pt-2.5",
+					"w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-400)]/90 border border-[var(--fg-600)]/20 overflow-hidden flex flex-col",
 				)}
 			>
-				{/* Connection status indicator */}
-				{/* <div className="absolute top-2 right-2 z-10">
-          <div className={cn(
-            "w-2 h-2 rounded-full",
-            isConnected ? "bg-[var(--positive-400)]" : "bg-[var(--negative-400)]"
-          )} />
-        </div> */}
-
-				{/* Terminal type badge */}
-				{/* <div className="absolute top-2 left-2 z-10">
-          <span className={cn(
-            "text-xs px-2 py-1 bg-[var(--blackest)] bg-opacity-50 text-[var(--whitest)] rounded"
-          )}>
-            {terminal.getTerminalType().toUpperCase()}
-          </span>
-        </div> */}
+				{/* Header */}
+				<div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
+					<span className="text-xs font-medium">
+						💻 {terminal.getTerminalType().toUpperCase()}
+					</span>
+					<div className="flex items-center gap-2">
+						{/* Connection status indicator */}
+						<div
+							className={cn(
+								"w-2 h-2 rounded-full",
+								isConnected
+									? "bg-[var(--positive-400)]"
+									: "bg-[var(--negative-400)]",
+							)}
+						/>
+						<button
+							type="button"
+							onClick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onRemoveElement(element.id);
+							}}
+							className="text-xs w-6 h-6 bg-[var(--fg-800)] hover:bg-[var(--fg-700)] rounded transition-colors text-[var(--bg-white)] flex items-center justify-center"
+						>
+							×
+						</button>
+					</div>
+				</div>
 
 				{/* Terminal container */}
 				<div
 					ref={terminalRef}
 					data-terminal-id={element.id}
-					className={cn("w-full h-full pointer-events-auto")}
+					className={cn("flex-1 pointer-events-auto")}
 				/>
 			</div>
 		</motion.div>
