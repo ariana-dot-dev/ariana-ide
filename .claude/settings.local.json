@@ -11,7 +11,9 @@
       "Bash(just:*)",
       "Bash(npm install)",
       "Bash(uv run:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo build:*)"
     ],
     "deny": []
   }
