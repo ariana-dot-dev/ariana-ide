@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microphone Component Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body>
+    <div id="root" class="p-8"></div>
+    
+    <script type="text/babel">
+        // Simple test version without external dependencies
+        const { useState, useContext, createContext, useReducer, useRef, useCallback, useEffect } = React;
+
+        // Simplified Audio Context for testing
+        const AudioContext = createContext(null);
+
+        function AudioProvider({ children, onSendTranscription }) {
+            const [isRecording, setIsRecording] = useState(false);
+            const [isListening, setIsListening] = useState(false);
+            const [transcription, setTranscription] = useState('');
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [error, setError] = useState(null);
+            
+            const recognitionRef = useRef(null);
+            const silenceTimerRef = useRef(null);
+            const isRecordingRef = useRef(false);
+
+            const startRecording = useCallback(async () => {
+                try {
+                    setError(null);
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        recognitionRef.current = new SpeechRecognition();
+                        
+                        recognitionRef.current.continuous = true;
+                        recognitionRef.current.interimResults = true;
+                        recognitionRef.current.lang = 'en-US';
+                        
+                        recognitionRef.current.onstart = () => {
+                            console.log('Speech recognition started');
+                            setIsListening(true);
+                        };
+                        
+                        recognitionRef.current.onresult = (event) => {
+                            let finalTranscript = '';
+                            let interimTranscript = '';
+                            
+                            for (let i = event.resultIndex; i < event.results.length; i++) {
+                                const transcript = event.results[i][0].transcript;
+                                if (event.results[i].isFinal) {
+                                    finalTranscript += transcript;
+                                } else {
+                                    interimTranscript += transcript;
+                                }
+                            }
+                            
+                            const currentTranscription = transcription + finalTranscript + interimTranscript;
+                            setTranscription(currentTranscription);
+                            
+                            // Handle silence detection for sending
+                            if (finalTranscript.trim()) {
+                                // Reset silence timer when we get new final results
+                                if (silenceTimerRef.current) {
+                                    clearTimeout(silenceTimerRef.current);
+                                }
+                                
+                                // Set timer to send after 2 seconds of silence
+                                silenceTimerRef.current = setTimeout(async () => {
+                                    const textToSend = currentTranscription.trim();
+                                    if (textToSend && isRecordingRef.current) {
+                                        try {
+                                            setIsProcessing(true);
+                                            if (onSendTranscription) {
+                                                await onSendTranscription(textToSend);
+                                            } else {
+                                                console.log('Transcription:', textToSend);
+                                                alert(`Transcription sent: "${textToSend}"`);
+                                            }
+                                            setTranscription('');
+                                        } catch (error) {
+                                            setError(`Failed to send transcription: ${error.message}`);
+                                        } finally {
+                                            setIsProcessing(false);
+                                        }
+                                    }
+                                }, 2000);
+                            }
+                        };
+                        
+                        recognitionRef.current.onerror = (event) => {
+                            console.log('Speech recognition error:', event.error);
+                            if (event.error !== 'aborted' && event.error !== 'no-speech') {
+                                setError(`Speech recognition error: ${event.error}`);
+                            }
+                        };
+                        
+                        recognitionRef.current.onend = () => {
+                            console.log('Speech recognition ended');
+                            setIsListening(false);
+                            
+                            // Restart if we should still be recording
+                            if (isRecordingRef.current) {
+                                setTimeout(() => {
+                                    if (isRecordingRef.current && recognitionRef.current) {
+                                        try {
+                                            recognitionRef.current.start();
+                                        } catch (error) {
+                                            console.log('Failed to restart recognition:', error);
+                                        }
+                                    }
+                                }, 100);
+                            }
+                        };
+                        
+                        recognitionRef.current.start();
+                    } else {
+                        setError('Speech recognition not supported in this browser');
+                    }
+                    
+                    isRecordingRef.current = true;
+                    setIsRecording(true);
+                } catch (error) {
+                    setError(`Failed to start recording: ${error.message}`);
+                }
+            }, [transcription]);
+
+            const stopRecording = useCallback(() => {
+                isRecordingRef.current = false;
+                
+                if (recognitionRef.current) {
+                    recognitionRef.current.stop();
+                    recognitionRef.current = null;
+                }
+                
+                if (silenceTimerRef.current) {
+                    clearTimeout(silenceTimerRef.current);
+                    silenceTimerRef.current = null;
+                }
+                
+                setIsRecording(false);
+                setIsListening(false);
+            }, []);
+
+            const sendTranscription = useCallback(async (text) => {
+                if (!text.trim()) return;
+                
+                try {
+                    setIsProcessing(true);
+                    
+                    if (onSendTranscription) {
+                        await onSendTranscription(text);
+                    } else {
+                        console.log('Transcription:', text);
+                        alert(`Transcription sent: "${text}"`);
+                    }
+                    
+                    setTranscription('');
+                    
+                } catch (error) {
+                    setError(`Failed to send transcription: ${error.message}`);
+                } finally {
+                    setIsProcessing(false);
+                }
+            }, [onSendTranscription]);
+
+            const value = {
+                isRecording,
+                isListening,
+                transcription,
+                isProcessing,
+                error,
+                startRecording,
+                stopRecording,
+                updateTranscription: setTranscription,
+                sendTranscription: () => sendTranscription(transcription),
+                setError
+            };
+
+            return React.createElement(AudioContext.Provider, { value }, children);
+        }
+
+        function useAudio() {
+            const context = useContext(AudioContext);
+            if (!context) {
+                throw new Error('useAudio must be used within an AudioProvider');
+            }
+            return context;
+        }
+
+        // Test Components
+        function MicrophoneButton({ size = 'md' }) {
+            const { isRecording, isListening, startRecording, stopRecording, error } = useAudio();
+
+            const sizeClasses = {
+                sm: 'w-8 h-8',
+                md: 'w-12 h-12',
+                lg: 'w-16 h-16'
+            };
+
+            const handleClick = () => {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            };
+
+            return React.createElement('button', {
+                onClick: handleClick,
+                disabled: !!error,
+                className: `
+                    ${sizeClasses[size]}
+                    relative rounded-full transition-all duration-300 focus:outline-none
+                    ${error ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    flex items-center justify-center text-white
+                `,
+                style: {
+                    backdropFilter: 'blur(12px)',
+                    background: isRecording 
+                        ? 'rgba(75, 85, 99, 0.2)' 
+                        : 'rgba(255, 255, 255, 0.1)',
+                    border: isRecording 
+                        ? '1px solid rgba(156, 163, 175, 0.4)'
+                        : '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: isRecording
+                        ? '0 8px 32px rgba(75, 85, 99, 0.3), inset 0 1px rgba(255, 255, 255, 0.2)'
+                        : '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px rgba(255, 255, 255, 0.2)'
+                },
+                title: isRecording ? 'Stop Recording' : 'Start Recording'
+            }, 
+                React.createElement('i', {
+                    className: isRecording ? 'bi bi-stop-fill' : 'bi bi-mic-fill',
+                    style: { 
+                        fontSize: size === 'sm' ? '14px' : size === 'md' ? '18px' : '22px',
+                        color: isRecording ? 'white' : '#4B5563'
+                    }
+                }),
+                isListening && React.createElement('div', {
+                    className: 'absolute inset-0 rounded-full border-2 border-white animate-pulse'
+                })
+            );
+        }
+
+        function TranscriptionEditor() {
+            const { transcription, updateTranscription, isRecording, isListening, isProcessing, sendTranscription, error } = useAudio();
+            
+            return React.createElement('div', { className: 'relative' },
+                React.createElement('textarea', {
+                    value: transcription,
+                    onChange: (e) => updateTranscription(e.target.value),
+                    onKeyDown: (e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                            e.preventDefault();
+                            sendTranscription();
+                        }
+                    },
+                    placeholder: 'Click the microphone to start recording...',
+                    disabled: isProcessing,
+                    className: `
+                        w-full min-h-[120px] max-h-[300px] p-4 
+                        border border-gray-200 rounded-xl resize-none
+                        transition-all duration-200
+                        focus:outline-none focus:border-gray-300
+                        placeholder-gray-400 text-gray-700
+                        ${isRecording ? 'border-gray-200' : ''}
+                        ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+                        ${error ? 'border-gray-300' : ''}
+                    `,
+                    style: {
+                        backdropFilter: 'blur(8px)',
+                        background: isRecording ? 'rgba(249, 250, 251, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.06), inset 0 1px rgba(255, 255, 255, 0.5)'
+                    }
+                }),
+                React.createElement('div', { className: 'mt-2 text-sm' },
+                    error && React.createElement('div', { className: 'text-gray-600' }, error),
+                    !error && React.createElement('div', { className: 'text-gray-500' },
+                        isRecording 
+                            ? 'Recording... (sends every 2s of silence, click mic to stop)' 
+                            : 'Press Ctrl+Enter to send manually'
+                    ),
+                    isListening && React.createElement('div', { className: 'text-gray-600' }, 'Listening...'),
+                    isProcessing && React.createElement('div', { className: 'text-blue-600' }, '⏳ Sending...')
+                )
+            );
+        }
+
+        function TestApp() {
+            const [isExpanded, setIsExpanded] = useState(false);
+
+            const handleTranscription = async (text) => {
+                console.log('Received transcription:', text);
+                alert(`Transcription received: "${text}"`);
+            };
+
+            return React.createElement(AudioProvider, { onSendTranscription: handleTranscription },
+                React.createElement('div', { className: 'max-w-2xl mx-auto' },
+                    React.createElement('h1', { className: 'text-2xl font-bold mb-6' }, 'Microphone Component Test'),
+                    React.createElement('div', { className: 'flex items-start gap-4' },
+                        React.createElement('div', { 
+                            className: 'cursor-pointer',
+                            onClick: () => setIsExpanded(!isExpanded)
+                        },
+                            React.createElement(MicrophoneButton, { size: 'md' })
+                        ),
+                        isExpanded && React.createElement('div', { className: 'flex-1' },
+                            React.createElement(TranscriptionEditor)
+                        )
+                    ),
+                    React.createElement('div', { className: 'mt-8 p-4 bg-gray-100 rounded-lg' },
+                        React.createElement('h3', { className: 'font-bold mb-2' }, 'Instructions:'),
+                        React.createElement('ol', { className: 'list-decimal list-inside space-y-1 text-sm' },
+                            React.createElement('li', null, 'Click the microphone button to expand'),
+                            React.createElement('li', null, 'Click it again to start recording'),
+                            React.createElement('li', null, 'Speak clearly'),
+                            React.createElement('li', null, 'Text appears in real-time'),
+                            React.createElement('li', null, 'Sends every 2 seconds of silence (keeps recording)'),
+                            React.createElement('li', null, 'Or press Ctrl+Enter to send manually')
+                        )
+                    )
+                )
+            );
+        }
+
+        ReactDOM.render(React.createElement(TestApp), document.getElementById('root'));
+    </script>
+</body>
+</html>
