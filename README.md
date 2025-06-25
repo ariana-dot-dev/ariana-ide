@@ -14,9 +14,8 @@
 For detailed information, see the documentation in the `docs/` folder:
 
 - [📋 **ROADMAP.md**](docs/ROADMAP.md) - Project roadmap and architecture
-- [⚙️ **INSTALL_DEV.md**](docs/INSTALL_DEV.md) - Development environment setup
-- [🚀 **RUN_DEV.md**](docs/RUN_DEV.md) - Running in development mode
-- [📦 **BUILD.md**](docs/BUILD.md) - Building and packaging guide
+- [⚙️ **DEV_GUIDE.md**](docs/DEV_GUIDE.md) - Development environment setup
+- [ **BUILD.md**](docs/BUILD.md) - Building and packaging guide
 
 ## Installation
 
@@ -27,22 +26,19 @@ Ariana IDE is not ready for usage yet. Come back in a few days/weeks!
 ### Development
 ```bash
 # Start backend
-cd backend && cargo run
+just dev-backend
 
 # Start frontend (separate terminal)
-cd frontend && npm run dev
+just dev-frontend
 
-# Start Tauri app (separate terminal)  
-cd frontend/tauri-app && npm run tauri dev
+# Start via CLI login (separate terminal)  
+just dev-cli
 ```
 
 ### Building
 ```bash
-# Configure for custom build
-node configure-build.js example-configs/ariana-beta.json
-
-# Build package
-node build-package.js
+# Build with custom config
+just build example-configs/ariana-beta.json
 
 # Install locally
 cd dist && npm install -g .

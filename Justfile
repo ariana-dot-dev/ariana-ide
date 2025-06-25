@@ -1,47 +1,56 @@
-# Build commands for ariana-ide
+# Ariana IDE - Development Commands
 
-# Default recipe to list all available commands
+# List all available commands
 default:
     @just --list
 
-#### Main commands ####
+# 🚀 Install and run backend server in development mode
+dev-backend:
+    @echo "🔧 Installing and running backend..."
+    cd backend && cargo run
 
-# Build everything
-build-all: build-backend build-frontend
-    @echo "All builds completed!"
+# 🎨 Install and run frontend (Tauri app only, no CLI login required)
+dev-frontend:
+    @echo "🔧 Installing frontend dependencies..."
+    cd frontend/tauri-app && npm install
+    @echo "🚀 Starting Tauri development server..."
+    cd frontend/tauri-app && npm run dev
 
-# Build the backend
-build-backend:
-    cd backend && cargo build
+# 🔐 Install and run frontend via CLI (requires backend running)
+dev-cli:
+    @echo "🔧 Installing CLI dependencies..."
+    cd frontend && npm install
+    @echo "🔧 Installing Tauri dependencies..."
+    cd frontend/tauri-app && npm install
+    @echo "🔨 Building CLI..."
+    cd frontend && npm run build
+    @echo "🔐 Starting CLI (will prompt for login)..."
+    cd frontend && node dist/cli.js
 
-# Build the frontend (complete build process)
-build-frontend: frontend-npm-ci tauri-npm-ci tauri-build tauri-cargo-build
+# 📦 Build with custom configuration
+build CONFIG_PATH:
+    @echo "📦 Building with config: {{CONFIG_PATH}}"
+    node configure-build.js "{{CONFIG_PATH}}"
+    node build-package.js
 
-# Format everything
-format-all:
+# 🏗️ Build for Windows
+build-windows:
+    @echo "🏗️ Building for Windows..."
+    cd frontend/tauri-app && npm run tauri build -- --target x86_64-pc-windows-msvc
+
+# 🏗️ Build for macOS  
+build-macos:
+    @echo "🏗️ Building for macOS..."
+    cd frontend && sh scripts/build_macos.sh
+
+# 🏗️ Build for Linux
+build-linux:
+    @echo "🏗️ Building for Linux..."
+    cd frontend && bash scripts/build_linux.sh
+
+# 🧹 Format all code
+format:
+    @echo "🧹 Formatting code..."
     cd backend && cargo fmt
     cd frontend/tauri-app/src-tauri && cargo fmt
     cd frontend && npm run format:write
-
-# Run the tauri app in development mode (watch mode by default -- i think)
-tauri-dev:
-    cd frontend/tauri-app && npx tauri dev
-
-#### Sub-commands ####
-
-# Install frontend cli/bin dependencies
-frontend-npm-ci:
-    cd frontend && npm ci
-
-# Install tauri-app js dependencies
-tauri-npm-ci:
-    cd frontend/tauri-app && npm ci
-
-# Build tauri-app js stuff
-tauri-build:
-    cd frontend/tauri-app && npm run build
-
-# Build tauri-app rust components
-tauri-cargo-build:
-    cd frontend/tauri-app/src-tauri && cargo build
-

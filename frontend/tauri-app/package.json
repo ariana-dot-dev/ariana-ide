@@ -5,10 +5,9 @@
 	"main": "src/main.tsx",
 	"type": "module",
 	"scripts": {
-		"dev": "node scripts/generateThemes.cjs && vite",
+		"dev": "node scripts/generateThemes.cjs && npx tauri dev",
 		"build": "node scripts/generateThemes.cjs && vite build",
-		"preview": "node scripts/generateThemes.cjs && vite preview",
-		"tauri": "tauri dev"
+		"preview": "node scripts/generateThemes.cjs && vite preview"
 	},
 	"keywords": [
 		"tauri",

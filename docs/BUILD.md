@@ -4,19 +4,14 @@ This guide covers how to build Ariana IDE for distribution, including the config
 
 ## Quick Build
 
-### Standard Build
 ```bash
-# Build the default version
-node build-package.js
-```
+# Build with custom configuration (one command)
+just build example-configs/ariana-beta.json
 
-### Custom Build
-```bash
-# Configure for a specific environment
-node configure-build.js example-configs/ariana-beta.json
-
-# Build with the configuration
-node build-package.js
+# Platform-specific builds
+just build-windows
+just build-macos
+just build-linux
 ```
 
 ## Configurable Build System
@@ -74,32 +69,23 @@ The project includes example configurations in `example-configs/`:
 
 ## Build Process
 
-### 1. Configure Build
+### Build with Just
 ```bash
-# Set configuration from a config file
-node configure-build.js path/to/your-config.json
-```
-
-This copies your configuration to `initial_config.json` and displays the build settings.
-
-### 2. Build Package
-```bash
-# Build the complete package
-node build-package.js
+# One command to configure and build
+just build path/to/your-config.json
 ```
 
 This process:
-1. Runs the configuration script (temporarily modifies package.json)
+1. Configures the build (temporarily modifies package.json)
 2. Builds the CLI with TypeScript
 3. Copies config to Tauri app resources
 4. Builds the Tauri desktop application
 5. Restores original package.json
 6. Creates a distributable package in `dist/`
 
-### 3. Install Locally
+### Install Locally
 ```bash
-cd dist
-npm install -g .
+cd dist && npm install -g .
 ```
 
 After installation, you can use your custom executable:
@@ -108,33 +94,17 @@ ariana-beta --version
 ariana-test status
 ```
 
-## Build Scripts
-
-### Individual Component Builds
-
-#### CLI Only
-```bash
-cd frontend
-npm run build:configured
-```
-
-#### Tauri App Only
-```bash
-cd frontend/tauri-app
-npm run build
-```
-
-#### Platform-Specific Builds
-The project includes platform-specific build scripts (these are simplified versions):
+## Platform-Specific Builds
 
 ```bash
-# Linux build (requires Docker/cross)
-cd frontend
-npm run build:linux
+# Windows (requires Windows or cross-compilation)
+just build-windows
 
-# macOS build (requires macOS)
-cd frontend  
-npm run build:macos
+# macOS (requires macOS)  
+just build-macos
+
+# Linux (uses cross-compilation)
+just build-linux
 ```
 
 ## Distribution Structure
@@ -198,17 +168,12 @@ function MyComponent() {
 }
 ```
 
-2. **Configure the build**:
+2. **Build with Just**:
 ```bash
-node configure-build.js my-config.json
+just build my-config.json
 ```
 
-3. **Build the package**:
-```bash
-node build-package.js
-```
-
-4. **Install and test**:
+3. **Install and test**:
 ```bash
 cd dist
 npm install -g .
