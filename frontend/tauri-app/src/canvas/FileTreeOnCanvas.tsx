@@ -1,13 +1,13 @@
 import { motion, type PanInfo } from "framer-motion";
 import type React from "react";
 import { useState } from "react";
-import Logo from "../components/Logo";
+import { FileTree } from "../components/FileTree";
 import { useStore } from "../state";
 import { cn } from "../utils";
-import type { Rectangle } from "./Rectangle";
+import type { FileTreeCanvas } from "./FileTreeCanvas";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
-interface RectangleOnCanvasProps {
+interface FileTreeOnCanvasProps {
 	layout: ElementLayout;
 	onDragStart: (element: CanvasElement) => void;
 	onDragEnd: (element: CanvasElement) => void;
@@ -15,62 +15,57 @@ interface RectangleOnCanvasProps {
 		event: MouseEvent | TouchEvent | PointerEvent,
 		info: PanInfo,
 	) => void;
-	onRectangleUpdate: (element: Rectangle, newTargets: ElementTargets) => void;
+	onFileTreeUpdate: (
+		element: FileTreeCanvas,
+		newTargets: ElementTargets,
+	) => void;
 	onRemoveElement: (elementId: string) => void;
 	isDragTarget: boolean;
 	isDragging: boolean;
 }
 
-const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
+const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 	layout,
 	onDragStart: propOnDragStart,
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
-	onRectangleUpdate,
+	onFileTreeUpdate,
 	onRemoveElement,
 	isDragTarget,
 	isDragging,
 }) => {
 	const { cell, element } = layout;
 	const [isHovered, setIsHovered] = useState(false);
-	const [showOverlay, setShowOverlay] = useState(false);
 	const [dragging, setDragging] = useState(false);
-	const { theme, isLightTheme } = useStore();
-
-	if (isDragging) {
-		console.log(
-			`RectangleOnCanvas for ${element.id} IS DRAGGING. Received propOnDrag type: ${typeof propOnDrag}`,
-		);
-	} else if (
-		typeof propOnDrag === "function" &&
-		propOnDrag.toString().includes("handleDrag")
-	) {
-		console.warn(
-			`RectangleOnCanvas for ${element.id} NOT DRAGGING but received actual handleDrag function.`,
-		);
-	}
+	const [rootPath, setRootPath] = useState(
+		"fileTree" in element.kind ? element.kind.fileTree.rootPath : "/Users/ale",
+	);
+	const { theme } = useStore();
 
 	const handleDragStartInternal = () => {
-		console.log(`INTERNAL handleDragStart for: ${element.id}`);
 		propOnDragStart(element);
 	};
 
 	const handleDragEndInternal = () => {
-		console.log(`INTERNAL handleDragEnd for: ${element.id}`);
 		propOnDragEnd(element);
 	};
 
-	const handleElementUpdate = (
-		updatedElement: Rectangle,
-		newTargets: ElementTargets,
-	) => {
-		onRectangleUpdate(updatedElement, newTargets);
+	const handleFileSelect = (path: string) => {
+		// TODO: Implement file opening logic
+	};
+
+	const changeDirectory = () => {
+		const newPath = prompt("Enter directory path:", rootPath);
+		if (newPath && "fileTree" in element.kind) {
+			element.kind.fileTree.setRootPath(newPath);
+			setRootPath(newPath);
+		}
 	};
 
 	return (
 		<motion.div
 			className={cn(
-				`absolute p-1 cursor-move select-none`,
+				`absolute cursor-move select-none`,
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
@@ -110,15 +105,8 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 				handleDragEndInternal();
 			}}
 			onDrag={(event, info) => {
-				console.log(
-					`MOTION.DIV onDrag FIRED for ${element.id}. isDragging: ${isDragging}. Type of propOnDrag: ${typeof propOnDrag}`,
-				);
 				if (typeof propOnDrag === "function") {
 					propOnDrag(event, info);
-				} else {
-					console.error(
-						`propOnDrag is NOT a function for ${element.id}! Type: ${typeof propOnDrag}.`,
-					);
 				}
 			}}
 			onMouseEnter={() => setIsHovered(true)}
@@ -129,11 +117,12 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 			<div
 				className={cn(
 					"w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-400)]/90 border border-[var(--fg-600)]/20 overflow-hidden flex flex-col",
+					`theme-${theme}`,
 				)}
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
-					<span className="text-xs font-medium">✨ Ariana</span>
+					<span className="text-xs font-medium">📁 Files</span>
 					<button
 						type="button"
 						onClick={(e) => {
@@ -147,32 +136,18 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 					</button>
 				</div>
 
-				{/* Logo Content */}
-				<div className={cn("flex-1 flex items-center justify-center")}>
-					<div className={cn("select-none")} style={{ width: cell.width / 4 }}>
-						<Logo
-							className={cn(
-								isLightTheme
-									? "text-[var(--fg-800-30)]"
-									: "text-[var(--fg-100-30)]",
-							)}
-						/>
+				{/* File Tree Content */}
+				<div className="flex-1 overflow-auto p-1">
+					<div className="text-xs text-[var(--fg-400)] mb-1 px-1 truncate">
+						{rootPath}
+					</div>
+					<div className="text-xs">
+						<FileTree rootPath={rootPath} onFileSelect={handleFileSelect} />
 					</div>
 				</div>
-
-				{/* {showOverlay && element instanceof Rectangle && (
-        <ElementOverlay
-          element={element}
-          onConfirm={handleElementUpdate}
-          onClose={() => {
-            console.log('Closing overlay for', element.id);
-            setShowOverlay(false);
-          }}
-        />
-      )} */}
 			</div>
 		</motion.div>
 	);
 };
 
-export default RectangleOnCanvas;
+export default FileTreeOnCanvas;
