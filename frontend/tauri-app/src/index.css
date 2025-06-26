@@ -115,6 +115,10 @@ body {
 	outline: none;
 }
 
+*:active {
+	outline: none;
+}
+
 @theme {
 	--font-sans: "Satoshi", sans-serif;
 	--font-mono: "JetBrainsMono Nerd Font", "FiraCode Nerd Font", "MapleMono", "Hack Nerd Font", "MesloLGS NF", "Space Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",

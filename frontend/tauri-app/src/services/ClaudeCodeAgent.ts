@@ -42,7 +42,7 @@ export class ClaudeCodeAgent extends EventEmitter {
 	constructor() {
 		super();
 		this.logPrefix = `[ClaudeCodeAgent-${Date.now().toString(36)}]`;
-		console.log(this.logPrefix, "🚀 Created new ClaudeCodeAgent instance");
+		console.log(this.logPrefix, "Created new ClaudeCodeAgent instance");
 	}
 	
 	/**
@@ -53,8 +53,8 @@ export class ClaudeCodeAgent extends EventEmitter {
 		terminalSpec: TerminalSpec,
 		onTerminalReady?: (terminalId: string) => void
 	): Promise<void> {
-		console.log(this.logPrefix, "📝 Starting Claude Code task with prompt:", prompt);
-		console.log(this.logPrefix, "🖥️ Terminal spec:", JSON.stringify(terminalSpec, null, 2));
+		console.log(this.logPrefix, "Starting Claude Code task with prompt:", prompt);
+		console.log(this.logPrefix, "Terminal spec:", JSON.stringify(terminalSpec, null, 2));
 		
 		if (this.isRunning) {
 			const error = "Claude Code task is already running";
@@ -68,29 +68,29 @@ export class ClaudeCodeAgent extends EventEmitter {
 		this.screenLines = [];
 		
 		try {
-			console.log(this.logPrefix, "🔌 Creating headless terminal session...");
+			console.log(this.logPrefix, "Creating headless terminal session...");
 			// Create headless terminal session
 			this.terminalId = await headlessTerminalAPI.createSession(terminalSpec);
-			console.log(this.logPrefix, "✅ Terminal session created with ID:", this.terminalId);
+			console.log(this.logPrefix, "Terminal session created with ID:", this.terminalId);
 			
 			// Set up event listeners
-			console.log(this.logPrefix, "👂 Setting up terminal listeners...");
+			console.log(this.logPrefix, "Setting up terminal listeners...");
 			this.setupTerminalListeners();
 			
 			// Notify that terminal is ready
-			console.log(this.logPrefix, "📞 Notifying terminal ready callback...");
+			console.log(this.logPrefix, "Notifying terminal ready callback...");
 			onTerminalReady?.(this.terminalId);
 			
 			// Wait a bit for terminal to be fully ready
-			console.log(this.logPrefix, "⏱️ Waiting 1000ms for terminal to be ready...");
+			console.log(this.logPrefix, "Waiting 1000ms for terminal to be ready...");
 			await this.delay(1000);
 			
 			// Check if Claude Code is installed and start the process
-			console.log(this.logPrefix, "🎯 Initializing Claude Code...");
+			console.log(this.logPrefix, "Initializing Claude Code...");
 			await this.initializeClaudeCode(prompt);
 			
 		} catch (error) {
-			console.error(this.logPrefix, "💥 Error starting task:", error);
+			console.error(this.logPrefix, "Error starting task:", error);
 			this.isRunning = false;
 			this.emit('taskError', error instanceof Error ? error.message : String(error));
 			throw error;
@@ -200,22 +200,22 @@ export class ClaudeCodeAgent extends EventEmitter {
 	}
 	
 	private handleTerminalEvents(events: TerminalEvent[]): void {
-		console.log(this.logPrefix, "📺 Received", events.length, "terminal events");
+		console.log(this.logPrefix, "Received", events.length, "terminal events");
 		
 		for (const event of events) {
-			console.log(this.logPrefix, "🔄 Processing event:", event.type);
+			console.log(this.logPrefix, "Processing event:", event.type);
 			
 			switch (event.type) {
 				case 'screenUpdate':
 					if (event.screen) {
-						console.log(this.logPrefix, "📱 Screen update - new screen has", event.screen.length, "lines");
+						console.log(this.logPrefix, "Screen update - new screen has", event.screen.length, "lines");
 						this.screenLines = [...event.screen];
 						
 						// Log current screen content for debugging
 						const screenText = event.screen.map(line => 
 							line.map(item => item.lexeme).join('')
 						);
-						console.log(this.logPrefix, "📄 Current screen content:");
+						console.log(this.logPrefix, "Current screen content:");
 						screenText.forEach((line, i) => {
 							if (line.trim()) {
 								console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(line));
@@ -226,7 +226,7 @@ export class ClaudeCodeAgent extends EventEmitter {
 					
 				case 'newLines':
 					if (event.lines) {
-						console.log(this.logPrefix, "➕ New lines added:", event.lines.length);
+						console.log(this.logPrefix, "New lines added:", event.lines.length);
 						this.screenLines.push(...event.lines);
 						
 						// Log new lines content
@@ -241,7 +241,7 @@ export class ClaudeCodeAgent extends EventEmitter {
 					
 				case 'patch':
 					if (event.line !== undefined && event.items) {
-						console.log(this.logPrefix, "🔧 Patching line", event.line, "with", event.items.length, "items");
+						console.log(this.logPrefix, "Patching line", event.line, "with", event.items.length, "items");
 						// Ensure we have enough lines
 						while (this.screenLines.length <= event.line) {
 							this.screenLines.push([]);
@@ -258,7 +258,7 @@ export class ClaudeCodeAgent extends EventEmitter {
 		
 		// Get current TUI lines for CLI agents library
 		const tuiLines = this.getCurrentTuiLines();
-		console.log(this.logPrefix, "📊 Extracted", tuiLines.length, "TUI lines for CLI agents:");
+		console.log(this.logPrefix, "Extracted", tuiLines.length, "TUI lines for CLI agents:");
 		tuiLines.forEach((line, i) => {
 			if (line.content.trim()) {
 				console.log(this.logPrefix, `  TUI[${i}]:`, JSON.stringify(line.content));
@@ -274,26 +274,26 @@ export class ClaudeCodeAgent extends EventEmitter {
 	
 	private async initializeClaudeCode(prompt: string): Promise<void> {
 		if (!this.terminalId) {
-			console.error(this.logPrefix, "❌ No terminal ID available for Claude Code initialization");
+			console.error(this.logPrefix, "No terminal ID available for Claude Code initialization");
 			return;
 		}
 		
-		console.log(this.logPrefix, "🔍 Checking if Claude Code is available...");
+		console.log(this.logPrefix, "Checking if Claude Code is available...");
 		// Check if claude is available
 		await headlessTerminalAPI.sendCommand(this.terminalId, "which claude");
 		await this.delay(1000);
 		
-		console.log(this.logPrefix, "📁 Getting current working directory...");
+		console.log(this.logPrefix, "Getting current working directory...");
 		// Get the current working directory
 		await headlessTerminalAPI.sendCommand(this.terminalId, "pwd");
 		await this.delay(500);
 		
 		// Start Claude Code with the prompt
 		const claudeCommand = `claude "${prompt.replace(/"/g, '\\"')}"`;
-		console.log(this.logPrefix, "🚀 Starting Claude Code with command:", claudeCommand);
+		console.log(this.logPrefix, "Starting Claude Code with command:", claudeCommand);
 		await headlessTerminalAPI.sendCommand(this.terminalId, claudeCommand);
 		
-		console.log(this.logPrefix, "✅ Claude Code command sent, emitting taskStarted event");
+		console.log(this.logPrefix, "Claude Code command sent, emitting taskStarted event");
 		this.emit('taskStarted', { prompt, terminalId: this.terminalId });
 	}
 	

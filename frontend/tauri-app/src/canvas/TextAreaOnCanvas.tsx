@@ -149,19 +149,10 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		setTerminalId(null);
 	};
 
-	const handleClearTerminal = () => {
-		setShowTerminal(false);
-		setTerminalId(null);
-		if (claudeAgent) {
-			claudeAgent.cleanup();
-			setClaudeAgent(null);
-		}
-	};
-
 	return (
 		<motion.div
 			className={cn(
-				"absolute p-1 select-none overflow-hidden",
+				"absolute select-none overflow-hidden py-4 px-5 border-2 rounded-md border-[var(--bg-600-40)]",
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
@@ -190,28 +181,15 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				{/* Text Area Section */}
 				<div 
 					className={cn(
-						"flex flex-col rounded-md backdrop-blur-md bg-[var(--bg-200)]/10 p-4 gap-4",
+						"flex flex-col rounded-md gap-2",
 						showTerminal ? "w-1/2" : "w-full"
 					)}
 				>
 					{/* Header */}
 					<div className="flex items-center justify-between">
-						<h3 className="text-sm font-semibold text-[var(--fg-800)]">
-							Claude Code Agent
+						<h3 className="text-sm text-[var(--fg-500)]">
+							Prompt something ↓
 						</h3>
-						<div className="flex gap-2">
-							{showTerminal && (
-								<button
-									onClick={handleClearTerminal}
-									className={cn(
-										"px-2 py-1 text-xs rounded bg-[var(--bg-300)] hover:bg-[var(--bg-400)] transition-colors",
-										"text-[var(--fg-700)]"
-									)}
-								>
-									Clear
-								</button>
-							)}
-						</div>
 					</div>
 					
 					{/* Text Area */}
@@ -221,14 +199,19 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 						onChange={(e) => setText(e.target.value)}
 						disabled={isLocked}
 						placeholder="Enter your coding task here..."
+						spellCheck={false}
 						className={cn(
-							"flex-1 w-full p-3 rounded border font-mono text-sm resize-none",
-							"bg-[var(--bg-100)] border-[var(--bg-400)] text-[var(--fg-800)]",
-							"focus:outline-none focus:ring-2 focus:ring-[var(--accent-500)] focus:border-transparent",
-							"placeholder:text-[var(--fg-500)]",
+							"flex-1 border-none w-full border text-base resize-none",
+							"text-[var(--fg-800)]",
+							"focus:text-[var(--fg-900)]",
+							"placeholder:text-[var(--fg-600)]",
 							isLocked && "opacity-60 cursor-not-allowed",
 							"scrollbar-thin scrollbar-thumb-[var(--bg-400)] scrollbar-track-transparent"
 						)}
+						style={{
+							backgroundImage: "radial-gradient(circle at 1px 1px, var(--bg-600-60) 1px, transparent 0)",
+							backgroundSize: "20px 20px",
+						}}
 						rows={Math.max(4, Math.floor((cell.height - 120) / 20))}
 					/>
 					

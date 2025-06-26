@@ -64,9 +64,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ onAddElementRef }) => {
 	}, [onAddElementRef]);
 
 	return (
-		<div
-			className={cn("absolute top-0 left-0 w-screen h-screen overflow-hidden")}
-		>
+		<div className="w-full h-full">
 			<Canvas
 				elements={elements}
 				stabilityWeight={stabilityWeight}
