@@ -1,7 +1,12 @@
 import type React from "react";
 import { memo } from "react";
 import { cn } from "../../utils";
-import { getEditorFont, getLineHeight, lineToY } from "./utils/measurements";
+import {
+	getFontFamily,
+	getFontSize,
+	getLineHeight,
+	lineToY,
+} from "./utils/measurements";
 
 interface LineProps {
 	lineNumber: number;
@@ -15,26 +20,34 @@ export const Line = memo<LineProps>(
 
 		return (
 			<div
-				className="absolute left-0 flex"
+				className="absolute left-0"
 				style={{
 					top: `${y}px`,
 					height: `${getLineHeight()}px`,
-					fontFamily: getEditorFont(),
 				}}
 			>
 				{showLineNumbers && (
 					<div
-						className={cn(
-							"select-none text-gray-500 text-right pr-4",
-							"min-w-[3rem]",
-						)}
-						style={{ fontSize: "14px" }}
+						className={cn("absolute select-none text-gray-500 text-right")}
+						style={{
+							fontSize: `${getFontSize()}px`,
+							fontFamily: getFontFamily(),
+							width: "48px", // 3rem
+							paddingRight: "16px", // pr-4
+						}}
 					>
 						{lineNumber + 1}
 					</div>
 				)}
-				<div className="flex-1 whitespace-pre" style={{ fontSize: "14px" }}>
-					{content || " "}{" "}
+				<div
+					className="absolute whitespace-pre"
+					style={{
+						fontSize: `${getFontSize()}px`,
+						fontFamily: getFontFamily(),
+						left: showLineNumbers ? "64px" : "0px",
+					}}
+				>
+					{content || " "}
 					{/* render space for empty lines to maintain height */}
 				</div>
 			</div>

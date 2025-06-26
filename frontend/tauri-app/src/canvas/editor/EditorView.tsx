@@ -36,7 +36,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 			const y = e.clientY - rect.top;
 
 			// account for line numbers width if shown
-			const lineNumberWidth = showLineNumbers ? 60 : 0; // 3rem = 48px + padding
+			const lineNumberWidth = showLineNumbers ? 64 : 0; // 3rem = 48px + pr-4 = 16px
 			const adjustedX = x - lineNumberWidth;
 
 			const line = yToLine(y);
@@ -57,7 +57,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
 	// calculate total height for scrolling
 	const totalHeight = document.getLineCount() * getLineHeight();
-	const lineNumberWidth = showLineNumbers ? 60 : 0;
+	const lineNumberWidth = showLineNumbers ? 64 : 0;
 
 	// calculate max width for horizontal scrolling
 	let maxWidth = 0;
