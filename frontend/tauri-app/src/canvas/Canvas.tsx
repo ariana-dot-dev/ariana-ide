@@ -2,6 +2,8 @@ import type { PanInfo } from "framer-motion";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../utils";
+import type { CodeEditor } from "./CodeEditor";
+import CodeEditorCanvas from "./CodeEditorCanvas";
 import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import FileTreeOnCanvas from "./FileTreeOnCanvas";
@@ -48,230 +50,224 @@ const Canvas: React.FC<CanvasProps> = ({
 	stabilityWeight = 0.1,
 	onElementsChange,
 }) => {
+	const canvasRef = useRef<HTMLDivElement>(null);
 	const [layouts, setLayouts] = useState<ElementLayout[]>([]);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+	const workerRef = useRef<{
+		worker: Worker;
+		messageCount: number;
+	} | null>(null);
+
 	const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(
 		null,
 	);
 	const [dragTarget, setDragTarget] = useState<CanvasElement | null>(null);
-	const canvasRef = useRef<HTMLDivElement>(null);
-	const workerRef = useRef<Worker | null>(null);
-	const previousLayoutsRef = useRef<ElementLayout[]>([]);
-	const elementsRef = useRef<CanvasElement[]>(elements);
+	const [dragPosition, setDragPosition] = useState<{ x: number; y: number }>({
+		x: 0,
+		y: 0,
+	});
 
-	// Update canvas size when window resizes
-	const updateCanvasSize = useCallback(() => {
-		if (canvasRef.current) {
-			const rect = canvasRef.current.getBoundingClientRect();
-			setCanvasSize({ width: rect.width, height: rect.height });
-		}
-	}, []);
-
-	// Initialize worker and resize observer
+	// Initialize worker
 	useEffect(() => {
-		workerRef.current = createGridWorker();
-
-		const handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
-			if (event.data.type === "GRID_OPTIMIZED") {
-				const newWorkerLayouts = event.data.payload.layouts;
-				console.log(
-					"Canvas: Worker returned layouts for elements:",
-					newWorkerLayouts.map((l) => l.element.id),
-				);
-
-				// Use a function to get the current elements to avoid stale closure
-				setLayouts((_currentLayouts) => {
-					// Get the current elements array from ref
-					const currentElements = elementsRef.current;
-					console.log(
-						"Canvas: Current elements array has IDs:",
-						currentElements.map((e) => e.id),
-					);
-
-					const newLayouts = newWorkerLayouts
-						.map((layout) => {
-							const element = currentElements.find(
-								(e) => e.id === layout.element.id,
-							);
-							if (!element) {
-								console.warn(
-									"Canvas: Could not find element for layout:",
-									layout.element.id,
-								);
-								return null;
-							}
-							console.log(
-								"Canvas: Found element for layout:",
-								layout.element.id,
-								Object.keys(element.kind)[0],
-							);
-							return {
-								element,
-								cell: layout.cell,
-								score: layout.score,
-								previousCell: layout.previousCell,
-							} satisfies ElementLayout;
-						})
-						.filter((l) => l !== null);
-
-					console.log("Canvas: Setting new layouts count:", newLayouts.length);
-					previousLayoutsRef.current = newLayouts;
-					return newLayouts;
-				});
-			}
+		const newWorker = createGridWorker();
+		workerRef.current = {
+			worker: newWorker,
+			messageCount: 0,
 		};
-
-		workerRef.current.onmessage = handleWorkerMessage;
-
-		// Set up resize observer
-		const resizeObserver = new ResizeObserver(updateCanvasSize);
-		if (canvasRef.current) {
-			resizeObserver.observe(canvasRef.current);
-		}
-
-		// Initial size update
-		updateCanvasSize();
 
 		return () => {
-			if (workerRef.current) {
-				workerRef.current.terminate();
-			}
-			resizeObserver.disconnect();
+			newWorker.terminate();
 		};
-	}, [updateCanvasSize]);
-
-	function optimizeElements() {
-		if (
-			elements.length > 0 &&
-			canvasSize.width > 0 &&
-			canvasSize.height > 0 &&
-			workerRef.current
-		) {
-			const message: WorkerMessage = {
-				type: "OPTIMIZE_GRID",
-				payload: {
-					elements: elements.map((e) => ({
-						id: e.id,
-						targets: e.targets,
-						weight: e.weight,
-					})),
-					canvasWidth: canvasSize.width,
-					canvasHeight: canvasSize.height,
-					previousLayouts: previousLayoutsRef.current,
-					options: { stabilityWeight },
-				},
-			};
-
-			workerRef.current.postMessage(message);
-		}
-	}
-
-	// Update elements ref whenever elements change
-	useEffect(() => {
-		elementsRef.current = elements;
-	}, [elements]);
-
-	// Optimize grid when elements or canvas size changes
-	useEffect(() => {
-		optimizeElements();
-	}, [elements, canvasSize, stabilityWeight]);
-
-	// Drag and drop handlers
-	const handleDragStart = useCallback((element: CanvasElement) => {
-		setDraggedElement(element);
 	}, []);
 
-	const handleDrag = useCallback(
-		(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-			const canvasRect = canvasRef.current?.getBoundingClientRect();
-			if (!canvasRect || !draggedElement) return;
+	// Request layout updates from worker
+	useEffect(() => {
+		const worker = workerRef.current;
+		if (!worker || canvasSize.width === 0 || canvasSize.height === 0) return;
 
-			const localX = info.point.x - canvasRect.left;
-			const localY = info.point.y - canvasRect.top;
+		const message: WorkerMessage = {
+			id: ++worker.messageCount,
+			type: "updateLayout",
+			data: {
+				elements,
+				canvasWidth: canvasSize.width,
+				canvasHeight: canvasSize.height,
+				draggedElement,
+				dragPosition,
+				dragTarget,
+				stabilityWeight,
+			},
+		};
 
-			const targetLayout = layouts.find((layout) => {
-				if (layout.element.id === draggedElement.id) return false; // Can't drop on itself
+		worker.worker.postMessage(message);
 
-				const { x, y, width, height } = layout.cell;
-				return (
-					localX >= x &&
-					localX <= x + width &&
-					localY >= y &&
-					localY <= y + height
-				);
-			});
-
-			const newTarget = targetLayout ? targetLayout.element : null;
-			if (newTarget?.id !== dragTarget?.id) {
-				setDragTarget(newTarget);
+		const handleMessage = (event: MessageEvent<WorkerResponse>) => {
+			if (event.data.id === worker.messageCount) {
+				setLayouts(event.data.layouts);
 			}
+		};
+
+		worker.worker.addEventListener("message", handleMessage);
+
+		return () => {
+			worker.worker.removeEventListener("message", handleMessage);
+		};
+	}, [
+		elements,
+		canvasSize,
+		draggedElement,
+		dragPosition,
+		dragTarget,
+		stabilityWeight,
+	]);
+
+	// Handle canvas resize
+	useEffect(() => {
+		if (!canvasRef.current) return;
+
+		const resizeObserver = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				setCanvasSize({
+					width: entry.contentRect.width,
+					height: entry.contentRect.height,
+				});
+			}
+		});
+
+		resizeObserver.observe(canvasRef.current);
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	}, []);
+
+	const handleDragStart = useCallback((element: CanvasElement) => {
+		console.log("Canvas: handleDragStart", element.id);
+		setDraggedElement(element);
+		setDragTarget(null);
+	}, []);
+
+	const handleDragEnd = useCallback(
+		(element: CanvasElement) => {
+			console.log("Canvas: handleDragEnd", element.id);
+			if (dragTarget && draggedElement) {
+				// Find indices of the dragged element and target
+				const draggedIndex = elements.findIndex(
+					(el) => el.id === draggedElement.id,
+				);
+				const targetIndex = elements.findIndex(
+					(el) => el.id === dragTarget.id,
+				);
+
+				if (draggedIndex !== -1 && targetIndex !== -1) {
+					// Create a new array with swapped elements
+					const newElements = [...elements];
+					[newElements[draggedIndex], newElements[targetIndex]] = [
+						newElements[targetIndex],
+						newElements[draggedIndex],
+					];
+					onElementsChange(newElements);
+				}
+			}
+
+			setDraggedElement(null);
+			setDragTarget(null);
+			setDragPosition({ x: 0, y: 0 });
 		},
-		[layouts, draggedElement, dragTarget],
+		[dragTarget, draggedElement, elements, onElementsChange],
 	);
 
-	const handleDragEnd = useCallback(() => {
-		if (draggedElement && dragTarget && draggedElement.id !== dragTarget.id) {
-			// Swap the elements
-			const newElements = [...elements];
-			const draggedIndex = newElements.findIndex(
-				(el) => el.id === draggedElement.id,
-			);
-			const targetIndex = newElements.findIndex(
-				(el) => el.id === dragTarget.id,
-			);
+	const handleDrag = useCallback((event: unknown, info: PanInfo) => {
+		console.log(`Canvas: handleDrag received. Delta: x=${info.delta.x}, y=${info.delta.y}`);
+		// Find the element under the drag position
+		const point = info.point;
 
-			if (draggedIndex !== -1 && targetIndex !== -1) {
-				[newElements[draggedIndex], newElements[targetIndex]] = [
-					newElements[targetIndex],
-					newElements[draggedIndex],
-				];
-				// onElementsChange(newElements);
-				setLayouts(
-					layouts.map((layout) => {
-						if (layout.element.id === draggedElement.id) {
-							return {
-								...layout,
-								element: newElements[draggedIndex],
-							};
-						} else if (layout.element.id === dragTarget.id) {
-							return {
-								...layout,
-								element: newElements[targetIndex],
-							};
-						}
-						return layout;
-					}),
-				);
+		// Check all layouts to see if we're over a different element
+		for (const layout of layouts) {
+			const { cell } = layout;
+			if (
+				layout.element !== draggedElement &&
+				point.x >= cell.x &&
+				point.x <= cell.x + cell.width &&
+				point.y >= cell.y &&
+				point.y <= cell.y + cell.height
+			) {
+				if (dragTarget !== layout.element) {
+					setDragTarget(layout.element);
+				}
+				break;
 			}
 		}
-		setDraggedElement(null);
-		setDragTarget(null);
-	}, [draggedElement, dragTarget, elements, onElementsChange]);
 
-	// Element update handlers
+		setDragPosition({
+			x: info.point.x,
+			y: info.point.y,
+		});
+	}, [layouts, draggedElement, dragTarget]);
+
+	// CRUD operations for elements
 	const handleRectangleUpdate = useCallback(
 		(element: Rectangle, newTargets: ElementTargets) => {
-			element.updateTargets(newTargets);
-			// Trigger re-optimization by updating the elements array
-			onElementsChange([...elements]);
+			// Find and update the element
+			const newElements = elements.map((el) => {
+				if (el.id === element.id && "rectangle" in el.kind) {
+					element.size = newTargets.size;
+					element.aspectRatio = newTargets.aspectRatio;
+					element.area = newTargets.area;
+					return el;
+				}
+				return el;
+			});
+			onElementsChange(newElements);
 		},
 		[elements, onElementsChange],
 	);
 
 	const handleTerminalUpdate = useCallback(
 		(element: Terminal, newConfig: TerminalConfig) => {
-			element.updateConfig(newConfig);
-			// Trigger re-optimization by updating the elements array
-			onElementsChange([...elements]);
+			// Find and update the element
+			const newElements = elements.map((el) => {
+				if (el.id === element.id && "terminal" in el.kind) {
+					el.kind.terminal.config = newConfig;
+					return el;
+				}
+				return el;
+			});
+			onElementsChange(newElements);
 		},
 		[elements, onElementsChange],
 	);
 
 	const handleFileTreeUpdate = useCallback(
 		(element: FileTreeCanvas, newTargets: ElementTargets) => {
-			element.updateTargets(newTargets);
-			// Trigger re-optimization by updating the elements array
-			onElementsChange([...elements]);
+			// Find and update the element
+			const newElements = elements.map((el) => {
+				if (el.id === element.id && "fileTree" in el.kind) {
+					element.size = newTargets.size;
+					element.aspectRatio = newTargets.aspectRatio;
+					element.area = newTargets.area;
+					return el;
+				}
+				return el;
+			});
+			onElementsChange(newElements);
+		},
+		[elements, onElementsChange],
+	);
+
+	const handleCodeEditorUpdate = useCallback(
+		(element: CodeEditor, newTargets: ElementTargets) => {
+			// Find and update the element
+			const newElements = elements.map((el) => {
+				if (el.id === element.id && "codeEditor" in el.kind) {
+					element.size = newTargets.size;
+					element.aspectRatio = newTargets.aspectRatio;
+					element.area = newTargets.area;
+					return el;
+				}
+				return el;
+			});
+			onElementsChange(newElements);
 		},
 		[elements, onElementsChange],
 	);
@@ -354,6 +350,20 @@ const Canvas: React.FC<CanvasProps> = ({
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
 							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
+							isDragTarget={layout.element === dragTarget}
+							isDragging={layout.element === draggedElement}
+						/>
+					);
+				} else if ("codeEditor" in layout.element.kind) {
+					return (
+						<CodeEditorCanvas
+							key={`${layout.element.id}`}
+							layout={layout}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
+							onCodeEditorUpdate={handleCodeEditorUpdate}
+							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
 						/>

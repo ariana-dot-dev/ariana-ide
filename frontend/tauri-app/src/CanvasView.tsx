@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import Canvas from "./canvas/Canvas";
+import { CodeEditor } from "./canvas/CodeEditor";
+import { CustomTerminal } from "./canvas/CustomTerminal";
 import { Rectangle } from "./canvas/Rectangle";
 import { Terminal } from "./canvas/Terminal";
 import { TextArea } from "./canvas/TextArea";
@@ -34,8 +36,8 @@ const createDemoElements = (): CanvasElement[] => {
 				// ),
 			]
 		: [
-				Rectangle.canvasElement(
-					{ size: "large", aspectRatio: 1 / 1, area: "center" },
+				CodeEditor.canvasElement(
+					{ size: "large", aspectRatio: 16 / 9, area: "center" },
 					1,
 				),
 				Terminal.createLocalShell(),
