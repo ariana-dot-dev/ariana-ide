@@ -116,3 +116,5 @@ src-tauri/WixTools
 Thumbs.db
 
 .npmrc
+
+.mcp.json

@@ -1,63 +1,82 @@
 import React, { useState } from "react";
 import Canvas from "./canvas/Canvas";
+import { CustomTerminal } from "./canvas/CustomTerminal";
 import { Rectangle } from "./canvas/Rectangle";
 import { Terminal } from "./canvas/Terminal";
-import { CustomTerminal } from "./canvas/CustomTerminal";
-import { CanvasElement, SizeTarget, AreaTarget } from "./canvas/types";
+import type { CanvasElement } from "./canvas/types";
 import { cn } from "./utils";
+
+interface CanvasViewProps {
+	onAddElementRef?: React.MutableRefObject<
+		((element: CanvasElement) => void) | null
+	>;
+}
 
 // Demo elements for testing
 const createDemoElements = (): CanvasElement[] => {
-	const isMac = navigator.platform.includes("Mac");
 	const isWindows = navigator.platform.includes("Win");
-	const isLinux = navigator.platform.includes("Linux");
+	const _isMac = navigator.platform.includes("Mac");
+	const _isLinux = navigator.platform.includes("Linux");
 
-	return isWindows ? [
-		// Rectangle.canvasElement(
-		// 	{ size: "large", aspectRatio: 1 / 1, area: "center" },
-		// 	1,
-		// ),
-		// CustomTerminal.canvasElement(
-		// 	{
-		// 		kind: {
-		// 			$type: "git-bash",
-		// 		},
-		// 		workingDir: "$HOME",
-		// 		lines: 5,
-		// 		cols: 10,
-		// 	},
-		// 	1,
-		// ),
-		CustomTerminal.canvasElement(
-			{
-				kind: {
-					$type: "wsl",
-					distribution: "Ubuntu",
-					workingDirectory: "~",
-				},
-				lines: 5,
-				cols: 10,
-			},
-			1,
-		),
-	] : [
-		Rectangle.canvasElement(
-			{ size: "large", aspectRatio: 1 / 1, area: "center" },
-			1,
-		),
-		Terminal.createLocalShell(),
-	]
+	return isWindows
+		? [
+				// Rectangle.canvasElement(
+				// 	{ size: "large", aspectRatio: 1 / 1, area: "center" },
+				// 	1,
+				// ),
+				// CustomTerminal.canvasElement(
+				// 	{
+				// 		kind: {
+				// 			$type: "git-bash",
+				// 		},
+				// 		workingDir: "$HOME",
+				// 		lines: 5,
+				// 		cols: 10,
+				// 	},
+				// 	1,
+				// ),
+				CustomTerminal.canvasElement(
+					{
+						kind: {
+							$type: "wsl",
+							distribution: "Ubuntu",
+							workingDirectory: "~",
+						},
+						lines: 5,
+						cols: 10,
+					},
+					1,
+				),
+			]
+		: [
+				Rectangle.canvasElement(
+					{ size: "large", aspectRatio: 1 / 1, area: "center" },
+					1,
+				),
+				Terminal.createLocalShell(),
+			];
 };
 
-const CanvasView: React.FC = () => {
+const CanvasView: React.FC<CanvasViewProps> = ({ onAddElementRef }) => {
 	const [elements, setElements] = useState<CanvasElement[]>(() =>
 		createDemoElements(),
 	);
-	const [stabilityWeight, setStabilityWeight] = useState(0.3);
+	const [stabilityWeight, _setStabilityWeight] = useState(0.3);
 
 	const handleElementsChange = (newElements: CanvasElement[]) => {
 		setElements(newElements);
 	};
+
+	const addElement = (element: CanvasElement) => {
+		setElements((prev) => [...prev, element]);
+	};
+
+	// Expose addElement function to parent
+	React.useEffect(() => {
+		if (onAddElementRef) {
+			onAddElementRef.current = addElement;
+		}
+	}, [onAddElementRef]);
 
 	return (
 		<div
