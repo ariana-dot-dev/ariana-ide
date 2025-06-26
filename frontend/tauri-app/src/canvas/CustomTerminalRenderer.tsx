@@ -12,7 +12,8 @@ import { cn } from "../utils";
 
 interface CustomTerminalRendererProps {
 	elementId: string;
-	spec: TerminalSpec;
+	spec?: TerminalSpec;
+	existingTerminalId?: string; // New prop to connect to existing terminal
 	onTerminalReady?: (terminalId: string) => void;
 	onTerminalError?: (error: string) => void;
 }
@@ -41,6 +42,7 @@ class TerminalConnectionManager {
 export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	elementId,
 	spec,
+	existingTerminalId,
 	onTerminalReady,
 	onTerminalError,
 }) => {
@@ -91,10 +93,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		let mounted = true;
 
 		const connectTerminal = async () => {
-			// Check if we already have a connection for this element
-			const existingTerminalId =
-				TerminalConnectionManager.getConnection(elementId);
-
+			// If we have an existing terminal ID passed in, use that
 			if (existingTerminalId && !terminalId) {
 				setTerminalId(existingTerminalId);
 				setIsConnected(true);
@@ -113,8 +112,35 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				return;
 			}
 
+			// Check if we already have a connection for this element
+			const managedTerminalId =
+				TerminalConnectionManager.getConnection(elementId);
+
+			if (managedTerminalId && !terminalId) {
+				setTerminalId(managedTerminalId);
+				setIsConnected(true);
+
+				// Set up event listeners for existing connection
+				await customTerminalAPI.onTerminalEvent(
+					managedTerminalId,
+					handleTerminalEvent,
+				);
+				await customTerminalAPI.onTerminalDisconnect(
+					managedTerminalId,
+					handleTerminalDisconnect,
+				);
+
+				onTerminalReady?.(managedTerminalId);
+				return;
+			}
+
 			// Don't create new connection if we already have one
 			if (terminalId && isConnected) {
+				return;
+			}
+
+			// Don't create new connection if no spec provided (headless case)
+			if (!spec) {
 				return;
 			}
 
@@ -149,7 +175,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			mounted = false;
 			// Don't kill terminals on unmount - keep connections alive for reuse
 		};
-	}, [elementId]);
+	}, [elementId, existingTerminalId]);
 
 	const scrollDown = useCallback(() => {
 		const inner = () => {
@@ -511,7 +537,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				<div
 					ref={scrollableRef}
 					className={cn(
-						"absolute top-0 left-0 w-full h-full overflow-y-auto flex flex-col",
+						"absolute top-0 left-0 w-full h-full overflow-x-hidden overflow-y-auto flex flex-col",
 					)}
 				>
 					{/* iterate windows of size 10 */}

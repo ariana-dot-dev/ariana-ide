@@ -2,6 +2,7 @@ import type { CustomTerminal } from "./CustomTerminal";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import type { Rectangle } from "./Rectangle";
 import type { Terminal } from "./Terminal";
+import { TextArea } from "./TextArea";
 
 export type SizeTarget = "small" | "medium" | "large";
 export type AreaTarget =
@@ -40,12 +41,14 @@ export type CanvasElementKind =
 	| RectangleKind
 	| TerminalKind
 	| CustomTerminalKind
-	| FileTreeKind;
+	| FileTreeKind
+	| TextAreaKind;
 
 export type RectangleKind = { rectangle: Rectangle };
 export type TerminalKind = { terminal: Terminal };
 export type CustomTerminalKind = { customTerminal: CustomTerminal };
 export type FileTreeKind = { fileTree: FileTreeCanvas };
+export type TextAreaKind = { textArea: TextArea };
 
 export class CanvasElement {
 	public weight: number;
@@ -67,6 +70,8 @@ export class CanvasElement {
 			return this.kind.customTerminal.targets();
 		} else if ("fileTree" in this.kind) {
 			return this.kind.fileTree.targets();
+		} else if ("textArea" in this.kind) {
+			return this.kind.textArea.targets();
 		}
 		throw new Error("Invalid kind");
 	}

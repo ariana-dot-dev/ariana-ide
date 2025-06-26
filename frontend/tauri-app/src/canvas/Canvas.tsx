@@ -15,6 +15,7 @@ import RectangleOnCanvas from "./RectangleOnCanvas";
 import type { Terminal, TerminalConfig } from "./Terminal";
 import TerminalOnCanvas from "./TerminalOnCanvas";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
+import TextAreaOnCanvas from "./TextAreaOnCanvas";
 
 interface CanvasProps {
 	elements: CanvasElement[];
@@ -357,6 +358,20 @@ const Canvas: React.FC<CanvasProps> = ({
 									}
 									onFileTreeUpdate={handleFileTreeUpdate}
 									onRemoveElement={handleRemoveElement}
+									isDragTarget={layout.element === dragTarget}
+									isDragging={layout.element === draggedElement}
+								/>
+							)
+						} else if ("textArea" in layout.element.kind) {
+							return (
+								<TextAreaOnCanvas
+									key={`${layout.element.id}`}
+									layout={layout}
+									onDragStart={handleDragStart}
+									onDragEnd={handleDragEnd}
+									onDrag={
+										layout.element === draggedElement ? handleDrag : () => {}
+									}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}
 								/>
