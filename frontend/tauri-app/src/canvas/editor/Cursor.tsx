@@ -1,0 +1,47 @@
+import type React from "react";
+import { useEffect, useState } from "react";
+import { cn } from "../../utils";
+import type { Position } from "./Document";
+import { columnToX, getLineHeight, lineToY } from "./utils/measurements";
+
+interface CursorProps {
+	position: Position;
+	isActive: boolean;
+}
+
+export const Cursor: React.FC<CursorProps> = ({ position, isActive }) => {
+	const [visible, setVisible] = useState(true);
+
+	// blinking animation
+	useEffect(() => {
+		if (!isActive) {
+			setVisible(false);
+			return;
+		}
+
+		setVisible(true);
+		const interval = setInterval(() => {
+			setVisible((v) => !v);
+		}, 530); // standard cursor blink rate
+
+		return () => clearInterval(interval);
+	}, [isActive, position]); // reset blink on position change
+
+	const x = columnToX(position.column);
+	const y = lineToY(position.line);
+
+	return (
+		<div
+			className={cn(
+				"absolute w-0.5 bg-white transition-all duration-75",
+				!visible && "opacity-0",
+			)}
+			style={{
+				left: `${x}px`,
+				top: `${y}px`,
+				height: `${getLineHeight()}px`,
+				transform: "translateX(-1px)", // center the cursor
+			}}
+		/>
+	);
+};
