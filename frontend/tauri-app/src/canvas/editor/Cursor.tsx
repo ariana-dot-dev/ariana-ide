@@ -33,14 +33,13 @@ export const Cursor: React.FC<CursorProps> = ({ position, isActive }) => {
 	return (
 		<div
 			className={cn(
-				"absolute w-0.5 bg-white transition-all duration-75",
+				"absolute w-[2px] bg-white transition-all duration-75",
 				!visible && "opacity-0",
 			)}
 			style={{
 				left: `${x}px`,
 				top: `${y}px`,
 				height: `${getLineHeight()}px`,
-				transform: "translateX(-1px)", // center the cursor
 			}}
 		/>
 	);

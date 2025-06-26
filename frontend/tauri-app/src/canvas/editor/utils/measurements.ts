@@ -18,6 +18,10 @@ export function getEditorFont(): string {
 	return `${FONT_SIZE}px ${FONT_FAMILY}`;
 }
 
+export function getFontFamily(): string {
+	return FONT_FAMILY;
+}
+
 function getMeasurementContext(): CanvasRenderingContext2D {
 	if (!measurementCanvas || !measurementContext) {
 		measurementCanvas = document.createElement("canvas");
