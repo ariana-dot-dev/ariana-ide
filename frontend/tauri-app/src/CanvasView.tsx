@@ -2,10 +2,9 @@ import React, { useState } from "react";
 import Canvas from "./canvas/Canvas";
 import { Rectangle } from "./canvas/Rectangle";
 import { Terminal } from "./canvas/Terminal";
-import { CustomTerminal } from "./canvas/CustomTerminal";
 import { CanvasElement } from "./canvas/types";
-import { createTextAreaElement } from "./canvas/utils";
 import { cn } from "./utils";
+import { TextArea } from "./canvas/TextArea";
 
 interface CanvasViewProps {
 	onAddElementRef?: React.RefObject<
@@ -21,20 +20,19 @@ const createDemoElements = (): CanvasElement[] => {
 
 	return isWindows ? [
 		// Create a Claude Code text area with a default prompt
-		createTextAreaElement("Create a simple hello world program in Python"),
-		
-		CustomTerminal.canvasElement(
-			{
-				kind: {
-					$type: "wsl",
-					distribution: "Ubuntu",
-					workingDirectory: "~",
-				},
-				lines: 5,
-				cols: 10,
-			},
-			1,
-		),
+		TextArea.canvasElement("Create a simple hello world program in Python")		
+		// CustomTerminal.canvasElement(
+		// 	{
+		// 		kind: {
+		// 			$type: "wsl",
+		// 			distribution: "Ubuntu",
+		// 			workingDirectory: "~",
+		// 		},
+		// 		lines: 5,
+		// 		cols: 10,
+		// 	},
+		// 	1,
+		// ),
 	] : [
 		Rectangle.canvasElement(
 			{ size: "large", aspectRatio: 1 / 1, area: "center" },

@@ -47,6 +47,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	onTerminalError,
 }) => {
 	const { isLightTheme } = useStore();
+	const logPrefix = `[CustomTerminalRenderer-${elementId}]`;
 
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [screen, setScreen] = useState<LineItem[][]>([]);
@@ -93,12 +94,19 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		let mounted = true;
 
 		const connectTerminal = async () => {
+			console.log(logPrefix, "🔌 Connecting terminal...");
+			console.log(logPrefix, "📋 existingTerminalId:", existingTerminalId);
+			console.log(logPrefix, "📋 spec:", spec);
+			console.log(logPrefix, "📋 current terminalId:", terminalId);
+			
 			// If we have an existing terminal ID passed in, use that
 			if (existingTerminalId && !terminalId) {
+				console.log(logPrefix, "🔗 Using existing terminal ID:", existingTerminalId);
 				setTerminalId(existingTerminalId);
 				setIsConnected(true);
 
 				// Set up event listeners for existing connection
+				console.log(logPrefix, "👂 Setting up event listeners for existing terminal");
 				await customTerminalAPI.onTerminalEvent(
 					existingTerminalId,
 					handleTerminalEvent,
@@ -108,6 +116,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					handleTerminalDisconnect,
 				);
 
+				console.log(logPrefix, "✅ Connected to existing terminal, notifying ready");
 				onTerminalReady?.(existingTerminalId);
 				return;
 			}

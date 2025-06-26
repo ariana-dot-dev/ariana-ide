@@ -1,0 +1,67 @@
+# CLI Agents Library - Development Commands
+
+# List all available commands
+default:
+    @just --list
+
+# 🔨 Build the library
+build:
+    @echo "🔨 Building CLI agents library..."
+    cargo build --release
+
+# 🧪 Run tests
+test:
+    @echo "🧪 Running tests..."
+    cargo test
+
+# 🔍 Check code without building
+check:
+    @echo "🔍 Checking code..."
+    cargo check
+
+# 🧹 Format code
+format:
+    @echo "🧹 Formatting code..."
+    cargo fmt
+
+# 🔍 Lint code
+lint:
+    @echo "🔍 Linting code..."
+    cargo clippy -- -D warnings
+
+# 🚀 Run example
+example:
+    @echo "🚀 Running example..."
+    cargo run --bin example
+
+# 🐍 Build Python bindings
+python:
+    @echo "🐍 Building Python bindings..."
+    cargo build --features python
+
+# 📦 Build Python package
+python-package:
+    @echo "📦 Building Python package..."
+    python setup.py bdist_wheel
+
+# 🔄 Watch and rebuild on changes
+watch:
+    @echo "🔄 Watching for changes..."
+    cargo watch -x "build --release"
+
+# 🔄 Watch and rebuild with Tauri integration
+watch-and-build:
+    @echo "🔄 Watching for changes and triggering Tauri rebuild..."
+    cargo watch -x "build --release" -s "echo '✅ CLI agents library rebuilt'"
+
+# 🧹 Clean build artifacts
+clean:
+    @echo "🧹 Cleaning build artifacts..."
+    cargo clean
+
+# 📋 Show library info
+info:
+    @echo "📋 CLI Agents Library Information:"
+    @echo "Version: $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+    @echo "Features: default, python"
+    @echo "Target directory: target/"

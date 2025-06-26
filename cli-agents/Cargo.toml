@@ -36,3 +36,7 @@ python = ["pyo3", "pyo3-asyncio"]
 [[bin]]
 name = "example"
 path = "src/bin/example.rs"
+
+# Development dependencies
+[dev-dependencies]
+env_logger = "0.10"

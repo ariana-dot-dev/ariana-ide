@@ -26,8 +26,11 @@ export class HeadlessTerminalAPI {
 	private sessions = new Map<string, HeadlessTerminalSession>();
 	private screenStates = new Map<string, TerminalScreenState>();
 	private eventCallbacks = new Map<string, (events: TerminalEvent[]) => void>();
+	private logPrefix = "[HeadlessTerminalAPI]";
 	
-	constructor() {}
+	constructor() {
+		console.log(this.logPrefix, "🏗️ HeadlessTerminalAPI initialized");
+	}
 	
 	/**
 	 * Create a new headless terminal session
@@ -41,8 +44,11 @@ export class HeadlessTerminalAPI {
 			cols: Math.max(80, spec.cols)
 		};
 		
+		console.log(this.logPrefix, "🚀 Creating terminal session with spec:", JSON.stringify(enhancedSpec, null, 2));
+		
 		try {
 			const terminalId = await customTerminalAPI.connectTerminal(enhancedSpec);
+			console.log(this.logPrefix, "✅ Terminal connected with ID:", terminalId);
 			
 			const session: HeadlessTerminalSession = {
 				id: terminalId,
@@ -60,11 +66,16 @@ export class HeadlessTerminalAPI {
 				totalLines: 0
 			});
 			
+			console.log(this.logPrefix, "📊 Session state initialized for:", terminalId);
+			
 			// Set up event monitoring
+			console.log(this.logPrefix, "👂 Setting up event monitoring...");
 			await this.setupEventMonitoring(terminalId);
 			
+			console.log(this.logPrefix, "🎉 Session created successfully:", terminalId);
 			return terminalId;
 		} catch (error) {
+			console.error(this.logPrefix, "💥 Failed to create session:", error);
 			throw new Error(`Failed to create headless terminal session: ${error}`);
 		}
 	}
@@ -73,12 +84,17 @@ export class HeadlessTerminalAPI {
 	 * Send a complete command to the terminal
 	 */
 	async sendCommand(sessionId: string, command: string): Promise<void> {
+		console.log(this.logPrefix, "📝 Sending command to session", sessionId.slice(0, 8) + "...:", command);
+		
 		if (!this.isSessionActive(sessionId)) {
-			throw new Error(`Session ${sessionId} is not active`);
+			const error = `Session ${sessionId} is not active`;
+			console.error(this.logPrefix, "❌", error);
+			throw new Error(error);
 		}
 		
 		await customTerminalAPI.sendRawInput(sessionId, command + "\n");
 		this.updateLastActivity(sessionId);
+		console.log(this.logPrefix, "✅ Command sent successfully");
 	}
 	
 	/**
@@ -301,42 +317,74 @@ export class HeadlessTerminalAPI {
 	}
 	
 	private handleTerminalEvents(sessionId: string, events: TerminalEvent[]): void {
+		console.log(this.logPrefix, "📺 Handling", events.length, "events for session", sessionId.slice(0, 8) + "...");
+		
 		const state = this.screenStates.get(sessionId);
-		if (!state) return;
+		if (!state) {
+			console.error(this.logPrefix, "❌ No state found for session:", sessionId);
+			return;
+		}
 		
 		this.updateLastActivity(sessionId);
 		
 		// Update screen state based on events
 		for (const event of events) {
+			console.log(this.logPrefix, "🔄 Processing event:", event.type);
+			
 			switch (event.type) {
 				case 'screenUpdate':
 					if (event.screen) {
+						console.log(this.logPrefix, "📱 Screen update - setting", event.screen.length, "lines");
 						state.lines = [...event.screen];
 						state.cursorLine = event.cursor_line ?? 0;
 						state.cursorCol = event.cursor_col ?? 0;
 						state.totalLines = state.lines.length;
+						
+						// Log current screen text
+						const screenText = this.getCurrentScreenText(sessionId);
+						console.log(this.logPrefix, "📄 Screen content after update:");
+						screenText.forEach((line, i) => {
+							if (line.trim()) {
+								console.log(this.logPrefix, `  [${i}]:`, JSON.stringify(line));
+							}
+						});
 					}
 					break;
 					
 				case 'newLines':
 					if (event.lines) {
+						console.log(this.logPrefix, "➕ Adding", event.lines.length, "new lines");
 						state.lines.push(...event.lines);
 						state.totalLines = state.lines.length;
+						
+						// Log new lines
+						event.lines.forEach((line, i) => {
+							const lineText = line.map(item => item.lexeme).join('');
+							if (lineText.trim()) {
+								console.log(this.logPrefix, `  New[${i}]:`, JSON.stringify(lineText));
+							}
+						});
 					}
 					break;
 					
 				case 'patch':
 					if (event.line !== undefined && event.items) {
+						console.log(this.logPrefix, "🔧 Patching line", event.line, "with", event.items.length, "items");
 						// Ensure we have enough lines
 						while (state.lines.length <= event.line) {
 							state.lines.push([]);
 						}
 						state.lines[event.line] = [...event.items];
+						
+						// Log patched line
+						const lineText = event.items.map(item => item.lexeme).join('');
+						console.log(this.logPrefix, `  Patch[${event.line}]:`, JSON.stringify(lineText));
 					}
 					break;
 					
 				case 'cursorMove':
 					if (event.line !== undefined && event.col !== undefined) {
+						console.log(this.logPrefix, "↔️ Cursor moved to line", event.line, "col", event.col);
 						state.cursorLine = event.line;
 						state.cursorCol = event.col;
 					}
@@ -347,7 +395,10 @@ export class HeadlessTerminalAPI {
 		// Forward events to callback if registered
 		const callback = this.eventCallbacks.get(sessionId);
 		if (callback) {
+			console.log(this.logPrefix, "📞 Forwarding events to callback");
 			callback(events);
+		} else {
+			console.log(this.logPrefix, "⚠️ No callback registered for session");
 		}
 	}
 	

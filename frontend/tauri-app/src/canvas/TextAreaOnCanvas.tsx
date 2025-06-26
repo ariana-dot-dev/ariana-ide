@@ -59,26 +59,40 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	});
 
 	const handleGoClick = async () => {
-		if (isLoading || !text.trim()) return;
+		console.log("[TextAreaOnCanvas]", "🚀 Go button clicked with text:", text.trim());
 		
+		if (isLoading || !text.trim()) {
+			console.log("[TextAreaOnCanvas]", "⚠️ Cannot start - isLoading:", isLoading, "hasText:", !!text.trim());
+			return;
+		}
+		
+		console.log("[TextAreaOnCanvas]", "🔒 Locking UI and starting task...");
 		setIsLoading(true);
 		setIsLocked(true);
 		
 		try {
 			// Create Claude Code agent
+			console.log("[TextAreaOnCanvas]", "🤖 Creating Claude Code agent...");
 			const agent = new ClaudeCodeAgent();
 			setClaudeAgent(agent);
 			
 			// Show terminal
+			console.log("[TextAreaOnCanvas]", "📺 Showing terminal...");
 			setShowTerminal(true);
 			
 			// Start Claude Code task
-			await agent.startTask(text.trim(), createTerminalSpec(), (terminalId: string) => {
+			const terminalSpec = createTerminalSpec();
+			console.log("[TextAreaOnCanvas]", "🎯 Starting Claude Code task with spec:", terminalSpec);
+			
+			await agent.startTask(text.trim(), terminalSpec, (terminalId: string) => {
+				console.log("[TextAreaOnCanvas]", "✅ Terminal ready, ID:", terminalId);
 				setTerminalId(terminalId);
 			});
 			
+			console.log("[TextAreaOnCanvas]", "🎉 Task started successfully");
+			
 		} catch (error) {
-			console.error("Failed to start Claude Code task:", error);
+			console.error("[TextAreaOnCanvas]", "💥 Failed to start Claude Code task:", error);
 			setIsLoading(false);
 			setIsLocked(false);
 		}
@@ -88,23 +102,39 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	useEffect(() => {
 		if (!claudeAgent) return;
 		
-		const handleTaskComplete = () => {
+		console.log("[TextAreaOnCanvas]", "👂 Setting up event listeners for Claude Code agent");
+		
+		const handleTaskComplete = (result: any) => {
+			console.log("[TextAreaOnCanvas]", "✅ Task completed:", result);
 			setIsLoading(false);
 			setIsLocked(false);
 		};
 		
 		const handleTaskError = (error: string) => {
-			console.error("Claude Code task error:", error);
+			console.error("[TextAreaOnCanvas]", "❌ Claude Code task error:", error);
 			setIsLoading(false);
 			setIsLocked(false);
 		};
 		
+		const handleTaskStarted = (data: any) => {
+			console.log("[TextAreaOnCanvas]", "🎬 Task started:", data);
+		};
+		
+		const handleScreenUpdate = (tuiLines: any) => {
+			console.log("[TextAreaOnCanvas]", "📱 Screen update received:", tuiLines.length, "lines");
+		};
+		
 		claudeAgent.on('taskComplete', handleTaskComplete);
 		claudeAgent.on('taskError', handleTaskError);
+		claudeAgent.on('taskStarted', handleTaskStarted);
+		claudeAgent.on('screenUpdate', handleScreenUpdate);
 		
 		return () => {
+			console.log("[TextAreaOnCanvas]", "🧹 Cleaning up event listeners");
 			claudeAgent.off('taskComplete', handleTaskComplete);
 			claudeAgent.off('taskError', handleTaskError);
+			claudeAgent.off('taskStarted', handleTaskStarted);
+			claudeAgent.off('screenUpdate', handleScreenUpdate);
 		};
 	}, [claudeAgent]);
 

@@ -9,7 +9,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "build:configured": "node ../build-config.js && npm run build",
     "dev": "npm run build && node dist/cli.js",
     "format:write": "biome format --write",
     "prepublishOnly": "npm run build:configured",
@@ -19,7 +18,6 @@
     "build:linux": "bash scripts/build_linux.sh",
     "build:macos": "sh ./scripts/build_macos.sh",
     "build:windows": "powershell.exe ./scripts/build_windows.ps1",
-    "build:simple": "bash scripts/build_simple.sh",
     "build:all": "npm run build:linux && npm run build:macos"
   },
   "keywords": [

@@ -5,4 +5,4 @@ export { default as ElementOverlay } from "./ElementOverlay";
 export { Rectangle } from "./Rectangle";
 export { TextArea } from "./TextArea";
 export * from "./types";
-export * from "./utils";
+export * from "../utils";

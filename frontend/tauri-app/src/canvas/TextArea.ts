@@ -1,4 +1,4 @@
-import { ElementTargets } from "./types";
+import { CanvasElement, ElementTargets } from "./types";
 
 export class TextArea {
 	public id: string;
@@ -31,5 +31,10 @@ export class TextArea {
 	
 	public unlock(): void {
 		this.isLocked = false;
+	}
+
+	static canvasElement(content: string = ""): CanvasElement {
+		const textArea = new TextArea(content);
+		return new CanvasElement({ textArea }, 1);
 	}
 }

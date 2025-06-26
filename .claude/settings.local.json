@@ -14,7 +14,11 @@
       "Bash(mv:*)",
       "Bash(cargo check:*)",
       "Bash(cargo build:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run:*)",
+      "Bash(npx typescript:*)"
     ],
     "deny": []
   }

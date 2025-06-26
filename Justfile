@@ -4,7 +4,7 @@
 default:
     @just --list
 
-# 🚀 Install and run backend server in development mode
+# Install and run backend server in development mode
 dev-backend:
     @echo "🔧 Installing and running backend..."
     cp backend/.env.example backend/.env
@@ -13,48 +13,43 @@ dev-backend:
     cd backend && sqlx migrate run
     cd backend && cargo run
 
-# 🎨 Install and run frontend (Tauri app only, no CLI login required)
+# Install and run frontend (Tauri app only, no CLI login required)
 dev-frontend:
-    @echo "🔧 Installing frontend dependencies..."
+    @echo "Installing frontend dependencies..."
     cd frontend/tauri-app && npm install
-    @echo "🚀 Starting Tauri development server..."
-    cd frontend && npm run dev-tauri
+    @echo "Starting Tauri development server..."
+    cd cli-agents && cargo watch -x build -s 'cd ../frontend && npm run dev-tauri'
 
-# 🔐 Install and run frontend via CLI (requires backend running)
+# Install and run frontend via CLI (requires backend running)
 dev-cli:
-    @echo "🔧 Installing CLI dependencies..."
+    @echo "Installing CLI dependencies..."
     cd frontend && npm install
-    @echo "🔧 Installing Tauri dependencies..."
+    @echo "Installing Tauri dependencies..."
     cd frontend/tauri-app && npm install
-    @echo "🔨 Building CLI..."
+    @echo "Building CLI..."
     cd frontend && npm run build
-    @echo "🔐 Starting CLI (will prompt for login)..."
+    @echo "Starting CLI (will prompt for login)..."
     cd frontend && node dist/cli.js
 
-# 📦 Build with custom configuration
-build CONFIG_PATH:
-    @echo "📦 Building with config: {{CONFIG_PATH}}"
-    node configure-build.js "{{CONFIG_PATH}}"
-    node build-package.js
-
-# 🏗️ Build for Windows
+# Build for Windows
 build-windows:
-    @echo "🏗️ Building for Windows..."
+    @echo "Building for Windows..."
     cd frontend/tauri-app && npm run tauri build -- --target x86_64-pc-windows-msvc
 
-# 🏗️ Build for macOS  
+# Build for macOS  
 build-macos:
-    @echo "🏗️ Building for macOS..."
+    @echo "Building for macOS..."
     cd frontend && sh scripts/build_macos.sh
 
-# 🏗️ Build for Linux
+# Build for Linux
 build-linux:
-    @echo "🏗️ Building for Linux..."
+    @echo "Building for Linux..."
     cd frontend && bash scripts/build_linux.sh
 
-# 🧹 Format all code
+# Format all code
 format:
-    @echo "🧹 Formatting code..."
+    @echo "Formatting code..."
     cd backend && cargo fmt
     cd frontend/tauri-app/src-tauri && cargo fmt
+    cd cli-agents && cargo fmt
     cd frontend && npm run format:write
