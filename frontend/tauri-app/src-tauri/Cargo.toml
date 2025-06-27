@@ -33,6 +33,9 @@ tauri-plugin-store = "2"
 tauri-plugin-fs = "2"
 walkdir = "2.5.0"
 
+# Local CLI agents library
+cli-agents = { path = "../../../cli-agents" }
+
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!

@@ -31,7 +31,7 @@ const StoreContext = createContext<IStore | null>(null);
 
 // Provider component
 export function StoreProvider({ children }: { children: ReactNode }) {
-	const [theme, setThemeState] = useState("semi-sky");
+	const [theme, setThemeState] = useState("light");
 	const [showOnboarding, setShowOnboardingState] = useState(false);
 	const [currentInterpreterScript, setCurrentInterpreterScriptState] =
 		useState("");
@@ -112,7 +112,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			setShowOnboarding(true);
 		}
 		if (commandToRevert.$type === "Theme:set") {
-			let previousTheme = "semi-sky";
+			let previousTheme = "light";
 			for (let i = newStack.length - 1; i >= 0; i--) {
 				const prevCommand = newStack[i];
 				if (prevCommand.$type === "Theme:set") {

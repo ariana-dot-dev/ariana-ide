@@ -57,7 +57,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute p-1 select-none overflow-hidden",
+				"absolute select-none overflow-hidden",
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{

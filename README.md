@@ -9,115 +9,53 @@
   </div>
 </p>
 
-## Short term Roadmap
+## Documentation
 
-- [x] TS Scripting engine + Boot script
-- [x] LLM API integration (Anthropic, OpenAI, Google, Groq, OpenRouter)
-- [x] Auto Layout
-- [ ] Small Agent for UI control
-- [ ] Machine/Env setup system with [mise](https://mise.jdx.dev/getting-started.html)
-- [x] Terminal UI DONNNNNE (buggy)
-- [ ] Machine/Env UI + fs UI
-- [ ] Text editing UI
+For detailed information, see the documentation in the `docs/` folder:
+
+- [📋 **ROADMAP.md**](docs/ROADMAP.md) - Project roadmap and architecture
+- [⚙️ **DEV_GUIDE.md**](docs/DEV_GUIDE.md) - Development environment setup
+- [ **BUILD.md**](docs/BUILD.md) - Building and packaging guide
 
 ## Installation
 
 Ariana IDE is not ready for usage yet. Come back in a few days/weeks!
 
-## Architecture
+## Quick Start
 
-- **Backend**: Rust + Actix Web + SQLite + LLM API
-- **CLI**: Node.js with email-based authentication flow
-- **Desktop App**: Tauri + React + Vite
+### Prerequisites
 
-## Project Structure
+- Node.js (>= 24.2.0)
+- Rust (latest)
 
-```
-ariana/
-├── backend/          # Rust backend server
-│   ├── src/
-│   │   ├── main.rs
-│   │   ├── auth.rs
-│   │   ├── database.rs
-│   │   ├── email.rs
-│   │   └── llm/      # LLM API integration
-│   └── Cargo.toml
-├── frontend/         # Node.js CLI + Tauri app
-│   ├── src/
-│   │   └── cli.js    # Main CLI application
-│   ├── tauri-app/    # Tauri desktop application
-│   └── package.json
-└── README.md
-```
+### Install Just
 
-## Development
-
-### Backend Setup
-
-1. Navigate to the backend directory:
 ```bash
-cd backend
+# Install Just
+
+npm install -g just
 ```
 
-2. Set up environment variables:
+### Development
 ```bash
-cp .env.example .env
-# Edit .env with your email credentials
+# Start backend
+# Before first time: edit backend/.env
+just dev-backend
+
+# Start frontend (separate terminal)
+just dev-frontend
+
+# Start via CLI login (separate terminal)  
+just dev-cli
 ```
 
-3. Run the backend:
+### Building
 ```bash
-cargo run
-```
+# Build with custom config
+just build example-configs/ariana-beta.json
 
-The backend will start on `http://localhost:8080` with the following endpoints:
-- `/ping` - Health check
-- `/auth/*` - Authentication endpoints
-- `/api/providers` - List LLM providers and models
-- `/api/inference` - LLM text completion
-- `/api/inference/stream` - LLM streaming completion
-
-See `backend/API_DOCUMENTATION.md` for complete LLM API documentation.
-
-### Frontend Setup
-
-1. Install CLI dependencies:
-```bash
-cd frontend
-npm install
-```
-
-2. Install Tauri app dependencies:
-```bash
-cd tauri-app
-npm install
-```
-
-3. Test the CLI locally:
-```bash
-cd ..
-node src/cli.js
-```
-
-## Usage
-
-### CLI Commands
-
-- `ariana` - Main command (login if not authenticated, launch IDE if authenticated)
-- `ariana login` - Force login flow
-- `ariana logout` - Clear stored credentials
-- `ariana status` - Check authentication status
-
-## Server Configuration
-
-Configure your email service in `backend/.env`:
-
-```
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-SENDER_EMAIL=your-email@gmail.com
+# Install locally
+cd dist && npm install -g .
 ```
 
 ## License

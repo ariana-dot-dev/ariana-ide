@@ -8,7 +8,7 @@ Write-Host "Building for Windows x64..."
 npm run tauri build -- --target x86_64-pc-windows-msvc
 
 # Copy binary to bin directory
-$sourcePath = "src-tauri\target\x86_64-pc-windows-msvc\release\ariana IDE.exe"
+$sourcePath = "src-tauri\target\x86_64-pc-windows-msvc\release\ariana-ide.exe
 $destPath = "..\bin\ariana-ide-windows-x64.exe"
 
 if (Test-Path $sourcePath) {

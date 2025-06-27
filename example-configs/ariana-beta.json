@@ -1,0 +1,8 @@
+{
+  "buildParams": {
+    "executableName": "ariana-beta"
+  },
+  "runtimeParams": {
+    "serverUrl": "https://beta-api.ariana.dev"
+  }
+}

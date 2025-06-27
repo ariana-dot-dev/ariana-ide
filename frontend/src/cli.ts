@@ -17,6 +17,15 @@ interface Config {
 	backendUrl?: string;
 }
 
+interface BuildConfig {
+	buildParams: {
+		executableName: string;
+	};
+	runtimeParams: {
+		serverUrl: string;
+	};
+}
+
 interface AuthResponse {
 	token: string;
 	account: {
@@ -52,10 +61,27 @@ async function isDevelopmentMode(): Promise<boolean> {
 	}
 }
 
-// Get backend URL from: 1. ENV var, 2. Global config, 3. Smart default
+// Load build config from bundled config.json
+async function loadBuildConfig(): Promise<BuildConfig | null> {
+	try {
+		const configPath = path.join(__dirname, "config.json");
+		const configContent = await fs.readFile(configPath, "utf8");
+		return JSON.parse(configContent);
+	} catch {
+		return null;
+	}
+}
+
+// Get backend URL from: 1. ENV var, 2. Build config, 3. Global config, 4. Smart default
 async function getBackendUrl(): Promise<string> {
 	if (process.env.RIANA_BACKEND_URL) {
 		return process.env.RIANA_BACKEND_URL;
+	}
+
+	// Check bundled build config first
+	const buildConfig = await loadBuildConfig();
+	if (buildConfig?.runtimeParams?.serverUrl) {
+		return buildConfig.runtimeParams.serverUrl;
 	}
 
 	const config = await loadConfig();
@@ -222,7 +248,9 @@ async function status(): Promise<void> {
 			`Token expires at: ${new Date(config.expiresAt!).toLocaleString()}`,
 		);
 	} else {
-		console.log("You are not logged in. Run `ariana login` to authenticate.");
+		const buildConfig = await loadBuildConfig();
+		const executableName = buildConfig?.buildParams?.executableName || "ariana";
+		console.log(`You are not logged in. Run \`${executableName} login\` to authenticate.`);
 	}
 }
 
@@ -283,10 +311,29 @@ async function install(): Promise<void> {
 	console.log("Ariana setup complete.");
 }
 
+// Get version from package.json (ground truth) and description
+async function getVersionAndDescription(): Promise<{version: string, description: string}> {
+	try {
+		const packageJsonPath = path.join(__dirname, "..", "package.json");
+		const packageJsonContent = await fs.readFile(packageJsonPath, "utf8");
+		const packageJson = JSON.parse(packageJsonContent);
+		return {
+			version: packageJson.version || "0.1.0",
+			description: "ariana IDE - A modern development environment"
+		};
+	} catch {
+		return {
+			version: "0.1.0",
+			description: "ariana IDE - A modern development environment"
+		};
+	}
+}
+
 // Main CLI logic
+const { version, description } = await getVersionAndDescription();
 program
-	.version("0.1.0")
-	.description("ariana IDE - A modern development environment");
+	.version(version)
+	.description(description);
 
 program
 	.command("login")

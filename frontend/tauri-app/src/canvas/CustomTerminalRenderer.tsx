@@ -12,7 +12,8 @@ import { cn } from "../utils";
 
 interface CustomTerminalRendererProps {
 	elementId: string;
-	spec: TerminalSpec;
+	spec?: TerminalSpec;
+	existingTerminalId?: string;
 	onTerminalReady?: (terminalId: string) => void;
 	onTerminalError?: (error: string) => void;
 }
@@ -41,10 +42,12 @@ class TerminalConnectionManager {
 export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	elementId,
 	spec,
+	existingTerminalId,
 	onTerminalReady,
 	onTerminalError,
 }) => {
 	const { isLightTheme } = useStore();
+	const logPrefix = `[CustomTerminalRenderer-${elementId}]`;
 
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [screen, setScreen] = useState<LineItem[][]>([]);
@@ -88,18 +91,22 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 	// Initialize terminal connection
 	useEffect(() => {
-		let mounted = true;
+		// let mounted = true;
 
 		const connectTerminal = async () => {
-			// Check if we already have a connection for this element
-			const existingTerminalId =
-				TerminalConnectionManager.getConnection(elementId);
-
+			console.log(logPrefix, "Connecting terminal...");
+			console.log(logPrefix, "existingTerminalId:", existingTerminalId);
+			console.log(logPrefix, "spec:", spec);
+			console.log(logPrefix, "current terminalId:", terminalId);
+			
+			// If we have an existing terminal ID passed in, use that
 			if (existingTerminalId && !terminalId) {
+				console.log(logPrefix, "Using existing terminal ID:", existingTerminalId);
 				setTerminalId(existingTerminalId);
 				setIsConnected(true);
 
 				// Set up event listeners for existing connection
+				console.log(logPrefix, "Setting up event listeners for existing terminal");
 				await customTerminalAPI.onTerminalEvent(
 					existingTerminalId,
 					handleTerminalEvent,
@@ -109,7 +116,30 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					handleTerminalDisconnect,
 				);
 
+				console.log(logPrefix, "Connected to existing terminal, notifying ready");
 				onTerminalReady?.(existingTerminalId);
+				return;
+			}
+
+			// Check if we already have a connection for this element
+			const managedTerminalId =
+				TerminalConnectionManager.getConnection(elementId);
+
+			if (managedTerminalId && !terminalId) {
+				setTerminalId(managedTerminalId);
+				setIsConnected(true);
+
+				// Set up event listeners for existing connection
+				await customTerminalAPI.onTerminalEvent(
+					managedTerminalId,
+					handleTerminalEvent,
+				);
+				await customTerminalAPI.onTerminalDisconnect(
+					managedTerminalId,
+					handleTerminalDisconnect,
+				);
+
+				onTerminalReady?.(managedTerminalId);
 				return;
 			}
 
@@ -118,9 +148,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				return;
 			}
 
+			// Don't create new connection if no spec provided (headless case)
+			if (!spec) {
+				return;
+			}
+
 			try {
 				const id = await customTerminalAPI.connectTerminal(spec);
-				if (!mounted) return;
+				// if (!mounted) return;
 
 				// Store the connection mapping
 				TerminalConnectionManager.setConnection(elementId, id);
@@ -137,7 +172,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 				onTerminalReady?.(id);
 			} catch (err) {
-				if (!mounted) return;
+				// if (!mounted) return;
 				const errorMessage = err instanceof Error ? err.message : String(err);
 				onTerminalError?.(errorMessage);
 			}
@@ -145,11 +180,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 		connectTerminal();
 
-		return () => {
-			mounted = false;
-			// Don't kill terminals on unmount - keep connections alive for reuse
-		};
-	}, [elementId]);
+		// return () => {
+		// 	mounted = false;
+		// 	// Don't kill terminals on unmount - keep connections alive for reuse
+		// };
+	}, [elementId, existingTerminalId]);
 
 	const scrollDown = useCallback(() => {
 		const inner = () => {
@@ -266,6 +301,19 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 							return;
 						}
 						await customTerminalAPI.sendCtrlC(terminalId);
+						event.preventDefault();
+						return;
+					}
+					if (event.key === "v") {
+						// Handle paste by reading from clipboard
+						try {
+							const text = await navigator.clipboard.readText();
+							if (text) {
+								await sendRawInput(text);
+							}
+						} catch (clipboardErr) {
+							console.error("Error reading clipboard:", clipboardErr);
+						}
 						event.preventDefault();
 						return;
 					}
@@ -483,9 +531,9 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		<div
 			ref={terminalRef}
 			className={cn(
-				"rounded-md text-2xl backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				"rounded-md text-base backdrop-blur-md bg-[var(--bg-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
 			)}
-			tabIndex={0}
+			tabIndex={-1}
 			onKeyDown={handleKeyDown}
 			onClick={() => terminalRef.current?.focus()}
 		>
@@ -498,7 +546,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				<div
 					ref={scrollableRef}
 					className={cn(
-						"absolute top-0 left-0 w-full h-full overflow-y-auto flex flex-col",
+						"absolute top-0 left-0 w-full h-full overflow-x-hidden overflow-y-auto flex flex-col",
 					)}
 				>
 					{/* iterate windows of size 10 */}

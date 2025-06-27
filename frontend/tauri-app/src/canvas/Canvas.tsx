@@ -15,6 +15,7 @@ import RectangleOnCanvas from "./RectangleOnCanvas";
 import type { Terminal, TerminalConfig } from "./Terminal";
 import TerminalOnCanvas from "./TerminalOnCanvas";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
+import TextAreaOnCanvas from "./TextAreaOnCanvas";
 
 interface CanvasProps {
 	elements: CanvasElement[];
@@ -175,8 +176,6 @@ const Canvas: React.FC<CanvasProps> = ({
 		optimizeElements();
 	}, [elements, canvasSize, stabilityWeight]);
 
-	// Colors are now generated directly in the render based on ID, so this useEffect is no longer needed.
-
 	// Drag and drop handlers
 	const handleDragStart = useCallback((element: CanvasElement) => {
 		setDraggedElement(element);
@@ -286,90 +285,96 @@ const Canvas: React.FC<CanvasProps> = ({
 	);
 
 	return (
-		<div className={cn("flex w-full h-full p-2")}>
-			<div className={cn("relative w-full h-full rounded-md overflow-hidden")}>
-				<div
-					ref={canvasRef}
-					className={cn("absolute left-0 w-full overflow-hidden m-0 p-0")}
-					style={{ top: "30px", height: "calc(100% - 30px)" }}
-				>
-					{layouts.map((layout) => {
-						if ("rectangle" in layout.element.kind) {
-							return (
-								<RectangleOnCanvas
-									key={`${layout.element.id}`}
-									layout={layout}
-									onDragStart={handleDragStart}
-									onDragEnd={handleDragEnd}
-									onDrag={
-										layout.element === draggedElement ? handleDrag : () => {}
-									}
-									onRectangleUpdate={handleRectangleUpdate}
-									onRemoveElement={handleRemoveElement}
-									isDragTarget={layout.element === dragTarget}
-									isDragging={layout.element === draggedElement}
-								/>
-							);
-						} else if ("terminal" in layout.element.kind) {
-							return (
-								<TerminalOnCanvas
-									key={`${layout.element.id}`}
-									layout={layout}
-									onDragStart={handleDragStart}
-									onDragEnd={handleDragEnd}
-									onDrag={
-										layout.element === draggedElement ? handleDrag : () => {}
-									}
-									onTerminalUpdate={handleTerminalUpdate}
-									onRemoveElement={handleRemoveElement}
-									isDragTarget={layout.element === dragTarget}
-									isDragging={layout.element === draggedElement}
-								/>
-							);
-						} else if ("customTerminal" in layout.element.kind) {
-							return (
-								<CustomTerminalOnCanvas
-									key={`${layout.element.id}`}
-									layout={layout}
-									spec={layout.element.kind.customTerminal.spec}
-									onDragStart={handleDragStart}
-									onDragEnd={handleDragEnd}
-									onDrag={
-										layout.element === draggedElement ? handleDrag : () => {}
-									}
-									isDragTarget={layout.element === dragTarget}
-									isDragging={layout.element === draggedElement}
-								/>
-							);
-						} else if ("fileTree" in layout.element.kind) {
-							console.log(
-								"Canvas: Rendering FileTreeOnCanvas for element:",
-								layout.element.id,
-							);
-							return (
-								<FileTreeOnCanvas
-									key={`${layout.element.id}`}
-									layout={layout}
-									onDragStart={handleDragStart}
-									onDragEnd={handleDragEnd}
-									onDrag={
-										layout.element === draggedElement ? handleDrag : () => {}
-									}
-									onFileTreeUpdate={handleFileTreeUpdate}
-									onRemoveElement={handleRemoveElement}
-									isDragTarget={layout.element === dragTarget}
-									isDragging={layout.element === draggedElement}
-								/>
-							);
-						}
-						return (
-							<div key={`${layout.element.id}`}>
-								None: {JSON.stringify(layout.element)}
-							</div>
-						);
-					})}
-				</div>
-			</div>
+		<div ref={canvasRef} className={cn("relative flex w-full h-full")}>	
+			{layouts.map((layout) => {
+				if ("rectangle" in layout.element.kind) {
+					return (
+						<RectangleOnCanvas
+							key={`${layout.element.id}`}
+							layout={layout}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDrag={
+								layout.element === draggedElement ? handleDrag : () => {}
+							}
+							onRectangleUpdate={handleRectangleUpdate}
+							onRemoveElement={handleRemoveElement}
+							isDragTarget={layout.element === dragTarget}
+							isDragging={layout.element === draggedElement}
+						/>
+					);
+				} else if ("terminal" in layout.element.kind) {
+					return (
+						<TerminalOnCanvas
+							key={`${layout.element.id}`}
+							layout={layout}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDrag={
+								layout.element === draggedElement ? handleDrag : () => {}
+							}
+							onTerminalUpdate={handleTerminalUpdate}
+							onRemoveElement={handleRemoveElement}
+							isDragTarget={layout.element === dragTarget}
+							isDragging={layout.element === draggedElement}
+						/>
+					);
+				} else if ("customTerminal" in layout.element.kind) {
+					return (
+						<CustomTerminalOnCanvas
+							key={`${layout.element.id}`}
+							layout={layout}
+							spec={layout.element.kind.customTerminal.spec}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDrag={
+								layout.element === draggedElement ? handleDrag : () => {}
+							}
+							isDragTarget={layout.element === dragTarget}
+							isDragging={layout.element === draggedElement}
+						/>
+					);
+				} else if ("fileTree" in layout.element.kind) {
+					console.log(
+						"Canvas: Rendering FileTreeOnCanvas for element:",
+						layout.element.id,
+					);
+					return (
+						<FileTreeOnCanvas
+							key={`${layout.element.id}`}
+							layout={layout}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDrag={
+								layout.element === draggedElement ? handleDrag : () => {}
+							}
+							onFileTreeUpdate={handleFileTreeUpdate}
+							onRemoveElement={handleRemoveElement}
+							isDragTarget={layout.element === dragTarget}
+							isDragging={layout.element === draggedElement}
+						/>
+					)
+				} else if ("textArea" in layout.element.kind) {
+					return (
+						<TextAreaOnCanvas
+							key={`${layout.element.id}`}
+							layout={layout}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDrag={
+								layout.element === draggedElement ? handleDrag : () => {}
+							}
+							isDragTarget={layout.element === dragTarget}
+							isDragging={layout.element === draggedElement}
+						/>
+					);
+				}
+				return (
+					<div key={`${layout.element.id}`}>
+						None: {JSON.stringify(layout.element)}
+					</div>
+				);
+			})}
 		</div>
 	);
 };

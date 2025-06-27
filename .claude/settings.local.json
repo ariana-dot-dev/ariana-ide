@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node:*)",
+      "Bash(npm run build:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(chmod:*)",
+      "Bash(just:*)",
+      "Bash(npm install)",
+      "Bash(uv run:*)",
+      "Bash(mv:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo build:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run:*)",
+      "Bash(npx typescript:*)"
     ],
     "deny": []
   }

@@ -1,0 +1,42 @@
+[package]
+name = "cli-agents"
+version = "0.1.0"
+edition = "2021"
+description = "A library for wrapping CLI agentic tools like Claude Code"
+authors = ["Ariana Team"]
+license = "MIT"
+
+[lib]
+name = "cli_agents"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+thiserror = "1.0"
+anyhow = "1.0"
+futures = "0.3"
+log = "0.4"
+notify = "6.0"
+walkdir = "2.0"
+similar = "2.0"
+crossbeam-channel = "0.5"
+
+# Python bindings
+pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"], optional = true }
+
+[features]
+default = []
+python = ["pyo3", "pyo3-asyncio"]
+
+[[bin]]
+name = "example"
+path = "src/bin/example.rs"
+
+# Development dependencies
+[dev-dependencies]
+env_logger = "0.10"

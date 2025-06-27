@@ -5,10 +5,12 @@
 	"main": "src/main.tsx",
 	"type": "module",
 	"scripts": {
-		"dev": "uv run ./scripts/generate_theme_colors.py && vite",
-		"build": "uv run ./scripts/generate_theme_colors.py && vite build",
-		"preview": "uv run ./scripts/generate_theme_colors.py && vite preview",
-		"tauri": "tauri dev"
+		"dev": "node scripts/generateThemes.cjs && vite",
+		"build": "node scripts/generateThemes.cjs && vite build",
+		"preview": "node scripts/generateThemes.cjs && vite preview",
+		"tauri": "tauri",
+		"tauri:dev": "tauri dev",
+		"tauri:build": "tauri build"
 	},
 	"keywords": [
 		"tauri",
@@ -18,6 +20,7 @@
 	"author": "",
 	"license": "AGPL-3.0-or-later",
 	"dependencies": {
+		"@swc/wasm-web": "^1.12.6",
 		"@tailwindcss/vite": "^4.1.10",
 		"@tauri-apps/api": "^2.5.0",
 		"@tauri-apps/plugin-fs": "^2.3.0",
