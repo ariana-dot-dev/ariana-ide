@@ -15,12 +15,12 @@ const Onboarding = ({ userEmail }: { userEmail: string }) => {
 		<div
 			id="onboarding"
 			className={cn(
-				"group relative text-center p-8 border-2 border-[var(--bg-100)]/0 hover:border-[var(--bg-100)]/20 border-dashed",
+				"group relative text-center p-8 border-2 border-[var(--base-100)]/0 hover:border-[var(--base-100)]/20 border-dashed",
 			)}
 		>
 			<button
 				className={cn(
-					"group/closebutton absolute right-0 top-0 group-hover:flex hidden p-1 items-center justify-center cursor-pointer border-b-2 border-l-2 border-[var(--bg-100)]/20 border-dashed rounded-bl-md",
+					"group/closebutton absolute right-0 top-0 group-hover:flex hidden p-1 items-center justify-center cursor-pointer border-b-2 border-l-2 border-[var(--base-100)]/20 border-dashed rounded-bl-md",
 				)}
 				onClick={async () => {
 					await interpreter?.tryRunInstruction("Onboarding.hide()");
@@ -38,7 +38,7 @@ const Onboarding = ({ userEmail }: { userEmail: string }) => {
 				<img src="./assets/app-icon.png" className={cn("w-56 opacity-10")} />
 				<h1 className={cn("text-5xl font-mono font-bold mb-8")}>Ariana IDE</h1>
 			</div>
-			<p className={cn("text-[var(--bg-100)] text-lg px-2")}>
+			<p className={cn("text-[var(--base-100)] text-lg px-2")}>
 				Welcome, {userEmail}
 			</p>
 		</div>

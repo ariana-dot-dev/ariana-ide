@@ -112,7 +112,7 @@ function App() {
 		return (
 			<div
 				className={cn(
-					"h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--bg-300)] to-[var(--bg-200)] flex flex-col rounded-lg overflow-hidden",
+					"h-screen w-screen items-center justify-center bg-gradient-to-b from-[var(--base-300)] to-[var(--base-200)] flex flex-col rounded-lg overflow-hidden",
 				)}
 			>
 				Loading user config...
@@ -124,10 +124,10 @@ function App() {
 		<InterpreterContext value={interpreter}>
 			<div
 				className={cn(
-					"relative font-sans font-semibold h-screen w-screen overflow-hidden selection:bg-[var(--fg-300)] text-[var(--blackest)]",
+					"relative font-sans font-semibold h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)]",
 					isLightTheme
-						? "bg-gradient-to-t from-[var(--fg-100)] to-[var(--bg-500)]"
-						: "bg-gradient-to-t from-[var(--fg-500)] to-[var(--bg-500)]",
+						? "bg-gradient-to-t from-[var(--acc-100)] to-[var(--base-100)]"
+						: "bg-gradient-to-t from-[var(--acc-100)] to-[var(--base-100)]",
 					isMaximized ? "rounded-none" : "rounded-lg",
 					`theme-${store.theme}`,
 				)}
@@ -157,8 +157,8 @@ function App() {
 							}, 1000)
 						}}
 						className={cn(
-							"flex items-center outline-0 justify-center rounded-md select-none relative z-50  transition-[height] border-[var(--bg-600-70)]",
-							showTitlebar ? "h-fit py-1" : "h-1 mx-2 hover:h-3 not-hover:bg-[var(--bg-600-40)] hover:border-2"
+							"flex items-center outline-0 justify-center rounded-md select-none relative z-50  transition-[height] border-[var(--acc-400-50)]",
+							showTitlebar ? "h-fit py-1" : "h-1 mx-2 hover:h-3 not-hover:bg-[var(--base-400-40)] hover:border-2"
 						)}
 					>
 						{showTitlebar && (
@@ -166,7 +166,7 @@ function App() {
 								<span
 									data-tauri-drag-region
 									className={cn(
-										"starting:opacity-0 text-[var(--fg-500)] opacity-100 text-sm font-medium font-sans w-full text-center",
+										"starting:opacity-0 text-[var(--acc-500)] opacity-100 text-sm font-medium font-sans w-full text-center",
 									)}
 								>
 									Ariana IDE
@@ -176,7 +176,7 @@ function App() {
 										type="button"
 										onClick={openFileTree}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--bg-600-70)] hover:bg-[var(--bg-600)] rounded-l-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-l-md transition-colors cursor-pointer",
 										)}
 									>
 										📁
@@ -185,7 +185,7 @@ function App() {
 										type="button"
 										onClick={openNewTerminal}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--bg-600-70)] hover:bg-[var(--bg-600)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-r-md transition-colors cursor-pointer",
 										)}
 									>
 										💻
@@ -196,21 +196,21 @@ function App() {
 										type="button"
 										onClick={handleClose}
 										className={cn(
-											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--bg-600-70)] hover:bg-red-400 hover:outline-2 outline-offset-2 outline-red-500/50 hover:opacity-100 transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--base-400-50)] hover:bg-red-400 hover:outline-2 outline-offset-2 outline-red-500/50 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 									<button
 										type="button"
 										onClick={handleMinimize}
 										className={cn(
-											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--bg-600-70)] hover:bg-yellow-400 hover:outline-2 outline-offset-2 outline-yellow-500/50 hover:opacity-100 transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--base-400-50)] hover:bg-yellow-400 hover:outline-2 outline-offset-2 outline-yellow-500/50 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 									<button
 										type="button"
 										onClick={handleMaximize}
 										className={cn(
-											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full  bg-[var(--bg-600-70)] hover:bg-green-400 hover:outline-2 outline-offset-2 outline-green-500/50 hover:opacity-100 transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full  bg-[var(--base-400-50)] hover:bg-green-400 hover:outline-2 outline-offset-2 outline-green-500/50 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 								</div>
@@ -222,7 +222,7 @@ function App() {
 					{!interpreter && (
 						<div
 							className={cn(
-								"absolute top-16 right-4 bg-[var(--bg-800)]/90 text-[var(--fg-300)] px-3 py-2 rounded-md text-sm",
+								"absolute top-16 right-4 bg-[var(--base-800)]/90 text-[var(--acc-300)] px-3 py-2 rounded-md text-sm",
 							)}
 						>
 							Initializing interpreter...
@@ -245,7 +245,7 @@ function App() {
 								key={theme}
 								className={cn(
 									`theme-${theme}`,
-									"rounded-full w-4 h-4 cursor-pointer  bg-gradient-to-br from-[var(--bg-500)] to-[var(--fg-500)] hover:outline-2 outline-[var(--fg-600)] transition-all",
+									"rounded-full w-4 h-4 cursor-pointer  bg-gradient-to-br from-[var(--base-500)] to-[var(--acc-500)] hover:outline-2 outline-[var(--acc-600)] transition-all",
 									theme === store.theme ? "opacity-100" : "opacity-50",
 								)}
 								onClick={() => store.setTheme(theme)}

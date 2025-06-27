@@ -31,7 +31,7 @@ const Repl = () => {
 		<div
 			id="scriptContainer"
 			className={cn(
-				"absolute text-[var(--blackest)] left-2 bottom-2 flex flex-col z-10 p-3 rounded-md backdrop-blur-sm font-mono bg-[var(--fg-800)]/10 w-[42ch] min-h-[40ch]",
+				"absolute text-[var(--blackest)] left-2 bottom-2 flex flex-col z-10 p-3 rounded-md backdrop-blur-sm font-mono bg-[var(--acc-800)]/10 w-[42ch] min-h-[40ch]",
 			)}
 		>
 			<div className={cn("px-3 py-2 flex-1")}>
@@ -41,7 +41,7 @@ const Repl = () => {
 			</div>
 			<div
 				className={cn(
-					"w-full rounded-md overflow-hidden max-w-full h-fit bg-[var(--fg-800)]/10 flex justify-between",
+					"w-full rounded-md overflow-hidden max-w-full h-fit bg-[var(--acc-800)]/10 flex justify-between",
 				)}
 			>
 				<input
@@ -61,7 +61,7 @@ const Repl = () => {
 					}}
 				/>
 				<button
-					className={cn("px-4 py-1 hover:bg-[var(--fg-600)] cursor-pointer")}
+					className={cn("px-4 py-1 hover:bg-[var(--acc-600)] cursor-pointer")}
 					onClick={() => {
 						try {
 							interpreter?.tryRunInstruction(commandInput);

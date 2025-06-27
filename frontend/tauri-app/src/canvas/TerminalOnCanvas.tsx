@@ -70,27 +70,27 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		// Resolve CSS variables -> solid colors for xterm (it cannot understand CSS vars)
 		const cssVars = getComputedStyle(document.documentElement);
 		const theme = {
-			background: resolveColor("--bg-500", cssVars),
-			foreground: resolveColor("--fg-500", cssVars),
-			cursor: resolveColor("--fg-900", cssVars),
-			selectionBackground: resolveColor("--fg-900", cssVars),
-			selectionForeground: resolveColor("--fg-200", cssVars),
+			background: resolveColor("--base-500", cssVars),
+			foreground: resolveColor("--acc-500", cssVars),
+			cursor: resolveColor("--acc-900", cssVars),
+			selectionBackground: resolveColor("--acc-900", cssVars),
+			selectionForeground: resolveColor("--acc-200", cssVars),
 			black: resolveColor("--blackest", cssVars),
 			red: resolveColor("--negative-500", cssVars),
 			green: resolveColor("--positive-500", cssVars),
-			yellow: resolveColor("--fg-600", cssVars),
-			blue: resolveColor("--fg-600", cssVars),
-			magenta: resolveColor("--fg-600", cssVars),
-			cyan: resolveColor("--fg-600", cssVars),
+			yellow: resolveColor("--acc-600", cssVars),
+			blue: resolveColor("--acc-600", cssVars),
+			magenta: resolveColor("--acc-600", cssVars),
+			cyan: resolveColor("--acc-600", cssVars),
 			white: resolveColor("--whitest", cssVars),
-			brightBlack: resolveColor("--fg-800", cssVars),
+			brightBlack: resolveColor("--acc-800", cssVars),
 			brightRed: resolveColor("--negative-500", cssVars),
 			brightGreen: resolveColor("--positive-500", cssVars),
-			brightYellow: resolveColor("--fg-200", cssVars),
-			brightBlue: resolveColor("--fg-200", cssVars),
-			brightMagenta: resolveColor("--fg-200", cssVars),
-			brightCyan: resolveColor("--fg-200", cssVars),
-			brightWhite: resolveColor("--fg-100", cssVars),
+			brightYellow: resolveColor("--acc-200", cssVars),
+			brightBlue: resolveColor("--acc-200", cssVars),
+			brightMagenta: resolveColor("--acc-200", cssVars),
+			brightCyan: resolveColor("--acc-200", cssVars),
+			brightWhite: resolveColor("--acc-100", cssVars),
 		} as const;
 
 		const xterm = new XTerm({
@@ -323,11 +323,11 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		>
 			<div
 				className={cn(
-					"w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-400)]/90 border border-[var(--fg-600)]/20 overflow-hidden flex flex-col",
+					"w-full h-full rounded-md backdrop-blur-md bg-[var(--base-400)]/90 border border-[var(--acc-600)]/20 overflow-hidden flex flex-col",
 				)}
 			>
 				{/* Header */}
-				<div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
+				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
 					<span className="text-xs font-medium">
 						💻 {terminal.getTerminalType().toUpperCase()}
 					</span>
@@ -348,7 +348,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 								e.stopPropagation();
 								onRemoveElement(element.id);
 							}}
-							className="text-xs w-6 h-6 bg-[var(--fg-800)] hover:bg-[var(--fg-700)] rounded transition-colors text-[var(--bg-white)] flex items-center justify-center"
+							className="text-xs w-6 h-6 bg-[var(--acc-800)] hover:bg-[var(--acc-700)] rounded transition-colors text-[var(--base-white)] flex items-center justify-center"
 						>
 							×
 						</button>
