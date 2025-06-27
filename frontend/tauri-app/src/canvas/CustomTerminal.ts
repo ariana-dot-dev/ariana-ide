@@ -1,5 +1,5 @@
-import { ElementTargets, CanvasElement } from "./types";
-import { TerminalSpec } from "../services/CustomTerminalAPI";
+import type { TerminalSpec } from "../services/CustomTerminalAPI";
+import { CanvasElement, type ElementTargets } from "./types";
 
 export class CustomTerminal {
 	public spec: TerminalSpec;

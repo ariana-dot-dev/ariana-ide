@@ -14,8 +14,8 @@ import type { Rectangle } from "./Rectangle";
 import RectangleOnCanvas from "./RectangleOnCanvas";
 import type { Terminal, TerminalConfig } from "./Terminal";
 import TerminalOnCanvas from "./TerminalOnCanvas";
-import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 import TextAreaOnCanvas from "./TextAreaOnCanvas";
+import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
 interface CanvasProps {
 	elements: CanvasElement[];
@@ -285,7 +285,7 @@ const Canvas: React.FC<CanvasProps> = ({
 	);
 
 	return (
-		<div ref={canvasRef} className={cn("relative flex w-full h-full")}>	
+		<div ref={canvasRef} className={cn("relative flex w-full h-full")}>
 			{layouts.map((layout) => {
 				if ("rectangle" in layout.element.kind) {
 					return (
@@ -294,9 +294,7 @@ const Canvas: React.FC<CanvasProps> = ({
 							layout={layout}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
-							onDrag={
-								layout.element === draggedElement ? handleDrag : () => {}
-							}
+							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
 							onRectangleUpdate={handleRectangleUpdate}
 							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
@@ -310,9 +308,7 @@ const Canvas: React.FC<CanvasProps> = ({
 							layout={layout}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
-							onDrag={
-								layout.element === draggedElement ? handleDrag : () => {}
-							}
+							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
 							onTerminalUpdate={handleTerminalUpdate}
 							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
@@ -327,9 +323,7 @@ const Canvas: React.FC<CanvasProps> = ({
 							spec={layout.element.kind.customTerminal.spec}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
-							onDrag={
-								layout.element === draggedElement ? handleDrag : () => {}
-							}
+							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
 						/>
@@ -345,15 +339,13 @@ const Canvas: React.FC<CanvasProps> = ({
 							layout={layout}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
-							onDrag={
-								layout.element === draggedElement ? handleDrag : () => {}
-							}
+							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
 							onFileTreeUpdate={handleFileTreeUpdate}
 							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
 						/>
-					)
+					);
 				} else if ("textArea" in layout.element.kind) {
 					return (
 						<TextAreaOnCanvas
@@ -361,9 +353,7 @@ const Canvas: React.FC<CanvasProps> = ({
 							layout={layout}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
-							onDrag={
-								layout.element === draggedElement ? handleDrag : () => {}
-							}
+							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
 						/>

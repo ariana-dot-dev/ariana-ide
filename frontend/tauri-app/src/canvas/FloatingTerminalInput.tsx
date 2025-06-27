@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { customTerminalAPI } from "../services/CustomTerminalAPI";
 import { cn } from "../utils";
 

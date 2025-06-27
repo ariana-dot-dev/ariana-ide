@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { TerminalConfig } from "../canvas/Terminal";
+import type { TerminalConfig } from "../canvas/Terminal";
 
 interface TerminalConnection {
 	id: string;

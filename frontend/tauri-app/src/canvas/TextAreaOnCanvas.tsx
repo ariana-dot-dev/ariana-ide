@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, PanInfo } from "framer-motion";
-import { cn } from "../utils";
-import { CanvasElement, ElementLayout } from "./types";
-import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
-import { TerminalSpec } from "../services/CustomTerminalAPI";
+import { motion, type PanInfo } from "framer-motion";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClaudeCodeAgent } from "../services/ClaudeCodeAgent";
+import type { TerminalSpec } from "../services/CustomTerminalAPI";
 import { useStore } from "../state";
+import { cn } from "../utils";
+import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
+import type { CanvasElement, ElementLayout } from "./types";
 
 interface TextAreaOnCanvasProps {
 	layout: ElementLayout;
@@ -29,17 +30,17 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 }) => {
 	const { cell, element } = layout;
 	const { isLightTheme } = useStore();
-	
+
 	// Text area state
 	const [text, setText] = useState("");
 	const [isLocked, setIsLocked] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
-	
+
 	// Terminal state
 	const [showTerminal, setShowTerminal] = useState(false);
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [claudeAgent, setClaudeAgent] = useState<ClaudeCodeAgent | null>(null);
-	
+
 	const textAreaRef = useRef<HTMLTextAreaElement>(null);
 	const [dragging, setDragging] = useState(false);
 
@@ -58,40 +59,57 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	});
 
 	const handleGoClick = async () => {
-		console.log("[TextAreaOnCanvas]", "Go button clicked with text:", text.trim());
-		
+		console.log(
+			"[TextAreaOnCanvas]",
+			"Go button clicked with text:",
+			text.trim(),
+		);
+
 		if (isLoading || !text.trim()) {
-			console.log("[TextAreaOnCanvas]", "Cannot start - isLoading:", isLoading, "hasText:", !!text.trim());
+			console.log(
+				"[TextAreaOnCanvas]",
+				"Cannot start - isLoading:",
+				isLoading,
+				"hasText:",
+				!!text.trim(),
+			);
 			return;
 		}
-		
+
 		console.log("[TextAreaOnCanvas]", "Locking UI and starting task...");
 		setIsLoading(true);
 		setIsLocked(true);
-		
+
 		try {
 			// Create Claude Code agent
 			console.log("[TextAreaOnCanvas]", "Creating Claude Code agent...");
 			const agent = new ClaudeCodeAgent();
 			setClaudeAgent(agent);
-			
+
 			// Show terminal
 			console.log("[TextAreaOnCanvas]", "Showing terminal...");
 			setShowTerminal(true);
-			
+
 			// Start Claude Code task
 			const terminalSpec = createTerminalSpec();
-			console.log("[TextAreaOnCanvas]", "Starting Claude Code task with spec:", terminalSpec);
-			
+			console.log(
+				"[TextAreaOnCanvas]",
+				"Starting Claude Code task with spec:",
+				terminalSpec,
+			);
+
 			await agent.startTask(text.trim(), terminalSpec, (terminalId: string) => {
 				console.log("[TextAreaOnCanvas]", "Terminal ready, ID:", terminalId);
 				setTerminalId(terminalId);
 			});
-			
+
 			console.log("[TextAreaOnCanvas]", "Task started successfully");
-			
 		} catch (error) {
-			console.error("[TextAreaOnCanvas]", "Failed to start Claude Code task:", error);
+			console.error(
+				"[TextAreaOnCanvas]",
+				"Failed to start Claude Code task:",
+				error,
+			);
 			setIsLoading(false);
 			setIsLocked(false);
 		}
@@ -100,40 +118,48 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	// Listen for task completion
 	useEffect(() => {
 		if (!claudeAgent) return;
-		
-		console.log("[TextAreaOnCanvas]", "Setting up event listeners for Claude Code agent");
-		
+
+		console.log(
+			"[TextAreaOnCanvas]",
+			"Setting up event listeners for Claude Code agent",
+		);
+
 		const handleTaskComplete = (result: any) => {
 			console.log("[TextAreaOnCanvas]", "✅ Task completed:", result);
 			setIsLoading(false);
 			setIsLocked(false);
 		};
-		
+
 		const handleTaskError = (error: string) => {
 			console.error("[TextAreaOnCanvas]", "❌ Claude Code task error:", error);
 			setIsLoading(false);
 			setIsLocked(false);
 		};
-		
+
 		const handleTaskStarted = (data: any) => {
 			console.log("[TextAreaOnCanvas]", "Task started:", data);
 		};
-		
+
 		const handleScreenUpdate = (tuiLines: any) => {
-			console.log("[TextAreaOnCanvas]", "Screen update received:", tuiLines.length, "lines");
+			console.log(
+				"[TextAreaOnCanvas]",
+				"Screen update received:",
+				tuiLines.length,
+				"lines",
+			);
 		};
-		
-		claudeAgent.on('taskComplete', handleTaskComplete);
-		claudeAgent.on('taskError', handleTaskError);
-		claudeAgent.on('taskStarted', handleTaskStarted);
-		claudeAgent.on('screenUpdate', handleScreenUpdate);
-		
+
+		claudeAgent.on("taskComplete", handleTaskComplete);
+		claudeAgent.on("taskError", handleTaskError);
+		claudeAgent.on("taskStarted", handleTaskStarted);
+		claudeAgent.on("screenUpdate", handleScreenUpdate);
+
 		return () => {
 			console.log("[TextAreaOnCanvas]", "🧹 Cleaning up event listeners");
-			claudeAgent.off('taskComplete', handleTaskComplete);
-			claudeAgent.off('taskError', handleTaskError);
-			claudeAgent.off('taskStarted', handleTaskStarted);
-			claudeAgent.off('screenUpdate', handleScreenUpdate);
+			claudeAgent.off("taskComplete", handleTaskComplete);
+			claudeAgent.off("taskError", handleTaskError);
+			claudeAgent.off("taskStarted", handleTaskStarted);
+			claudeAgent.off("screenUpdate", handleScreenUpdate);
 		};
 	}, [claudeAgent]);
 
@@ -180,10 +206,10 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			</div> */}
 			<div className={cn("w-full h-full flex flex-col py-4 px-5")}>
 				{/* Text Area Section */}
-				<div 
+				<div
 					className={cn(
 						"relative flex flex-col rounded-md gap-2",
-						showTerminal ? "h-1/3" : "h-full"
+						showTerminal ? "h-1/3" : "h-full",
 					)}
 				>
 					{/* Header */}
@@ -192,7 +218,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 							Prompt something ↓
 						</h3>
 					</div>
-					
+
 					{/* Text Area */}
 					<textarea
 						ref={textAreaRef}
@@ -207,20 +233,24 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 							"focus:text-[var(--acc-900)]",
 							"placeholder:text-[var(--base-600-50)]",
 							isLocked && "opacity-60 cursor-not-allowed",
-							"scrollbar-thin scrollbar-thumb-[var(--base-400)] scrollbar-track-transparent"
+							"scrollbar-thin scrollbar-thumb-[var(--base-400)] scrollbar-track-transparent",
 						)}
 						style={{
-							backgroundImage: "radial-gradient(circle at 3px 3px, var(--base-400-40) 1.4px, transparent 0)",
+							backgroundImage:
+								"radial-gradient(circle at 3px 3px, var(--base-400-40) 1.4px, transparent 0)",
 							backgroundSize: "24px 24px",
 							backgroundPosition: "10px 20px",
 						}}
 						rows={Math.max(4, Math.floor((cell.height - 120) / 20))}
 					/>
-					
+
 					{/* Action Button */}
-					<motion.div 
-						className="absolute left-0 flex justify-end" 
-						animate={{ left: `${isLoading ? 0 : text.split("\n").reduce((max, line) => (line.length > max ? line.length : max), 0) * 9.7}px`, top: `${(text.split("\n").length + 1.6) * 24}px` }}
+					<motion.div
+						className="absolute left-0 flex justify-end"
+						animate={{
+							left: `${isLoading ? 0 : text.split("\n").reduce((max, line) => (line.length > max ? line.length : max), 0) * 9.7}px`,
+							top: `${(text.split("\n").length + 1.6) * 24}px`,
+						}}
 						transition={{ type: "tween", duration: 0.05, ease: "linear" }}
 					>
 						{isLoading ? (
@@ -232,9 +262,11 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 								)}
 							>
 								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg group-hover:rounded-3xl rounded-br-2xl transition-all">
-									<div className={cn(
-										"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] font-medium transition-all text-[var(--whitest)] z-10",
-									)}>
+									<div
+										className={cn(
+											"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] font-medium transition-all text-[var(--whitest)] z-10",
+										)}
+									>
 										<div className="relative overflow-hidden">
 											<div className="absolute -translate-y-full group-hover:translate-y-0 transition-all">
 												Stop
@@ -242,14 +274,10 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 											<div className="absolute translate-y-0 group-hover:translate-y-full transition-all">
 												Running...
 											</div>
-											<div className="opacity-0">
-												Running...
-											</div>
+											<div className="opacity-0">Running...</div>
 										</div>
 									</div>
-									<div className="group-hover:hidden block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--base-500)] blur-[1px]">
-
-									</div>
+									<div className="group-hover:hidden block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--base-500)] blur-[1px]"></div>
 								</div>
 							</button>
 						) : (
@@ -260,24 +288,24 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 									"group rounded-lg rounded-br-2xl transition-all p-0.5 bg-[var(--base-200)]",
 									text.trim()
 										? "cursor-pointer hover:rounded-3xl hover:bg-[var(--acc-200)] opacity-50 hover:opacity-100"
-										: "opacity-0 pointer-events-none"
+										: "opacity-0 pointer-events-none",
 								)}
 							>
 								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg group-hover:rounded-3xl rounded-br-2xl transition-all">
-									<div className={cn(
-										"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] group-hover:bg-[var(--acc-300)] font-medium transition-all text-[var(--whitest)] z-10",
-									)}>
+									<div
+										className={cn(
+											"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] group-hover:bg-[var(--acc-300)] font-medium transition-all text-[var(--whitest)] z-10",
+										)}
+									>
 										Go
 									</div>
-									<div className="group-hover:block hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--acc-500)] blur-[1px]">
-
-									</div>
+									<div className="group-hover:block hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--acc-500)] blur-[1px]"></div>
 								</div>
 							</button>
 						)}
 					</motion.div>
 				</div>
-				
+
 				{/* Terminal Section */}
 				{showTerminal && terminalId && (
 					<div className="h-2/3 mt-2 opacity-70">

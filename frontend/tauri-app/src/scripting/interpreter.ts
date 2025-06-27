@@ -1,8 +1,8 @@
-import { Output, transformSync } from "@swc/wasm-web";
-import { readTextFile } from "@tauri-apps/plugin-fs";
+import { type Output, transformSync } from "@swc/wasm-web";
 import { resolveResource } from "@tauri-apps/api/path";
-import { Command } from "./baseScript";
-import { IStore } from "../state";
+import { readTextFile } from "@tauri-apps/plugin-fs";
+import type { IStore } from "../state";
+import type { Command } from "./baseScript";
 
 class Script {
 	baseScript: string = "";

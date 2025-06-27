@@ -1,4 +1,4 @@
-import { CanvasElement, ElementTargets } from "./types";
+import { CanvasElement, type ElementTargets } from "./types";
 
 export class FileTreeCanvas {
 	private _targets: ElementTargets;

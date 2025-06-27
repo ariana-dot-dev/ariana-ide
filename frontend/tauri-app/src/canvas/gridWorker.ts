@@ -1,5 +1,9 @@
-import { WorkerElementTargets, WorkerLayout } from "./gridWorkerCore";
-import { ElementLayout, ElementTargets, OptimizationOptions } from "./types";
+import type { WorkerElementTargets, WorkerLayout } from "./gridWorkerCore";
+import {
+	type ElementLayout,
+	ElementTargets,
+	type OptimizationOptions,
+} from "./types";
 
 export interface WorkerMessage {
 	type: "OPTIMIZE_GRID";
