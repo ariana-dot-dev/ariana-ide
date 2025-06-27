@@ -350,12 +350,12 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
                   <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
                     Project Location
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full max-w-full">
                     <input
                       type="text"
                       value={newProjectPath}
                       onChange={(e) => setNewProjectPath(e.target.value)}
-                      className="flex-1 px-3 py-2 bg-[var(--base-100)] border border-[var(--base-400)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)] text-[var(--base-700)]"
+                      className="flex-1 min-w-0 px-3 py-2 bg-[var(--base-100)] border border-[var(--base-400)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)] text-[var(--base-700)]"
                       placeholder="Choose a location for your project..."
                       readOnly
                     />
@@ -378,7 +378,7 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
                           alert(`Error selecting location: ${error.message || error}`);
                         }
                       }}
-                      className="px-4 py-2 bg-[var(--acc-500)] hover:bg-[var(--acc-600)] text-white rounded-md font-medium transition-colors"
+                      className="flex-shrink-0 px-4 py-2 bg-[var(--acc-500)] hover:bg-[var(--acc-600)] text-white rounded-md font-medium transition-colors"
                     >
                       Browse
                     </button>
