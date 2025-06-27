@@ -79,8 +79,10 @@ export interface TerminalEvent {
 }
 
 export class CustomTerminalAPI {
-	private eventListeners = new Map<string, UnlistenFn>();
-	private disconnectListeners = new Map<string, UnlistenFn>();
+	protected eventListeners = new Map<string, UnlistenFn>();
+	protected disconnectListeners = new Map<string, UnlistenFn>();
+	protected terminalId: string | null = null;
+	protected isConnected: boolean = false;
 
 	/**
 	 * Connect to a terminal by specification
@@ -90,6 +92,8 @@ export class CustomTerminalAPI {
 			const terminalId = await invoke<string>("custom_connect_terminal", {
 				spec,
 			});
+			this.terminalId = terminalId;
+			this.isConnected = true;
 			return terminalId;
 		} catch (error) {
 			throw new Error(`Failed to connect terminal: ${error}`);
@@ -126,6 +130,11 @@ export class CustomTerminalAPI {
 			}
 
 			await invoke("custom_kill_terminal", { id });
+			
+			if (this.terminalId === id) {
+				this.terminalId = null;
+				this.isConnected = false;
+			}
 		} catch (error) {
 			throw new Error(`Failed to kill terminal: ${error}`);
 		}
@@ -273,6 +282,22 @@ export class CustomTerminalAPI {
 		}
 		this.eventListeners.clear();
 		this.disconnectListeners.clear();
+		this.terminalId = null;
+		this.isConnected = false;
+	}
+
+	/**
+	 * Get the current terminal ID
+	 */
+	getTerminalId(): string | null {
+		return this.terminalId;
+	}
+
+	/**
+	 * Check if terminal is connected
+	 */
+	getIsConnected(): boolean {
+		return this.isConnected;
 	}
 }
 

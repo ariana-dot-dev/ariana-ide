@@ -31,7 +31,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const { isLightTheme } = useStore();
 	
 	// Text area state
-	const [text, setText] = useState("Create a simple hello world program in Python");
+	const [text, setText] = useState("");
 	const [isLocked, setIsLocked] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	
@@ -51,11 +51,10 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		propOnDragEnd(element);
 	};
 
-	// Create terminal spec for WSL (minimum 24x80)
 	const createTerminalSpec = (): TerminalSpec => ({
 		kind: { $type: "wsl" as const },
-		lines: Math.max(24, Math.floor(cell.height / 20)), // Ensure minimum 24 rows
-		cols: Math.max(80, Math.floor(cell.width / 8)),   // Ensure minimum 80 cols
+		lines: 24,
+		cols: 60,
 	});
 
 	const handleGoClick = async () => {
@@ -152,7 +151,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute select-none overflow-hidden py-4 px-5 border-2 rounded-md border-[var(--base-400-40)]",
+				"absolute select-none overflow-hidden border-2 rounded-md border-[var(--base-400-20)]",
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
@@ -177,12 +176,14 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			}}
 			layout
 		>
-			<div className={cn("w-full h-full flex")}>
+			{/* <div className="fixed w-full h-full opacity-30" style={{ background: 'url("assets/noise.png")' }}>
+			</div> */}
+			<div className={cn("w-full h-full flex flex-col py-4 px-5")}>
 				{/* Text Area Section */}
 				<div 
 					className={cn(
-						"flex flex-col rounded-md gap-2",
-						showTerminal ? "w-1/2" : "w-full"
+						"relative flex flex-col rounded-md gap-2",
+						showTerminal ? "h-1/3" : "h-full"
 					)}
 				>
 					{/* Header */}
@@ -198,44 +199,56 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 						value={text}
 						onChange={(e) => setText(e.target.value)}
 						disabled={isLocked}
-						placeholder="Enter your coding task here..."
+						placeholder=""
 						spellCheck={false}
 						className={cn(
-							"flex-1 border-none w-full border text-base resize-none",
+							"flex-1 font-mono border-none w-full border text-base resize-none",
 							"text-[var(--acc-800)]",
 							"focus:text-[var(--acc-900)]",
-							"placeholder:text-[var(--acc-600)]",
+							"placeholder:text-[var(--base-600-50)]",
 							isLocked && "opacity-60 cursor-not-allowed",
 							"scrollbar-thin scrollbar-thumb-[var(--base-400)] scrollbar-track-transparent"
 						)}
 						style={{
-							backgroundImage: "radial-gradient(circle at 1px 1px, var(--base-400-60) 1px, transparent 0)",
-							backgroundSize: "20px 20px",
+							backgroundImage: "radial-gradient(circle at 3px 3px, var(--base-400-40) 1.4px, transparent 0)",
+							backgroundSize: "24px 24px",
+							backgroundPosition: "10px 20px",
 						}}
 						rows={Math.max(4, Math.floor((cell.height - 120) / 20))}
 					/>
 					
 					{/* Action Button */}
-					<div className="flex justify-end">
+					<motion.div 
+						className="absolute left-0 flex justify-end" 
+						animate={{ left: `${isLoading ? 0 : text.split("\n").reduce((max, line) => (line.length > max ? line.length : max), 0) * 9.7}px`, top: `${(text.split("\n").length + 1.6) * 24}px` }}
+						transition={{ type: "tween", duration: 0.05, ease: "linear" }}
+					>
 						{isLoading ? (
 							<button
 								onClick={handleStopClick}
+								disabled={!text.trim()}
 								className={cn(
-									"group px-4 py-2 rounded-lg rounded-br-2xl font-medium transition-all border-transparent bg-[var(--base-600)] border-2 text-[var(--base-300)]",
-									"hover:border-[var(--acc-300)] hover:bg-transparent hover:rounded-br-xs hover:text-[var(--acc-500)] cursor-pointer",
-									"flex items-center gap-2"
+									"group rounded-lg rounded-br-2xl transition-all p-0.5 bg-[var(--base-200)] cursor-pointer hover:rounded-3xl opacity-70 hover:opacity-100",
 								)}
 							>
-								<div className="w-4 h-4 border-2 border-[var(--base-300)] group-hover:border-[var(--acc-300)] border-t-transparent group-hover:border-t-transparent rounded-full animate-spin" />
-								<div className="relative overflow-hidden">
-									<div className="absolute -translate-y-full group-hover:translate-y-0 transition-all">
-										Stop
+								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg hover:rounded-3xl rounded-br-2xl transition-all">
+									<div className={cn(
+										"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] font-medium transition-all text-[var(--whitest)] z-10",
+									)}>
+										<div className="relative overflow-hidden">
+											<div className="absolute -translate-y-full group-hover:translate-y-0 transition-all">
+												Stop
+											</div>
+											<div className="absolute translate-y-0 group-hover:translate-y-full transition-all">
+												Running...
+											</div>
+											<div className="opacity-0">
+												Running...
+											</div>
+										</div>
 									</div>
-									<div className="absolute translate-y-0 group-hover:translate-y-full transition-all">
-										Running...
-									</div>
-									<div className="opacity-0">
-										Running...
+									<div className="group-hover:hidden block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--base-500)] blur-[1px]">
+
 									</div>
 								</div>
 							</button>
@@ -244,30 +257,41 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 								onClick={handleGoClick}
 								disabled={!text.trim()}
 								className={cn(
-									"px-4 py-2 rounded-lg rounded-br-2xl font-medium transition-all border-[var(--base-300)] border-2 text-[var(--base-500)]",
+									"group rounded-lg rounded-br-2xl transition-all p-0.5 bg-[var(--base-200)]",
 									text.trim()
-										? "cursor-pointer hover:border-[var(--acc-300)] hover:rounded-br-xs hover:text-[var(--acc-500)]"
-										: "opacity-0 cursor-not-allowed"
+										? "cursor-pointer hover:rounded-3xl hover:bg-[var(--acc-200)] opacity-50 hover:opacity-100"
+										: "opacity-0 pointer-events-none"
 								)}
 							>
-								Go
+								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg hover:rounded-3xl rounded-br-2xl transition-all">
+									<div className={cn(
+										"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] group-hover:bg-[var(--acc-300)] font-medium transition-all text-[var(--whitest)] z-10",
+									)}>
+										Claude it
+									</div>
+									<div className="group-hover:block hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--acc-500)] blur-[1px]">
+
+									</div>
+								</div>
 							</button>
 						)}
-					</div>
+					</motion.div>
 				</div>
 				
 				{/* Terminal Section */}
 				{showTerminal && terminalId && (
-					<div className="w-1/2 pl-2">
+					<div className="h-2/3 mt-2 opacity-70">
 						<CustomTerminalRenderer
 							elementId={`claude-terminal-${terminalId}`}
 							existingTerminalId={terminalId}
+							terminalAPI={claudeAgent || undefined}
 							onTerminalReady={(id) => {
 								console.log("Claude terminal ready:", id);
 							}}
 							onTerminalError={(error) => {
 								console.error("Claude terminal error:", error);
 							}}
+							fontSize="base"
 						/>
 					</div>
 				)}

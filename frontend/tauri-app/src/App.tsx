@@ -18,7 +18,7 @@ const appWindow = getCurrentWebviewWindow();
 
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
-const THEMES = ["light", "semi-sky"];
+const THEMES = ["light", "light-sand", "semi-sky"];
 
 function App() {
 	const store = useStore();
@@ -124,10 +124,7 @@ function App() {
 		<InterpreterContext value={interpreter}>
 			<div
 				className={cn(
-					"relative font-sans font-semibold h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)]",
-					isLightTheme
-						? "bg-gradient-to-t from-[var(--acc-100)] to-[var(--base-100)]"
-						: "bg-gradient-to-t from-[var(--acc-100)] to-[var(--base-100)]",
+					"relative font-sans font-semibold h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)] bg-[var(--whitest)]",
 					isMaximized ? "rounded-none" : "rounded-lg",
 					`theme-${store.theme}`,
 				)}
@@ -158,7 +155,7 @@ function App() {
 						}}
 						className={cn(
 							"flex items-center outline-0 justify-center rounded-md select-none relative z-50  transition-[height] border-[var(--acc-400-50)]",
-							showTitlebar ? "h-fit py-1" : "h-1 mx-2 hover:h-3 not-hover:bg-[var(--base-400-40)] hover:border-2"
+							showTitlebar ? "h-fit py-1" : "h-1 mx-2 hover:h-3 not-hover:bg-[var(--base-400-20)] hover:border-2"
 						)}
 					>
 						{showTitlebar && (
@@ -176,7 +173,7 @@ function App() {
 										type="button"
 										onClick={openFileTree}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-l-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-l-md transition-colors cursor-pointer",
 										)}
 									>
 										📁
@@ -185,7 +182,7 @@ function App() {
 										type="button"
 										onClick={openNewTerminal}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
 										)}
 									>
 										💻
@@ -196,21 +193,21 @@ function App() {
 										type="button"
 										onClick={handleClose}
 										className={cn(
-											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--base-400-50)] hover:bg-red-400 hover:outline-2 outline-offset-2 outline-red-500/50 hover:opacity-100 transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--base-400-20)] hover:bg-red-400 hover:outline-2 outline-offset-2 outline-red-500/50 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 									<button
 										type="button"
 										onClick={handleMinimize}
 										className={cn(
-											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--base-400-50)] hover:bg-yellow-400 hover:outline-2 outline-offset-2 outline-yellow-500/50 hover:opacity-100 transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full bg-[var(--base-400-20)] hover:bg-yellow-400 hover:outline-2 outline-offset-2 outline-yellow-500/50 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 									<button
 										type="button"
 										onClick={handleMaximize}
 										className={cn(
-											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full  bg-[var(--base-400-50)] hover:bg-green-400 hover:outline-2 outline-offset-2 outline-green-500/50 hover:opacity-100 transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 w-3 h-3 rounded-full  bg-[var(--base-400-20)] hover:bg-green-400 hover:outline-2 outline-offset-2 outline-green-500/50 hover:opacity-100 transition-colors cursor-pointer",
 										)}
 									></button>
 								</div>
@@ -238,7 +235,7 @@ function App() {
 					</div> */}
 					<Repl />
 
-					<div className="absolute bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">
+					<div className="absolute hover:opacity-100 opacity-0 bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">
 						{THEMES.map((theme) => (
 							<button
 								type="button"

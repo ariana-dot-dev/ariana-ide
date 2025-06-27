@@ -130,6 +130,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 						spec={spec}
 						onTerminalReady={handleTerminalReady}
 						onTerminalError={handleTerminalError}
+						fontSize="sm"
 					/>
 				</div>
 			</div>

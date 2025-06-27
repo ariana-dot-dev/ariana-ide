@@ -56,12 +56,13 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--acc-500);
+  background-color: var(--base-400-50);
   border-radius: 4px;
+  cursor: grab;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--acc-600);
+  background-color: var(--base-500-50);
 }
 
 @font-face {

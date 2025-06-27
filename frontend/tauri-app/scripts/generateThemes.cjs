@@ -54,8 +54,18 @@ const THEMES = {
         "--border-thickness": "2px",
     },
     "light": {
-        "--acc-500": "#b8926f",  // blue equivalent
-        "--base-500": "#beaa9c",  // ~ oklch(82.8% 0.111 230.318)
+        "--acc-500": "#ff4f69",
+        "--base-500": "#8b8396",
+        "--whitest": "#fff7f8",
+        "--blackest": "#2b0f54",
+        "--positive-500": "#1ebc73",  // green
+        "--negative-500": "#a24b6f",  // red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
+    },
+    "light-sand": {
+        "--acc-500": "#b8926f",
+        "--base-500": "#968a81",
         "--whitest": "#ffffff",
         "--blackest": "#000000",
         "--positive-500": "#1ebc73",  // green
@@ -63,16 +73,6 @@ const THEMES = {
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
-    "light-sand": {
-        "--base-500": "#ab947a",
-        "--acc-500": "#c7dcd0",
-        "--blackest": "#3e3546",
-        "--whitest": "#ffffff",
-        "--positive-500": "#1ebc73",  // green
-        "--negative-500": "#e83b3b",  // red
-        "--border-radius": "8px",
-        "--border-thickness": "2px",
-    }
 };
 
 // Derived ramps to create: [prefix, base, target, stops]
