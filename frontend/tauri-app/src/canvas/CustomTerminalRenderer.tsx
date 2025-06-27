@@ -6,6 +6,7 @@ import {
 	type LineItem,
 	type TerminalEvent,
 	type TerminalSpec,
+	type CustomTerminalAPI,
 } from "../services/CustomTerminalAPI";
 import { useStore } from "../state";
 import { cn } from "../utils";
@@ -14,8 +15,10 @@ interface CustomTerminalRendererProps {
 	elementId: string;
 	spec?: TerminalSpec;
 	existingTerminalId?: string;
+	terminalAPI?: CustomTerminalAPI;
 	onTerminalReady?: (terminalId: string) => void;
 	onTerminalError?: (error: string) => void;
+	fontSize: "xs" | "sm" | "base" | "lg";
 }
 
 // Simple connection manager to reuse connections
@@ -43,11 +46,14 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	elementId,
 	spec,
 	existingTerminalId,
+	terminalAPI,
 	onTerminalReady,
 	onTerminalError,
+	fontSize
 }) => {
 	const { isLightTheme } = useStore();
 	const logPrefix = `[CustomTerminalRenderer-${elementId}]`;
+	const api = terminalAPI || customTerminalAPI;
 
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [screen, setScreen] = useState<LineItem[][]>([]);
@@ -55,7 +61,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	const [isConnected, setIsConnected] = useState(false);
 	const [windowDimensions, setWindowDimensions] = useState({
 		rows: 24,
-		cols: 80,
+		cols: 60,
 	});
 	const [charDimensions, setCharDimensions] = useState({
 		width: 7.35,
@@ -107,11 +113,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 				// Set up event listeners for existing connection
 				console.log(logPrefix, "Setting up event listeners for existing terminal");
-				await customTerminalAPI.onTerminalEvent(
+				await api.onTerminalEvent(
 					existingTerminalId,
 					handleTerminalEvent,
 				);
-				await customTerminalAPI.onTerminalDisconnect(
+				await api.onTerminalDisconnect(
 					existingTerminalId,
 					handleTerminalDisconnect,
 				);
@@ -130,11 +136,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				setIsConnected(true);
 
 				// Set up event listeners for existing connection
-				await customTerminalAPI.onTerminalEvent(
+				await api.onTerminalEvent(
 					managedTerminalId,
 					handleTerminalEvent,
 				);
-				await customTerminalAPI.onTerminalDisconnect(
+				await api.onTerminalDisconnect(
 					managedTerminalId,
 					handleTerminalDisconnect,
 				);
@@ -154,7 +160,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			}
 
 			try {
-				const id = await customTerminalAPI.connectTerminal(spec);
+				const id = await api.connectTerminal(spec);
 				// if (!mounted) return;
 
 				// Store the connection mapping
@@ -164,8 +170,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				setIsConnected(true);
 
 				// Set up event listeners
-				await customTerminalAPI.onTerminalEvent(id, handleTerminalEvent);
-				await customTerminalAPI.onTerminalDisconnect(
+				await api.onTerminalEvent(id, handleTerminalEvent);
+				await api.onTerminalDisconnect(
 					id,
 					handleTerminalDisconnect,
 				);
@@ -184,7 +190,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		// 	mounted = false;
 		// 	// Don't kill terminals on unmount - keep connections alive for reuse
 		// };
-	}, [elementId, existingTerminalId]);
+	}, [elementId, existingTerminalId, api]);
 
 	const scrollDown = useCallback(() => {
 		const inner = () => {
@@ -279,12 +285,12 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			if (!terminalId || !isConnected) return;
 
 			try {
-				await customTerminalAPI.sendRawInput(terminalId, input);
+				await api.sendRawInput(terminalId, input);
 			} catch (err) {
 				console.error("Error sending input:", err);
 			}
 		},
-		[terminalId, isConnected],
+		[terminalId, isConnected, api],
 	);
 
 	// Handle keyboard input - send each character immediately
@@ -300,7 +306,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 						if (selection && selection.length > 0) {
 							return;
 						}
-						await customTerminalAPI.sendCtrlC(terminalId);
+						await api.sendCtrlC(terminalId);
 						event.preventDefault();
 						return;
 					}
@@ -318,7 +324,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 						return;
 					}
 					if (event.key === "d") {
-						await customTerminalAPI.sendCtrlD(terminalId);
+						await api.sendCtrlD(terminalId);
 						event.preventDefault();
 						return;
 					}
@@ -450,7 +456,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			scrollDown();
 
 			try {
-				await customTerminalAPI.resizeTerminal(terminalId, lines, cols);
+				console.log(logPrefix, `Calling api.resizeTerminal(${terminalId}, ${lines}, ${cols})`);
+				console.log(logPrefix, "API instance type:", api.constructor.name);
+				console.log(logPrefix, "resizeTerminal method:", api.resizeTerminal.toString().substring(0, 100));
+				await api.resizeTerminal(terminalId, lines, cols);
 				// Update our tracked dimensions only after successful resize
 				setWindowDimensions({ rows: lines, cols });
 			} catch (err) {
@@ -466,6 +475,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		windowDimensions.rows,
 		isConnected,
 		charDimensions,
+		api,
+		terminalAPI,
 	]);
 
 	const handleResize = debouncedResize;
@@ -531,7 +542,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		<div
 			ref={terminalRef}
 			className={cn(
-				"rounded-md text-base backdrop-blur-md bg-[var(--base-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				"rounded-md p-3 bg-[var(--base-200)]/10 text-[var(--blackest)] font-mono focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				fontSize === "xs" && "text-xs",
+				fontSize === "sm" && "text-sm",
+				fontSize === "base" && "text-base",
+				fontSize === "lg" && "text-lg",
 			)}
 			tabIndex={-1}
 			onKeyDown={handleKeyDown}
@@ -573,12 +588,12 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 							duration: 0.1,
 						}}
 					>
-						<div className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs">
+						{/* <div className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs">
 							{" "}
+						</div> */}
+						<div className="absolute flex items-center justify-center top-0 left-0 h-full w-[200%] opacity-80">
+						<div>{'😎'}</div>
 						</div>
-						{/* <div className="absolute flex items-center justify-center top-0 left-0 h-full w-[200%] opacity-80">
-						<div>{'🚀'}</div> */}
-						{/* </div> */}
 					</motion.div>
 					<span ref={phantomCharRef} className="absolute -left-full -top-full">
 						A
@@ -761,36 +776,36 @@ const Row = React.memo(
 
 const colorMap = (color: string, isLightTheme: boolean) => {
 	const colors: Record<string, string> = {
-		Black: isLightTheme ? "#2e222f" : "#2e222f",
-		Red: isLightTheme ? "#ae2334" : "#733e39",
-		Green: isLightTheme ? "#239063" : "#733e39",
-		Yellow: isLightTheme ? "#f79617" : "#733e39",
-		Blue: isLightTheme ? "#4d65b4" : "#124e89",
-		Magenta: isLightTheme ? "#6b3e75" : "#733e39",
-		Cyan: isLightTheme ? "#0b8a8f" : "#733e39",
-		White: isLightTheme ? "#c7dcd0" : "#ffffff",
+		Black: isLightTheme ? "var(--blackest)" : "var(--blackest)",
+		Red: isLightTheme ? "var(--negative-500-50)" : "var(--negative-500-50)",
+		Green: isLightTheme ? "var(--positive-500-50)" : "var(--positive-500-50)",
+		Yellow: isLightTheme ? "var(--acc-500-50)" : "var(--acc-500-50)",
+		Blue: isLightTheme ? "var(--acc-500-50)" : "var(--acc-500-50)",
+		Magenta: isLightTheme ? "var(--acc-500-50)" : "var(--acc-500-50)",
+		Cyan: isLightTheme ? "var(--acc-500-50)" : "var(--acc-500-50)",
+		White: isLightTheme ? "var(--whitest)" : "var(--whitest)",
 		BrightBlack: isLightTheme
-			? "mix(#2e222f, #c7dcd0, 0.2)"
-			: "mix(#2e222f, #c7dcd0, 0.2)",
+			? "var(--blackest)"
+			: "var(--blackest)",
 		BrightRed: isLightTheme
-			? "mix(#ae2334, #c7dcd0, 0.2)"
-			: "mix(#e83b3b, #c7dcd0, 0.2)",
+			? "var(--negative-400-50)"
+			: "var(--negative-400-50)",
 		BrightGreen: isLightTheme
-			? "mix(#239063, #c7dcd0, 0.2)"
-			: "mix(#1ebc73, #c7dcd0, 0.2)",
+			? "var(--positive-400-50)"
+			: "var(--positive-400-50)",
 		BrightYellow: isLightTheme
-			? "mix(#f79617, #c7dcd0, 0.2)"
-			: "mix(#f9c22b, #c7dcd0, 0.2)",
+			? "var(--acc-400-50)"
+			: "var(--acc-400-50)",
 		BrightBlue: isLightTheme
-			? "mix(#4d65b4, #c7dcd0, 0.2)"
-			: "mix(#4d9be6, #c7dcd0, 0.2)",
+			? "var(--acc-400-50)"
+			: "var(--acc-400-50)",
 		BrightMagenta: isLightTheme
-			? "mix(#6b3e75, #c7dcd0, 0.2)"
-			: "mix(#905ea9, #c7dcd0, 0.2)",
+			? "var(--acc-400-50)"
+			: "var(--acc-400-50)",
 		BrightCyan: isLightTheme
-			? "mix(#0b8a8f, #c7dcd0, 0.2)"
-			: "mix(#0eaf9b, #c7dcd0, 0.2)",
-		BrightWhite: isLightTheme ? "mix(#c7dcd0, #c7dcd0, 0.2)" : "#ffffff",
+			? "var(--acc-400-50)"
+			: "var(--acc-400-50)",
+		BrightWhite: isLightTheme ? "var(--whitest)" : "var(--whitest)",
 	};
 
 	return colors[color];

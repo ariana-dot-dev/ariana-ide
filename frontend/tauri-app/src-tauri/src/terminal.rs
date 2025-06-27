@@ -66,7 +66,7 @@ impl TerminalConnection {
         
         let pty_pair = pty_system.openpty(PtySize {
             rows: 24,
-            cols: 80,
+            cols: 60,
             pixel_width: 0,
             pixel_height: 0,
         })?;

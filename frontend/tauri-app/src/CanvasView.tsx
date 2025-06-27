@@ -20,7 +20,7 @@ const createDemoElements = (): CanvasElement[] => {
 
 	return isWindows ? [
 		// Create a Claude Code text area with a default prompt
-		TextArea.canvasElement("Create a simple hello world program in Python")		
+		TextArea.canvasElement("")		
 		// CustomTerminal.canvasElement(
 		// 	{
 		// 		kind: {
