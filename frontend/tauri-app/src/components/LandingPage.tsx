@@ -16,6 +16,7 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectPath, setNewProjectPath] = useState("");
+  const [showAllSubfolders, setShowAllSubfolders] = useState<string | null>(null);
 
   console.log("LandingPage rendered - recentProjects:", recentProjects.length);
 
@@ -36,6 +37,52 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
   const handleOpenProject = () => {
     if (selectedProject) {
       onProjectSelect(selectedProject, selectedSubfolder);
+    }
+  };
+
+  const handleAddSubfolder = async (project: Project) => {
+    try {
+      console.log("Opening directory picker for new subfolder...");
+      const selectedPath = await open({
+        directory: true,
+        multiple: false,
+      });
+      
+      if (!selectedPath) {
+        return;
+      }
+      
+      const pathString = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+      
+      // Calculate relative path from project root
+      let relativePath = pathString.replace(project.rootPath, "");
+      if (relativePath.startsWith("/")) {
+        relativePath = relativePath.substring(1);
+      }
+      if (!relativePath) {
+        relativePath = "/"; // Root folder
+      }
+      
+      // Check if this subfolder already exists
+      const existingSubfolder = project.subfolderPaths.find(sf => sf.relativePath === relativePath);
+      if (existingSubfolder) {
+        alert("This subfolder is already in the project.");
+        return;
+      }
+      
+      // Add the new subfolder to the project
+      await projectService.waitForInitialization();
+      const updatedProject = projectService.addSubfolderToProject(project.id, relativePath);
+      
+      if (updatedProject) {
+        // Refresh the recent projects list
+        setRecentProjects(projectService.getRecentProjects(3));
+        console.log("Added subfolder:", relativePath, "to project:", project.name);
+      }
+      
+    } catch (error) {
+      console.error("Error adding subfolder:", error);
+      alert(`Error adding subfolder: ${error.message || error}`);
     }
   };
 
@@ -118,7 +165,7 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
                         <h3 className="font-semibold text-[var(--acc-600)]">
                           {project.name}
                         </h3>
-                        <p className="text-sm text-[var(--base-600)] mt-1">
+                        <p className="text-sm text-[var(--base-600)] mt-1 break-words break-all overflow-wrap-anywhere max-w-full">
                           {project.rootPath}
                         </p>
                         <p className="text-xs text-[var(--base-500)] mt-2">
@@ -129,30 +176,67 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
                     </div>
 
                     {/* Subfolders */}
-                    {selectedProject?.id === project.id && project.subfolderPaths.length > 1 && (
+                    {selectedProject?.id === project.id && (
                       <div className="mt-4 pt-4 border-t border-[var(--base-400)]">
                         <p className="text-sm font-medium text-[var(--base-600)] mb-2">
                           Active subfolders:
                         </p>
-                        <div className="space-y-1">
-                          {project.subfolderPaths.map((subfolder) => (
-                            <label
-                              key={subfolder.id}
-                              className="flex items-center space-x-2 cursor-pointer"
-                            >
-                              <input
-                                type="radio"
-                                name="subfolder"
-                                value={subfolder.id}
-                                checked={selectedSubfolder === subfolder.id}
-                                onChange={(e) => setSelectedSubfolder(e.target.value)}
-                                className="w-4 h-4 text-[var(--acc-500)]"
-                              />
-                              <span className="text-sm text-[var(--base-600)]">
-                                {subfolder.relativePath === "/" ? "Root" : subfolder.relativePath}
-                              </span>
-                            </label>
-                          ))}
+                        <div className="space-y-1 max-w-full">
+                          {(() => {
+                            // Always show root first
+                            const rootSubfolder = project.subfolderPaths.find(sf => sf.relativePath === "/");
+                            // Get non-root subfolders sorted by most recent (we'll simulate this for now)
+                            const nonRootSubfolders = project.subfolderPaths.filter(sf => sf.relativePath !== "/");
+                            
+                            const showingAll = showAllSubfolders === project.id;
+                            const subfoldersToShow = showingAll ? nonRootSubfolders : nonRootSubfolders.slice(0, 2);
+                            
+                            const allSubfolders = rootSubfolder ? [rootSubfolder, ...subfoldersToShow] : subfoldersToShow;
+                            
+                            return (
+                              <>
+                                {allSubfolders.map((subfolder) => (
+                                  <label
+                                    key={subfolder.id}
+                                    className="flex items-start space-x-2 cursor-pointer w-full max-w-full"
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="subfolder"
+                                      value={subfolder.id}
+                                      checked={selectedSubfolder === subfolder.id}
+                                      onChange={(e) => setSelectedSubfolder(e.target.value)}
+                                      className="w-4 h-4 text-[var(--acc-500)] mt-0.5 flex-shrink-0"
+                                    />
+                                    <span className="text-sm text-[var(--base-600)] break-words break-all overflow-wrap-anywhere flex-1 min-w-0">
+                                      {subfolder.relativePath === "/" ? "Root" : subfolder.relativePath}
+                                    </span>
+                                  </label>
+                                ))}
+                                
+                                {/* Show More/Less button */}
+                                {nonRootSubfolders.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAllSubfolders(showingAll ? null : project.id)}
+                                    className="text-xs text-[var(--acc-500)] hover:text-[var(--acc-600)] mt-1"
+                                  >
+                                    {showingAll ? "Show Less" : `Show ${nonRootSubfolders.length - 2} More`}
+                                  </button>
+                                )}
+                                
+                                {/* Add Subfolder button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSubfolder(project)}
+                                  className="flex items-center space-x-1 text-xs text-[var(--acc-500)] hover:text-[var(--acc-600)] mt-2"
+                                >
+                                  <span>+</span>
+                                  <span>Add Subfolder</span>
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}
@@ -169,6 +253,58 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Load Previous Project */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold text-[var(--acc-600)] mb-4">
+              Load Previous Project
+            </h2>
+            
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    console.log("Opening directory picker for existing project...");
+                    const selectedPath = await open({
+                      directory: true,
+                      multiple: false,
+                    });
+                    
+                    if (!selectedPath) {
+                      return;
+                    }
+                    
+                    const pathString = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+                    const projectName = pathString.split('/').pop() || "Loaded Project";
+                    
+                    console.log("Loading existing project:", projectName, "from:", pathString);
+                    
+                    // Create project entry for the existing folder
+                    await projectService.waitForInitialization();
+                    const project = projectService.addProject({
+                      name: projectName,
+                      rootPath: pathString,
+                      subfolderPaths: []
+                    });
+
+                    console.log("Project loaded:", project);
+                    onProjectSelect(project);
+                    
+                  } catch (error) {
+                    console.error("Error loading existing project:", error);
+                    alert(`Error loading project: ${error.message || error}`);
+                  }
+                }}
+                style={{ pointerEvents: 'auto', zIndex: 9999 }}
+                className="relative z-50 w-full bg-[var(--acc-500)] hover:bg-[var(--acc-600)] text-white font-semibold py-4 px-6 rounded-lg transition-colors border-2 border-solid border-[var(--acc-700)] flex items-center justify-center gap-3 cursor-pointer"
+              >
+                <span className="text-2xl">📂</span>
+                <span>Browse for Project</span>
+              </button>
+              
+            </div>
           </div>
 
           {/* Create New Project */}
@@ -280,63 +416,6 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Load Previous Project */}
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-[var(--acc-600)] mb-4">
-              Load Previous Project
-            </h2>
-            
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    console.log("Opening directory picker for existing project...");
-                    const selectedPath = await open({
-                      directory: true,
-                      multiple: false,
-                    });
-                    
-                    if (!selectedPath) {
-                      return;
-                    }
-                    
-                    const pathString = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
-                    const projectName = pathString.split('/').pop() || "Loaded Project";
-                    
-                    console.log("Loading existing project:", projectName, "from:", pathString);
-                    
-                    // Create project entry for the existing folder
-                    await projectService.waitForInitialization();
-                    const project = projectService.addProject({
-                      name: projectName,
-                      rootPath: pathString,
-                      subfolderPaths: []
-                    });
-
-                    console.log("Project loaded:", project);
-                    onProjectSelect(project);
-                    
-                  } catch (error) {
-                    console.error("Error loading existing project:", error);
-                    alert(`Error loading project: ${error.message || error}`);
-                  }
-                }}
-                style={{ pointerEvents: 'auto', zIndex: 9999 }}
-                className="relative z-50 w-full bg-[var(--acc-500)] hover:bg-[var(--acc-600)] text-white font-semibold py-4 px-6 rounded-lg transition-colors border-2 border-solid border-[var(--acc-700)] flex items-center justify-center gap-3 cursor-pointer"
-              >
-                <span className="text-2xl">📂</span>
-                <span>Browse for Project</span>
-              </button>
-              
-              <div className="bg-[var(--base-200)] rounded-lg p-4">
-                <p className="text-sm text-[var(--base-600)] text-center">
-                  Select any existing folder on your computer to load as a project
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

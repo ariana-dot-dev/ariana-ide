@@ -96,6 +96,29 @@ export class ProjectService implements ProjectManager {
     return this._projects.find(p => p.id === id) || null;
   }
 
+  addSubfolderToProject(projectId: string, relativePath: string): Project | null {
+    const projectIndex = this._projects.findIndex(p => p.id === projectId);
+    if (projectIndex === -1) return null;
+
+    const project = this._projects[projectIndex];
+    
+    // Check if subfolder already exists
+    const existingSubfolder = project.subfolderPaths.find(sf => sf.relativePath === relativePath);
+    if (existingSubfolder) return project;
+
+    // Add new subfolder
+    const newSubfolder = {
+      id: nanoid(),
+      relativePath
+    };
+
+    project.subfolderPaths.push(newSubfolder);
+    project.lastOpened = new Date();
+
+    this.saveProjects();
+    return project;
+  }
+
   async waitForInitialization(): Promise<void> {
     while (!this.initialized) {
       await new Promise(resolve => setTimeout(resolve, 10));
