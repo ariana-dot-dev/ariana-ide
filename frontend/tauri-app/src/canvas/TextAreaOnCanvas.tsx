@@ -152,7 +152,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute select-none overflow-hidden py-4 px-5 border-2 rounded-md border-[var(--bg-600-40)]",
+				"absolute select-none overflow-hidden py-4 px-5 border-2 rounded-md border-[var(--base-400-40)]",
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
@@ -187,7 +187,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				>
 					{/* Header */}
 					<div className="flex items-center justify-between">
-						<h3 className="text-sm text-[var(--fg-500)]">
+						<h3 className="text-sm text-[var(--acc-500)]">
 							Prompt something ↓
 						</h3>
 					</div>
@@ -202,14 +202,14 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 						spellCheck={false}
 						className={cn(
 							"flex-1 border-none w-full border text-base resize-none",
-							"text-[var(--fg-800)]",
-							"focus:text-[var(--fg-900)]",
-							"placeholder:text-[var(--fg-600)]",
+							"text-[var(--acc-800)]",
+							"focus:text-[var(--acc-900)]",
+							"placeholder:text-[var(--acc-600)]",
 							isLocked && "opacity-60 cursor-not-allowed",
-							"scrollbar-thin scrollbar-thumb-[var(--bg-400)] scrollbar-track-transparent"
+							"scrollbar-thin scrollbar-thumb-[var(--base-400)] scrollbar-track-transparent"
 						)}
 						style={{
-							backgroundImage: "radial-gradient(circle at 1px 1px, var(--bg-600-60) 1px, transparent 0)",
+							backgroundImage: "radial-gradient(circle at 1px 1px, var(--base-400-60) 1px, transparent 0)",
 							backgroundSize: "20px 20px",
 						}}
 						rows={Math.max(4, Math.floor((cell.height - 120) / 20))}
@@ -237,7 +237,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 									"px-4 py-2 rounded font-medium transition-all",
 									text.trim()
 										? "bg-[var(--accent-500)] hover:bg-[var(--accent-600)] text-white"
-										: "bg-[var(--bg-300)] text-[var(--fg-500)] cursor-not-allowed"
+										: "bg-[var(--base-300)] text-[var(--acc-500)] cursor-not-allowed"
 								)}
 							>
 								Go
@@ -247,7 +247,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 					
 					{/* Status */}
 					{claudeAgent && (
-						<div className="text-xs text-[var(--fg-600)]">
+						<div className="text-xs text-[var(--acc-600)]">
 							Status: {isLoading ? "Running..." : "Ready"}
 							{terminalId && (
 								<span className="ml-2">Terminal: {terminalId.slice(0, 8)}...</span>
@@ -259,7 +259,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				{/* Terminal Section */}
 				{showTerminal && terminalId && (
 					<div className="w-1/2 pl-2">
-						<div className="w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-200)]/10 p-2">
+						<div className="w-full h-full rounded-md backdrop-blur-md bg-[var(--base-200)]/10 p-2">
 							<div className="w-full h-full">
 								<CustomTerminalRenderer
 									elementId={`claude-terminal-${terminalId}`}

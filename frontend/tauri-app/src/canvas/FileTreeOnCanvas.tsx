@@ -116,12 +116,12 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 		>
 			<div
 				className={cn(
-					"w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-400)]/90 border border-[var(--fg-600)]/20 overflow-hidden flex flex-col",
+					"w-full h-full rounded-md backdrop-blur-md bg-[var(--base-400)]/90 border border-[var(--acc-600)]/20 overflow-hidden flex flex-col",
 					`theme-${theme}`,
 				)}
 			>
 				{/* Header */}
-				<div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
+				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
 					<span className="text-xs font-medium">📁 Files</span>
 					<button
 						type="button"
@@ -130,7 +130,7 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 							e.stopPropagation();
 							onRemoveElement(element.id);
 						}}
-						className="text-xs w-6 h-6 bg-[var(--fg-800)] hover:bg-[var(--fg-700)] rounded transition-colors text-[var(--bg-white)] flex items-center justify-center"
+						className="text-xs w-6 h-6 bg-[var(--acc-800)] hover:bg-[var(--acc-700)] rounded transition-colors text-[var(--base-white)] flex items-center justify-center"
 					>
 						×
 					</button>
@@ -138,7 +138,7 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 
 				{/* File Tree Content */}
 				<div className="flex-1 overflow-auto p-1">
-					<div className="text-xs text-[var(--fg-400)] mb-1 px-1 truncate">
+					<div className="text-xs text-[var(--acc-400)] mb-1 px-1 truncate">
 						{rootPath}
 					</div>
 					<div className="text-xs">

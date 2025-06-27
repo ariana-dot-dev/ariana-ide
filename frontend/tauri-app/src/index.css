@@ -52,16 +52,16 @@
 
 ::-webkit-scrollbar-track {
 	border-radius: 4px;
-  	background: var(--bg-300-20);
+  	background: var(--base-300-20);
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--fg-500);
+  background-color: var(--acc-500);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--fg-600);
+  background-color: var(--acc-600);
 }
 
 @font-face {

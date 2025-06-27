@@ -108,7 +108,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 		>
 			<div
 				className={cn(
-					"w-full h-full rounded-md bg-gradient-to-b from-bg-[var(--fg-900)]/30 to-bg-[var(--bg-600)]/30 backdrop-blur-md relative overflow-hidden",
+					"w-full h-full rounded-md bg-gradient-to-b from-bg-[var(--acc-900)]/30 to-bg-[var(--base-400)]/30 backdrop-blur-md relative overflow-hidden",
 				)}
 			>
 				{/* Connection status indicator */}

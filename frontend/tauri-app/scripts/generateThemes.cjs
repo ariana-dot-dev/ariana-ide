@@ -24,8 +24,8 @@ const path = require('path');
 // ---------------------------------------------------------------------------
 const THEMES = {
     "dark-red": {
-        "--fg-500": "#b33831",  // blue equivalent
-        "--bg-500": "#6e2727",  // ~ oklch(82.8% 0.111 230.318)
+        "--acc-500": "#b33831",  // blue equivalent
+        "--base-500": "#6e2727",  // ~ oklch(82.8% 0.111 230.318)
         "--whitest": "#45293f",
         "--blackest": "#ffffff",
         "--positive-500": "#1ebc73",  // green
@@ -34,18 +34,18 @@ const THEMES = {
         "--border-thickness": "2px",
     },
     "semi-sky": {
-        "--fg-500": "#41a6f6",  // blue equivalent
-        "--bg-500": "#73eff7",  // ~ oklch(82.8% 0.111 230.318)
-        "--whitest": "#1a1c2c",
-        "--blackest": "#f4f4f4",
-        "--positive-500": "#38b764",  // green
-        "--negative-500": "#b13e53",  // red
+        "--acc-500": "#0099db",  // blue equivalent
+        "--base-500": "#0099db",  // ~ oklch(82.8% 0.111 230.318)
+        "--whitest": "#ffffff",
+        "--blackest": "#181425",
+        "--positive-500": "#1ebc73",  // green
+        "--negative-500": "#a24b6f",  // red
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
     "semi-sun": {
-        "--fg-500": "#feae34",  // blue equivalent
-        "--bg-500": "#f77622",  // ~ oklch(82.8% 0.111 230.318)
+        "--acc-500": "#feae34",  // blue equivalent
+        "--base-500": "#f77622",  // ~ oklch(82.8% 0.111 230.318)
         "--blackest": "#ead4aa",
         "--whitest": "#3e2731",
         "--positive-500": "#38b764",  // green
@@ -54,8 +54,8 @@ const THEMES = {
         "--border-thickness": "2px",
     },
     "light": {
-        "--fg-500": "#999999",  // blue equivalent
-        "--bg-500": "#ffffff",  // ~ oklch(82.8% 0.111 230.318)
+        "--acc-500": "#b55088",  // blue equivalent
+        "--base-500": "#8b9bb4",  // ~ oklch(82.8% 0.111 230.318)
         "--whitest": "#ffffff",
         "--blackest": "#000000",
         "--positive-500": "#1ebc73",  // green
@@ -64,8 +64,8 @@ const THEMES = {
         "--border-thickness": "2px",
     },
     "light-sand": {
-        "--bg-500": "#ab947a",
-        "--fg-500": "#c7dcd0",
+        "--base-500": "#ab947a",
+        "--acc-500": "#c7dcd0",
         "--blackest": "#3e3546",
         "--whitest": "#ffffff",
         "--positive-500": "#1ebc73",  // green
@@ -79,26 +79,26 @@ const THEMES = {
 // Stops specify [suffix, weight] where weight is 0→target, 1→base.
 const DERIVED_SCALES = [
     [
-        "--fg",
-        "--fg-500",
+        "--acc",
+        "--acc-500",
         "--whitest",
         [[100, 0.9], [200, 0.7], [300, 0.5], [400, 0.3]],
     ],
     [
-        "--bg",
-        "--bg-500",
+        "--base",
+        "--base-500",
         "--whitest",
         [[100, 0.9], [200, 0.7], [300, 0.5], [400, 0.3]],
     ],
     [
-        "--fg",
-        "--fg-500",
+        "--acc",
+        "--acc-500",
         "--blackest",
         [[600, 0.1], [700, 0.2], [800, 0.3], [900, 0.4]],
     ],
     [
-        "--bg",
-        "--bg-500",
+        "--base",
+        "--base-500",
         "--blackest",
         [[600, 0.1], [700, 0.2], [800, 0.3], [900, 0.4]],
     ],

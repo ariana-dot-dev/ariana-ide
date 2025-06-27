@@ -54,7 +54,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 	return (
 		<div
 			className={cn(
-				"absolute top-0 right-0 bg-[var(--bg-900)] text-[var(--fg-100)] p-3 rounded-bl-lg shadow-lg z-30 min-w-48",
+				"absolute top-0 right-0 bg-[var(--base-900)] text-[var(--acc-100)] p-3 rounded-bl-lg shadow-lg z-30 min-w-48",
 			)}
 			onClick={(e) => e.stopPropagation()}
 			onMouseEnter={(e) => e.stopPropagation()}
@@ -66,7 +66,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 					<button
 						onClick={onClose}
 						className={cn(
-							"text-[var(--bg-400)] hover:text-[var(--fg-100)] text-sm",
+							"text-[var(--base-400)] hover:text-[var(--acc-100)] text-sm",
 						)}
 					>
 						×
@@ -79,7 +79,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 						value={aspectRatio}
 						onChange={(e) => setAspectRatio(parseFloat(e.target.value))}
 						className={cn(
-							"w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs",
+							"w-full bg-[var(--base-800)] border border-[var(--base-400)] rounded px-2 py-1 text-xs",
 						)}
 					>
 						{commonAspectRatios.map((ratio) => (
@@ -96,7 +96,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 						value={aspectRatio}
 						onChange={(e) => setAspectRatio(parseFloat(e.target.value))}
 						className={cn(
-							"w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs mt-1",
+							"w-full bg-[var(--base-800)] border border-[var(--base-400)] rounded px-2 py-1 text-xs mt-1",
 						)}
 						placeholder="Custom ratio"
 					/>
@@ -108,7 +108,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 						value={size}
 						onChange={(e) => setSize(e.target.value as SizeTarget)}
 						className={cn(
-							"w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs",
+							"w-full bg-[var(--base-800)] border border-[var(--base-400)] rounded px-2 py-1 text-xs",
 						)}
 					>
 						{sizeOptions.map((sizeOption) => (
@@ -125,7 +125,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 						value={area}
 						onChange={(e) => setArea(e.target.value as AreaTarget)}
 						className={cn(
-							"w-full bg-[var(--bg-800)] border border-[var(--bg-600)] rounded px-2 py-1 text-xs",
+							"w-full bg-[var(--base-800)] border border-[var(--base-400)] rounded px-2 py-1 text-xs",
 						)}
 					>
 						{areaOptions.map((areaOption) => (
@@ -144,7 +144,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 					<button
 						onClick={handleConfirm}
 						className={cn(
-							"flex-1 bg-[var(--fg-600)] hover:bg-[var(--fg-700)] text-[var(--fg-100)] px-3 py-1 rounded text-xs",
+							"flex-1 bg-[var(--acc-600)] hover:bg-[var(--acc-700)] text-[var(--acc-100)] px-3 py-1 rounded text-xs",
 						)}
 					>
 						Confirm
@@ -152,7 +152,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 					<button
 						onClick={onClose}
 						className={cn(
-							"flex-1 bg-[var(--bg-600)] hover:bg-[var(--bg-700)] text-[var(--fg-100)] px-3 py-1 rounded text-xs",
+							"flex-1 bg-[var(--base-400)] hover:bg-[var(--base-700)] text-[var(--acc-100)] px-3 py-1 rounded text-xs",
 						)}
 					>
 						Cancel

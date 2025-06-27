@@ -317,8 +317,8 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
 					className={cn(
 						"absolute w-2 h-4 opacity-75 animate-pulse left-0 top-0",
 						inputMode === "interactive"
-							? "bg-[var(--fg-error)]"
-							: "bg-[var(--fg-primary)]",
+							? "bg-[var(--acc-error)]"
+							: "bg-[var(--acc-primary)]",
 						isVisible && inputValue.length > 0 && inputMode === "shell"
 							? "hidden"
 							: "block",
@@ -340,7 +340,7 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
 					onPaste={handlePaste}
 					className={cn(
 						"pointer-events-auto border-none outline-none bg-transparent absolute left-0 top-0",
-						"text-[var(--fg-primary)] font-mono text-xs",
+						"text-[var(--acc-primary)] font-mono text-xs",
 						inputMode === "shell" ? "block" : "hidden",
 					)}
 					style={{
@@ -360,8 +360,8 @@ export const FloatingTerminalInput: React.FC<FloatingTerminalInputProps> = ({
 					className={cn(
 						"absolute text-xs px-1 rounded",
 						inputMode === "interactive"
-							? "bg-[var(--fg-error)] text-[var(--bg-primary)]"
-							: "bg-[var(--bg-accent)] text-[var(--fg-primary)]",
+							? "bg-[var(--acc-error)] text-[var(--base-primary)]"
+							: "bg-[var(--base-accent)] text-[var(--acc-primary)]",
 					)}
 					style={{ left: -15, top: -15, fontSize: "8px" }}
 				>
