@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export interface TerminalKind {
 	$type: "ssh" | "git-bash" | "wsl";
@@ -130,7 +130,7 @@ export class CustomTerminalAPI {
 			}
 
 			await invoke("custom_kill_terminal", { id });
-			
+
 			if (this.terminalId === id) {
 				this.terminalId = null;
 				this.isConnected = false;

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { ElementTargets, SizeTarget, AreaTarget } from "./types";
-import { Rectangle } from "./Rectangle";
+import type React from "react";
+import { useState } from "react";
 import { cn } from "../utils";
+import type { Rectangle } from "./Rectangle";
+import type { AreaTarget, ElementTargets, SizeTarget } from "./types";
 
 interface ElementOverlayProps {
 	element: Rectangle;

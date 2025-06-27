@@ -2,7 +2,7 @@ import type { CustomTerminal } from "./CustomTerminal";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import type { Rectangle } from "./Rectangle";
 import type { Terminal } from "./Terminal";
-import { TextArea } from "./TextArea";
+import type { TextArea } from "./TextArea";
 
 export type SizeTarget = "small" | "medium" | "large";
 export type AreaTarget =

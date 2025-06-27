@@ -129,33 +129,37 @@ function App() {
 					`theme-${store.theme}`,
 				)}
 			>
-				<div className="fixed w-full h-full opacity-40" style={{ background: 'url("assets/noise.png")' }}>
-				</div>
+				<div
+					className="fixed w-full h-full opacity-40"
+					style={{ background: 'url("assets/noise.png")' }}
+				></div>
 				<div className="w-full h-full flex flex-col gap-1.5 p-2">
 					{/* Custom Titlebar */}
 					<div
 						onMouseEnter={() => {
-							titleBarHoveredRef.current = true
+							titleBarHoveredRef.current = true;
 
 							setTimeout(() => {
-								console.log("titleBarHovered", titleBarHoveredRef.current)
+								console.log("titleBarHovered", titleBarHoveredRef.current);
 								if (titleBarHoveredRef.current) {
-									setShowTitlebar(true)
+									setShowTitlebar(true);
 								}
-							}, 400)
+							}, 400);
 						}}
 						onMouseLeave={() => {
-							titleBarHoveredRef.current = false
+							titleBarHoveredRef.current = false;
 
 							setTimeout(() => {
 								if (!titleBarHoveredRef.current) {
-									setShowTitlebar(false)
+									setShowTitlebar(false);
 								}
-							}, 1000)
+							}, 1000);
 						}}
 						className={cn(
 							"flex items-center outline-0 justify-center rounded-md select-none relative z-50  transition-[height] border-[var(--acc-400-50)]",
-							showTitlebar ? "h-fit py-1" : "h-1 mx-2 hover:h-3 not-hover:bg-[var(--base-400-20)] hover:border-2"
+							showTitlebar
+								? "h-fit py-1"
+								: "h-1 mx-2 hover:h-3 not-hover:bg-[var(--base-400-20)] hover:border-2",
 						)}
 					>
 						{showTitlebar && (

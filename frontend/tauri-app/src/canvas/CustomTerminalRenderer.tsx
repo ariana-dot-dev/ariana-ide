@@ -1,12 +1,12 @@
 import { motion, useInView } from "motion/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+	type CustomTerminalAPI,
 	customTerminalAPI,
 	defaultLineItem,
 	type LineItem,
 	type TerminalEvent,
 	type TerminalSpec,
-	type CustomTerminalAPI,
 } from "../services/CustomTerminalAPI";
 import { useStore } from "../state";
 import { cn } from "../utils";
@@ -49,7 +49,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	terminalAPI,
 	onTerminalReady,
 	onTerminalError,
-	fontSize
+	fontSize,
 }) => {
 	const { isLightTheme } = useStore();
 	const logPrefix = `[CustomTerminalRenderer-${elementId}]`;
@@ -104,25 +104,32 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			console.log(logPrefix, "existingTerminalId:", existingTerminalId);
 			console.log(logPrefix, "spec:", spec);
 			console.log(logPrefix, "current terminalId:", terminalId);
-			
+
 			// If we have an existing terminal ID passed in, use that
 			if (existingTerminalId && !terminalId) {
-				console.log(logPrefix, "Using existing terminal ID:", existingTerminalId);
+				console.log(
+					logPrefix,
+					"Using existing terminal ID:",
+					existingTerminalId,
+				);
 				setTerminalId(existingTerminalId);
 				setIsConnected(true);
 
 				// Set up event listeners for existing connection
-				console.log(logPrefix, "Setting up event listeners for existing terminal");
-				await api.onTerminalEvent(
-					existingTerminalId,
-					handleTerminalEvent,
+				console.log(
+					logPrefix,
+					"Setting up event listeners for existing terminal",
 				);
+				await api.onTerminalEvent(existingTerminalId, handleTerminalEvent);
 				await api.onTerminalDisconnect(
 					existingTerminalId,
 					handleTerminalDisconnect,
 				);
 
-				console.log(logPrefix, "Connected to existing terminal, notifying ready");
+				console.log(
+					logPrefix,
+					"Connected to existing terminal, notifying ready",
+				);
 				onTerminalReady?.(existingTerminalId);
 				return;
 			}
@@ -136,10 +143,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				setIsConnected(true);
 
 				// Set up event listeners for existing connection
-				await api.onTerminalEvent(
-					managedTerminalId,
-					handleTerminalEvent,
-				);
+				await api.onTerminalEvent(managedTerminalId, handleTerminalEvent);
 				await api.onTerminalDisconnect(
 					managedTerminalId,
 					handleTerminalDisconnect,
@@ -171,10 +175,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 				// Set up event listeners
 				await api.onTerminalEvent(id, handleTerminalEvent);
-				await api.onTerminalDisconnect(
-					id,
-					handleTerminalDisconnect,
-				);
+				await api.onTerminalDisconnect(id, handleTerminalDisconnect);
 
 				onTerminalReady?.(id);
 			} catch (err) {
@@ -456,9 +457,16 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 			scrollDown();
 
 			try {
-				console.log(logPrefix, `Calling api.resizeTerminal(${terminalId}, ${lines}, ${cols})`);
+				console.log(
+					logPrefix,
+					`Calling api.resizeTerminal(${terminalId}, ${lines}, ${cols})`,
+				);
 				console.log(logPrefix, "API instance type:", api.constructor.name);
-				console.log(logPrefix, "resizeTerminal method:", api.resizeTerminal.toString().substring(0, 100));
+				console.log(
+					logPrefix,
+					"resizeTerminal method:",
+					api.resizeTerminal.toString().substring(0, 100),
+				);
 				await api.resizeTerminal(terminalId, lines, cols);
 				// Update our tracked dimensions only after successful resize
 				setWindowDimensions({ rows: lines, cols });
@@ -592,7 +600,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 							{" "}
 						</div> */}
 						<div className="absolute flex items-center justify-center top-0 left-0 h-full w-[200%] opacity-80">
-						<div>{'😎'}</div>
+							<div>{"😎"}</div>
 						</div>
 					</motion.div>
 					<span ref={phantomCharRef} className="absolute -left-full -top-full">
@@ -784,27 +792,17 @@ const colorMap = (color: string, isLightTheme: boolean) => {
 		Magenta: isLightTheme ? "var(--acc-500-50)" : "var(--acc-500-50)",
 		Cyan: isLightTheme ? "var(--acc-500-50)" : "var(--acc-500-50)",
 		White: isLightTheme ? "var(--whitest)" : "var(--whitest)",
-		BrightBlack: isLightTheme
-			? "var(--blackest)"
-			: "var(--blackest)",
+		BrightBlack: isLightTheme ? "var(--blackest)" : "var(--blackest)",
 		BrightRed: isLightTheme
 			? "var(--negative-400-50)"
 			: "var(--negative-400-50)",
 		BrightGreen: isLightTheme
 			? "var(--positive-400-50)"
 			: "var(--positive-400-50)",
-		BrightYellow: isLightTheme
-			? "var(--acc-400-50)"
-			: "var(--acc-400-50)",
-		BrightBlue: isLightTheme
-			? "var(--acc-400-50)"
-			: "var(--acc-400-50)",
-		BrightMagenta: isLightTheme
-			? "var(--acc-400-50)"
-			: "var(--acc-400-50)",
-		BrightCyan: isLightTheme
-			? "var(--acc-400-50)"
-			: "var(--acc-400-50)",
+		BrightYellow: isLightTheme ? "var(--acc-400-50)" : "var(--acc-400-50)",
+		BrightBlue: isLightTheme ? "var(--acc-400-50)" : "var(--acc-400-50)",
+		BrightMagenta: isLightTheme ? "var(--acc-400-50)" : "var(--acc-400-50)",
+		BrightCyan: isLightTheme ? "var(--acc-400-50)" : "var(--acc-400-50)",
 		BrightWhite: isLightTheme ? "var(--whitest)" : "var(--whitest)",
 	};
 

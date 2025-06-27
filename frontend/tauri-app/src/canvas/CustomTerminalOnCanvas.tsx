@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, PanInfo } from "framer-motion";
+import { motion, type PanInfo } from "framer-motion";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import type { TerminalSpec } from "../services/CustomTerminalAPI";
 import { cn } from "../utils";
-import { CanvasElement, ElementLayout } from "./types";
 import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
-import { TerminalSpec } from "../services/CustomTerminalAPI";
+import type { CanvasElement, ElementLayout } from "./types";
 
 interface CustomTerminalOnCanvasProps {
 	layout: ElementLayout;

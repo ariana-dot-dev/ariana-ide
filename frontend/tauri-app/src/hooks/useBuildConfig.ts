@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { join, resourceDir } from "@tauri-apps/api/path";
 import { readTextFile } from "@tauri-apps/plugin-fs";
-import { resourceDir, join } from "@tauri-apps/api/path";
+import { useEffect, useState } from "react";
 
 interface BuildConfig {
 	buildParams: {
@@ -32,11 +32,11 @@ export function useBuildConfig() {
 				// Set default config if file doesn't exist
 				setBuildConfig({
 					buildParams: {
-						executableName: "ariana-ide"
+						executableName: "ariana-ide",
 					},
 					runtimeParams: {
-						serverUrl: "https://api.ariana.dev"
-					}
+						serverUrl: "https://api.ariana.dev",
+					},
 				});
 			} finally {
 				setLoading(false);
