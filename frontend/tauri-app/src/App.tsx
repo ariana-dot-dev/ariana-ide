@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from "react";
 import CanvasView from "./CanvasView";
 import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Terminal } from "./canvas/Terminal";
+import { CodeEditor } from "./canvas/CodeEditor";
 import type { CanvasElement } from "./canvas/types";
 import { useUserConfig } from "./hooks/useUserConfig";
 import Onboarding from "./Onboarding";
@@ -108,6 +109,18 @@ function App() {
 		addElementRef.current?.(terminalElement);
 	};
 
+	const openCodeEditor = () => {
+		const codeEditorElement = CodeEditor.canvasElement(
+			{
+				size: "large",
+				aspectRatio: 16 / 9,
+				area: "center",
+			},
+			1,
+		);
+		addElementRef.current?.(codeEditorElement);
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -186,10 +199,19 @@ function App() {
 										type="button"
 										onClick={openNewTerminal}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 									>
 										💻
+									</button>
+									<button
+										type="button"
+										onClick={openCodeEditor}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+										)}
+									>
+										📝
 									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>
