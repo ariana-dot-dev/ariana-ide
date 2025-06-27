@@ -14,6 +14,8 @@ interface AppState {
 	theme: string;
 	showOnboarding: boolean;
 	currentInterpreterScript: string;
+	showLandingPage: boolean;
+	currentProject: string | null;
 }
 
 // Define the shape of the store, including state and actions
@@ -21,6 +23,8 @@ export interface IStore extends AppState {
 	setTheme: (theme: string) => void;
 	setShowOnboarding: (show: boolean) => void;
 	setCurrentInterpreterScript: (script: string) => void;
+	setShowLandingPage: (show: boolean) => void;
+	setCurrentProject: (projectId: string | null) => void;
 	isLightTheme: boolean;
 	processCommand: (command: Command) => void;
 	revertCommand: () => void;
@@ -35,6 +39,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 	const [showOnboarding, setShowOnboardingState] = useState(false);
 	const [currentInterpreterScript, setCurrentInterpreterScriptState] =
 		useState("");
+	const [showLandingPage, setShowLandingPageState] = useState(true);
+	const [currentProject, setCurrentProjectState] = useState<string | null>(null);
 	const [processedCommandsStack, setProcessedCommandsStack] = useState<
 		Command[]
 	>([]);
@@ -51,6 +57,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					setThemeState(savedState.theme);
 					setShowOnboardingState(savedState.showOnboarding);
 					setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
+					setShowLandingPageState(savedState.showLandingPage ?? true);
+					setCurrentProjectState(savedState.currentProject ?? null);
+				} else {
+					// If no saved state, ensure we show the landing page
+					setShowLandingPageState(true);
+					setCurrentProjectState(null);
 				}
 			} catch (error) {
 				console.error("Failed to load state:", error);
@@ -68,6 +80,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					theme,
 					showOnboarding,
 					currentInterpreterScript,
+					showLandingPage,
+					currentProject,
 				};
 				await tauriStore.set("appState", stateToSave);
 				await tauriStore.save();
@@ -76,12 +90,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			}
 		};
 		saveState();
-	}, [theme, showOnboarding, currentInterpreterScript]);
+	}, [theme, showOnboarding, currentInterpreterScript, showLandingPage, currentProject]);
 
 	const setTheme = (newTheme: string) => setThemeState(newTheme);
 	const setShowOnboarding = (show: boolean) => setShowOnboardingState(show);
 	const setCurrentInterpreterScript = (script: string) =>
 		setCurrentInterpreterScriptState(script);
+	const setShowLandingPage = (show: boolean) => setShowLandingPageState(show);
+	const setCurrentProject = (projectId: string | null) => setCurrentProjectState(projectId);
 
 	const isLightTheme = useMemo(() => theme.startsWith("light"), [theme]);
 
@@ -131,6 +147,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		setShowOnboarding,
 		currentInterpreterScript,
 		setCurrentInterpreterScript,
+		showLandingPage,
+		setShowLandingPage,
+		currentProject,
+		setCurrentProject,
 		isLightTheme,
 		processCommand,
 		revertCommand,

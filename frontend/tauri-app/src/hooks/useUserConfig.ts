@@ -46,7 +46,15 @@ export function useUserConfig() {
 			}
 		};
 
-		loadUserConfig();
+		// Add a timeout to prevent infinite loading
+		const timeout = setTimeout(() => {
+			console.log("User config loading timeout, proceeding anyway...");
+			setLoading(false);
+		}, 3000); // 3 second timeout
+
+		loadUserConfig().finally(() => {
+			clearTimeout(timeout);
+		});
 	}, []);
 
 	return { userEmail, loading, error, setUserEmail };

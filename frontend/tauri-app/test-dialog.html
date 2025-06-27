@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dialog</title>
+    <script type="module">
+        import { invoke } from "@tauri-apps/api/core";
+
+        window.testDialog = async function() {
+            try {
+                console.log("Testing directory picker...");
+                const result = await invoke("open_directory_picker");
+                console.log("Result:", result);
+                document.getElementById("result").textContent = `Result: ${result || "None"}`;
+            } catch (error) {
+                console.error("Error:", error);
+                document.getElementById("result").textContent = `Error: ${error}`;
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>Test Directory Picker</h1>
+    <button onclick="testDialog()">Test Directory Picker</button>
+    <div id="result"></div>
+</body>
+</html>
