@@ -124,10 +124,17 @@ export default function LandingPage({ onProjectSelect }: LandingPageProps) {
 
 
   return (
-    <div className="flex-1 flex items-center justify-center p-8 relative z-50">
+    <div className="flex-1 flex items-center justify-center p-8 relative z-50 font-sans font-semibold">
       <div className="max-w-4xl w-full relative z-50">
         {/* Header */}
         <div className="text-center mb-12">
+          <div className="mb-6">
+            <img 
+              src="app-icon.png" 
+              alt="Ariana IDE Logo" 
+              className="w-16 h-16 mx-auto mb-4"
+            />
+          </div>
           <h1 className="text-4xl font-bold text-[var(--acc-600)] mb-4">
             Welcome to Ariana IDE
           </h1>

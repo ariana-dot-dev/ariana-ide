@@ -244,41 +244,41 @@ function App() {
 									Ariana IDE
 								</span>
 								<div className="absolute flex right-0">
-									<button
-										type="button"
-										onClick={openFileTree}
-										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-l-md transition-colors cursor-pointer",
-										)}
-									>
-										📁
-									</button>
-									<button
-										type="button"
-										onClick={openNewTerminal}
-										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] transition-colors cursor-pointer",
-										)}
-									>
-										💻
-									</button>
-									<button
-										type="button"
-										onClick={testDirectoryPicker}
-										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] transition-colors cursor-pointer",
-										)}
-									>
-										🔍
-									</button>
+									{!showLandingPage && (
+										<>
+											<button
+												type="button"
+												onClick={openFileTree}
+												className={cn(
+													"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-l-md transition-colors cursor-pointer",
+												)}
+											>
+												📁
+											</button>
+											<button
+												type="button"
+												onClick={openNewTerminal}
+												className={cn(
+													"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] transition-colors cursor-pointer",
+												)}
+											>
+												💻
+											</button>
+										</>
+									)}
 									<button
 										type="button"
 										onClick={toggleLandingPage}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] transition-colors cursor-pointer flex items-center justify-center",
+											!showLandingPage ? "rounded-r-md" : "rounded-md"
 										)}
 									>
-										🏠
+										<img 
+											src="app-icon.png" 
+											alt="Ariana" 
+											className="w-4 h-4"
+										/>
 									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>
