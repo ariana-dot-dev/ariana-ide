@@ -1,7 +1,7 @@
 import type { PanInfo } from "framer-motion";
 import { motion } from "framer-motion";
 import type React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "../utils";
 import type { CodeEditor } from "./CodeEditor";
 import { useEditorStore } from "./editor/EditorStore";
@@ -35,6 +35,7 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 	const { cell, element } = layout;
 	const codeEditor = (element.kind as { codeEditor: CodeEditor }).codeEditor;
 	const setText = useEditorStore((state) => state.setText);
+	const [dragging, setDragging] = useState(false);
 
 	// set initial content when component mounts
 	useEffect(() => {
@@ -42,6 +43,7 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 	}, [codeEditor, setText]);
 
 	const handleDragStart = () => {
+		setDragging(true);
 		onDragStart(element);
 	};
 
@@ -56,24 +58,49 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute rounded-lg overflow-hidden",
+				"absolute rounded-lg overflow-hidden cursor-move",
 				"bg-gray-900 border border-gray-700",
 				isDragTarget && "ring-2 ring-blue-500",
-				isDragging && "opacity-50",
+				isDragging && "opacity-50 z-30",
+				!isDragging && "z-10",
 			)}
-			style={{
-				left: cell.x,
-				top: cell.y,
+			initial={{
+				x: cell.x,
+				y: cell.y,
 				width: cell.width,
 				height: cell.height,
 			}}
+			animate={
+				!dragging
+					? {
+							x: cell.x,
+							y: cell.y,
+							width: cell.width,
+							height: cell.height,
+						}
+					: undefined
+			}
+			transition={{
+				type: "tween",
+				duration: 0.2,
+			}}
+			layout
 			drag
 			dragMomentum={false}
-			onDragStart={handleDragStart}
-			onDragEnd={onDragEnd}
+			onMouseDown={() => {
+				if (!dragging) {
+					setDragging(true);
+				}
+			}}
+			onDragStart={() => {
+				setDragging(true);
+				handleDragStart();
+			}}
+			onDragEnd={() => {
+				setDragging(false);
+				onDragEnd();
+			}}
 			onDrag={onDrag}
-			whileHover={{ scale: 1.005 }}
-			transition={{ duration: 0.2 }}
 		>
 			{/* Title bar */}
 			<div className="absolute top-0 left-0 right-0 bg-gray-800 border-b border-gray-700 px-3 py-2 flex justify-between items-center">
