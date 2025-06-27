@@ -231,7 +231,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 									"group rounded-lg rounded-br-2xl transition-all p-0.5 bg-[var(--base-200)] cursor-pointer hover:rounded-3xl opacity-70 hover:opacity-100",
 								)}
 							>
-								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg hover:rounded-3xl rounded-br-2xl transition-all">
+								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg group-hover:rounded-3xl rounded-br-2xl transition-all">
 									<div className={cn(
 										"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] font-medium transition-all text-[var(--whitest)] z-10",
 									)}>
@@ -263,11 +263,11 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 										: "opacity-0 pointer-events-none"
 								)}
 							>
-								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg hover:rounded-3xl rounded-br-2xl transition-all">
+								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg group-hover:rounded-3xl rounded-br-2xl transition-all">
 									<div className={cn(
 										"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] group-hover:bg-[var(--acc-300)] font-medium transition-all text-[var(--whitest)] z-10",
 									)}>
-										Claude it
+										Go
 									</div>
 									<div className="group-hover:block hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--acc-500)] blur-[1px]">
 
