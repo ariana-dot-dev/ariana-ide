@@ -15,7 +15,14 @@
 			"icons/128x128@2x.png",
 			"icons/icon.icns",
 			"icons/icon.ico"
-		]
+		],
+		"macOS": {
+			"entitlements": "entitlements.plist",
+			"exceptionDomain": null,
+			"frameworks": [],
+			"providerShortName": null,
+			"signingIdentity": null
+		}
 	},
 	"productName": "ariana IDE",
 	"mainBinaryName": "ariana IDE",
@@ -41,6 +48,7 @@
 		],
 		"security": {
 			"csp": null
-		}
+		},
+		"macOSPrivateApi": true
 	}
 }

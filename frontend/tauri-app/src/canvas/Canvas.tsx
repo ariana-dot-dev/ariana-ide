@@ -2,6 +2,8 @@ import type { PanInfo } from "framer-motion";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../utils";
+import AudioOnCanvas from "./AudioOnCanvas";
+import type { Audio, AudioConfig } from "./Audio";
 import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import FileTreeOnCanvas from "./FileTreeOnCanvas";
@@ -277,6 +279,15 @@ const Canvas: React.FC<CanvasProps> = ({
 		[elements, onElementsChange],
 	);
 
+	const handleAudioUpdate = useCallback(
+		(element: Audio, newConfig: AudioConfig) => {
+			element.updateConfig(newConfig);
+			// Trigger re-optimization by updating the elements array
+			onElementsChange([...elements]);
+		},
+		[elements, onElementsChange],
+	);
+
 	const handleRemoveElement = useCallback(
 		(elementId: string) => {
 			const newElements = elements.filter((el) => el.id !== elementId);
@@ -356,6 +367,22 @@ const Canvas: React.FC<CanvasProps> = ({
 										layout.element === draggedElement ? handleDrag : () => {}
 									}
 									onFileTreeUpdate={handleFileTreeUpdate}
+									onRemoveElement={handleRemoveElement}
+									isDragTarget={layout.element === dragTarget}
+									isDragging={layout.element === draggedElement}
+								/>
+							);
+						} else if ("audio" in layout.element.kind) {
+							return (
+								<AudioOnCanvas
+									key={`${layout.element.id}`}
+									layout={layout}
+									onDragStart={handleDragStart}
+									onDragEnd={handleDragEnd}
+									onDrag={
+										layout.element === draggedElement ? handleDrag : () => {}
+									}
+									onAudioUpdate={handleAudioUpdate}
 									onRemoveElement={handleRemoveElement}
 									isDragTarget={layout.element === dragTarget}
 									isDragging={layout.element === draggedElement}

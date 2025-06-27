@@ -1,0 +1,14 @@
+{
+  "name": "additional-components",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "file:../frontend/node_modules/react",
+    "react-dom": "file:../frontend/node_modules/react-dom"
+  },
+  "devDependencies": {
+    "@types/react": "file:../frontend/tauri-app/node_modules/@types/react",
+    "@types/react-dom": "file:../frontend/tauri-app/node_modules/@types/react-dom",
+    "typescript": "file:../frontend/node_modules/typescript"
+  }
+} 

@@ -4,6 +4,7 @@ import { type Event, listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import React, { useEffect, useState } from "react";
 import CanvasView from "./CanvasView";
+import { Audio } from "./canvas/Audio";
 import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Terminal } from "./canvas/Terminal";
 import type { CanvasElement } from "./canvas/types";
@@ -106,6 +107,22 @@ function App() {
 		addElementRef.current?.(terminalElement);
 	};
 
+	const openAudioRecorder = () => {
+		const audioElement = Audio.createMicrophone(
+			async (transcription: string) => {
+				// Handle transcription - you can integrate with your interpreter or other systems
+				console.log("Received transcription:", transcription);
+				
+				// Example: Send to interpreter
+				if (interpreter) {
+					// You could process the transcription through your interpreter
+					// interpreter.execute(transcription);
+				}
+			}
+		);
+		addElementRef.current?.(audioElement);
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -171,6 +188,15 @@ function App() {
 										)}
 									>
 										💻
+									</button>
+									<button
+										type="button"
+										onClick={openAudioRecorder}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-2 py-1 text-xs bg-[var(--bg-600)] hover:bg-[var(--bg-700)] rounded transition-colors cursor-pointer mr-2",
+										)}
+									>
+										🎤
 									</button>
 									<button
 										type="button"
