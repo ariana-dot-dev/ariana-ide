@@ -1,4 +1,4 @@
-name: Format Check (Bun)
+name: format checking (rustfmt/biome)
 
 on:
   push:

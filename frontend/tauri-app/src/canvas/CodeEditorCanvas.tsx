@@ -1,12 +1,12 @@
 import type { PanInfo } from "framer-motion";
 import { motion } from "framer-motion";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "../utils";
 import { CanvasHeader } from "./CanvasHeader";
 import type { CodeEditor } from "./CodeEditor";
-import { useEditorStore } from "./editor/EditorStore";
 import { EditorView } from "./editor/EditorView";
+import { TabBar } from "./TabBar";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
 interface CodeEditorCanvasProps {
@@ -35,20 +35,14 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 }) => {
 	const { cell, element } = layout;
 	const codeEditor = (element.kind as { codeEditor: CodeEditor }).codeEditor;
-	const setText = useEditorStore((state) => state.setText);
 	const [dragging, setDragging] = useState(false);
-
-	// set initial content when component mounts
-	useEffect(() => {
-		setText(codeEditor.getInitialContent());
-	}, [codeEditor, setText]);
 
 	const handleDragStart = () => {
 		setDragging(true);
 		onDragStart(element);
 	};
 
-	const handleUpdateTargets = (newTargets: ElementTargets) => {
+	const _handleUpdateTargets = (newTargets: ElementTargets) => {
 		onCodeEditorUpdate(codeEditor, newTargets);
 	};
 
@@ -107,6 +101,7 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 				)}
 			>
 				<CanvasHeader title={codeEditor.getTitle()} onRemove={handleRemove} />
+				<TabBar />
 				<div className="flex-1 p-2">
 					<EditorView className="rounded-b-lg h-full" showLineNumbers={true} />
 				</div>

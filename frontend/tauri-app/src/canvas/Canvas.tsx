@@ -377,7 +377,7 @@ const Canvas: React.FC<CanvasProps> = ({
 							key={`${layout.element.id}`}
 							layout={layout}
 							onDragStart={handleDragStart}
-							onDragEnd={handleDragEnd}
+							onDragEnd={() => handleDragEnd(layout.element)}
 							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
 							onCodeEditorUpdate={handleCodeEditorUpdate}
 							onRemoveElement={handleRemoveElement}

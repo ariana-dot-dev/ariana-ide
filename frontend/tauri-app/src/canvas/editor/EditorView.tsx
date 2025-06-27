@@ -25,7 +25,11 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const contentRef = useRef<HTMLDivElement>(null);
 
-	const { document, cursor, moveCursor } = useEditorStore();
+	const activeFileId = useEditorStore((state) => state.activeFileId);
+	const activeFile = useEditorStore((state) => state.files[activeFileId]);
+	const document = activeFile?.document || null;
+	const cursor = activeFile?.cursor || { line: 0, column: 0 };
+	const moveCursor = useEditorStore((state) => state.moveCursor);
 
 	const handleClick = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
@@ -42,6 +46,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
 			const line = yToLine(y);
 			const column = xToColumn(Math.max(0, adjustedX));
 
+			if (!document) return;
+
 			// clamp to valid position
 			const lineContent = document.getLine(line);
 			const maxLine = Math.min(line, document.getLineCount() - 1);
@@ -54,6 +60,14 @@ export const EditorView: React.FC<EditorViewProps> = ({
 		},
 		[document, moveCursor, showLineNumbers],
 	);
+
+	if (!document) {
+		return (
+			<div className="w-full h-full bg-gray-900 flex items-center justify-center text-gray-500 text-sm">
+				Open a file from the file tree to start editing
+			</div>
+		);
+	}
 
 	// calculate total height for scrolling
 	const totalHeight = document.getLineCount() * getLineHeight();

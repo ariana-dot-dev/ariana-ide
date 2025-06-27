@@ -100,6 +100,13 @@ async fn get_file_tree(path: String) -> Result<Vec<FileNode>, String> {
 	read_directory(&path).await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn read_file(path: String) -> Result<String, String> {
+	tokio::fs::read_to_string(&path)
+		.await
+		.map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	let terminal_manager = Arc::new(TerminalManager::new());
@@ -132,7 +139,8 @@ pub fn run() {
 			custom_resize_terminal,
 			// File tree commands
 			get_current_dir,
-			get_file_tree
+			get_file_tree,
+			read_file
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");

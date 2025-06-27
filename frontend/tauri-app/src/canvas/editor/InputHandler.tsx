@@ -9,13 +9,16 @@ interface InputHandlerProps {
 
 export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 	const inputRef = useRef<HTMLTextAreaElement>(null);
-	const {
-		cursor,
-		insertText,
-		deleteBackward,
-		deleteForward,
-		moveCursorRelative,
-	} = useEditorStore();
+	const activeFileId = useEditorStore((state) => state.activeFileId);
+	const cursor = useEditorStore(
+		(state) => state.files[activeFileId]?.cursor || { line: 0, column: 0 },
+	);
+	const insertText = useEditorStore((state) => state.insertText);
+	const deleteBackward = useEditorStore((state) => state.deleteBackward);
+	const deleteForward = useEditorStore((state) => state.deleteForward);
+	const moveCursorRelative = useEditorStore(
+		(state) => state.moveCursorRelative,
+	);
 
 	// position hidden textarea at cursor position
 	useEffect(() => {
@@ -113,12 +116,15 @@ export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 				break;
 
 			case "End": {
-				const doc = useEditorStore.getState().document;
-				const line = doc.getLine(cursor.line);
-				useEditorStore.getState().moveCursor({
-					line: cursor.line,
-					column: line ? line.length : 0,
-				});
+				const state = useEditorStore.getState();
+				const activeFile = state.files[state.activeFileId];
+				if (activeFile) {
+					const line = activeFile.document.getLine(cursor.line);
+					state.moveCursor({
+						line: cursor.line,
+						column: line ? line.length : 0,
+					});
+				}
 				break;
 			}
 		}
