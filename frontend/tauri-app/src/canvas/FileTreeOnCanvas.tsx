@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileTree } from "../components/FileTree";
 import { useStore } from "../state";
 import { cn } from "../utils";
+import { CanvasHeader } from "./CanvasHeader";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 
@@ -69,18 +70,18 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
-				x: cell.x,
-				y: cell.y,
-				width: cell.width,
-				height: cell.height,
+				x: cell.x + 4,
+				y: cell.y + 4,
+				width: cell.width - 8,
+				height: cell.height - 8,
 			}}
 			animate={
 				!dragging
 					? {
-							x: cell.x,
-							y: cell.y,
-							width: cell.width,
-							height: cell.height,
+							x: cell.x + 4,
+							y: cell.y + 4,
+							width: cell.width - 8,
+							height: cell.height - 8,
 						}
 					: undefined
 			}
@@ -120,24 +121,14 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 					`theme-${theme}`,
 				)}
 			>
-				{/* Header */}
-				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
-					<span className="text-xs font-medium">📁 Files</span>
-					<button
-						type="button"
-						onClick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							onRemoveElement(element.id);
-						}}
-						className="text-xs w-6 h-6 bg-[var(--acc-800)] hover:bg-[var(--acc-700)] rounded transition-colors text-[var(--base-white)] flex items-center justify-center"
-					>
-						×
-					</button>
-				</div>
+				<CanvasHeader
+					title="Files"
+					icon="📁"
+					onRemove={() => onRemoveElement(element.id)}
+				/>
 
 				{/* File Tree Content */}
-				<div className="flex-1 overflow-auto p-1">
+				<div className="flex-1 overflow-auto p-2">
 					<div className="text-xs text-[var(--acc-400)] mb-1 px-1 truncate">
 						{rootPath}
 					</div>

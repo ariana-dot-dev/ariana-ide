@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { cn } from "../utils";
+import { CanvasHeader } from "./CanvasHeader";
 import type { CodeEditor } from "./CodeEditor";
 import { useEditorStore } from "./editor/EditorStore";
 import { EditorView } from "./editor/EditorView";
@@ -58,25 +59,22 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute rounded-lg overflow-hidden cursor-move",
-				"bg-gray-900 border border-gray-700",
-				isDragTarget && "ring-2 ring-blue-500",
-				isDragging && "opacity-50 z-30",
-				!isDragging && "z-10",
+				"absolute cursor-move select-none",
+				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
-				x: cell.x,
-				y: cell.y,
-				width: cell.width,
-				height: cell.height,
+				x: cell.x + 4,
+				y: cell.y + 4,
+				width: cell.width - 8,
+				height: cell.height - 8,
 			}}
 			animate={
 				!dragging
 					? {
-							x: cell.x,
-							y: cell.y,
-							width: cell.width,
-							height: cell.height,
+							x: cell.x + 4,
+							y: cell.y + 4,
+							width: cell.width - 8,
+							height: cell.height - 8,
 						}
 					: undefined
 			}
@@ -102,19 +100,16 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 			}}
 			onDrag={onDrag}
 		>
-			{/* Title bar */}
-			<div className="absolute top-0 left-0 right-0 bg-gray-800 border-b border-gray-700 px-3 py-2 flex justify-between items-center">
-				<span className="text-sm text-gray-300">{codeEditor.getTitle()}</span>
-				<button
-					onClick={handleRemove}
-					className="text-gray-400 hover:text-white text-lg leading-none"
-				>
-					×
-				</button>
-			</div>
-
-			<div className="w-full h-full pt-10">
-				<EditorView className="rounded-b-lg" showLineNumbers={true} />
+			<div
+				className={cn(
+					"w-full h-full rounded-md backdrop-blur-md bg-[var(--base-400)]/90 border border-[var(--acc-600)]/20 overflow-hidden flex flex-col",
+					isDragTarget && "ring-2 ring-[var(--acc-500)]",
+				)}
+			>
+				<CanvasHeader title={codeEditor.getTitle()} onRemove={handleRemove} />
+				<div className="flex-1 p-2">
+					<EditorView className="rounded-b-lg h-full" showLineNumbers={true} />
+				</div>
 			</div>
 		</motion.div>
 	);
