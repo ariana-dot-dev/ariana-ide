@@ -11,6 +11,7 @@ import { resolveColor } from "../utils/colors";
 import "@xterm/xterm/css/xterm.css";
 import { TerminalService } from "../services/TerminalService";
 import { cn } from "../utils";
+import { CanvasHeader } from "./CanvasHeader";
 import type { Terminal, TerminalConfig } from "./Terminal";
 import type { CanvasElement, ElementLayout } from "./types";
 
@@ -272,22 +273,22 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute p-1 cursor-move select-none overflow-hidden",
+				"absolute cursor-move select-none",
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
-				x: cell.x,
-				y: cell.y,
-				width: cell.width,
-				height: cell.height,
+				x: cell.x + 4,
+				y: cell.y + 4,
+				width: cell.width - 8,
+				height: cell.height - 8,
 			}}
 			animate={
 				!dragging
 					? {
-							x: cell.x,
-							y: cell.y,
-							width: cell.width,
-							height: cell.height,
+							x: cell.x + 4,
+							y: cell.y + 4,
+							width: cell.width - 8,
+							height: cell.height - 8,
 						}
 					: undefined
 			}
@@ -326,41 +327,30 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 					"w-full h-full rounded-md backdrop-blur-md bg-[var(--base-400)]/90 border border-[var(--acc-600)]/20 overflow-hidden flex flex-col",
 				)}
 			>
-				{/* Header */}
-				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
-					<span className="text-xs font-medium">
-						💻 {terminal.getTerminalType().toUpperCase()}
-					</span>
-					<div className="flex items-center gap-2">
-						{/* Connection status indicator */}
-						<div
-							className={cn(
-								"w-2 h-2 rounded-full",
-								isConnected
-									? "bg-[var(--positive-400)]"
-									: "bg-[var(--negative-400)]",
-							)}
-						/>
-						<button
-							type="button"
-							onClick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								onRemoveElement(element.id);
-							}}
-							className="text-xs w-6 h-6 bg-[var(--acc-800)] hover:bg-[var(--acc-700)] rounded transition-colors text-[var(--base-white)] flex items-center justify-center"
-						>
-							×
-						</button>
-					</div>
-				</div>
+				<CanvasHeader
+					title={terminal.getTerminalType().toUpperCase()}
+					icon="💻"
+					onRemove={() => onRemoveElement(element.id)}
+				>
+					{/* Connection status indicator */}
+					<div
+						className={cn(
+							"w-2 h-2 rounded-full",
+							isConnected
+								? "bg-[var(--positive-400)]"
+								: "bg-[var(--negative-400)]",
+						)}
+					/>
+				</CanvasHeader>
 
 				{/* Terminal container */}
-				<div
-					ref={terminalRef}
-					data-terminal-id={element.id}
-					className={cn("flex-1 pointer-events-auto")}
-				/>
+				<div className="flex-1 p-2">
+					<div
+						ref={terminalRef}
+						data-terminal-id={element.id}
+						className={cn("h-full pointer-events-auto")}
+					/>
+				</div>
 			</div>
 		</motion.div>
 	);
