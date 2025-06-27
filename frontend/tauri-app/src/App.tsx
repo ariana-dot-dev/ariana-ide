@@ -13,6 +13,9 @@ import Repl from "./Repl";
 import { Interpreter } from "./scripting/interpreter";
 import { useStore } from "./state";
 import { cn } from "./utils";
+import LandingPage from "./components/LandingPage";
+import { Project } from "./types/project";
+import { projectService } from "./services/ProjectService";
 
 const appWindow = getCurrentWebviewWindow();
 
@@ -26,7 +29,10 @@ function App() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
-	const { isLightTheme } = store;
+	const { isLightTheme, showLandingPage, setShowLandingPage, setCurrentProject } = store;
+	
+	// Debug logging
+	console.log("App render - showLandingPage:", showLandingPage, "currentProject:", store.currentProject);
 	const addElementRef = React.useRef<((element: CanvasElement) => void) | null>(
 		null,
 	);
@@ -44,13 +50,15 @@ function App() {
 		// Initialize heavy components asynchronously without blocking UI
 		async function importAndRunSwcOnMount() {
 			try {
-				console.log("Starting SWC initialization...");
-				await initSwc("/wasm_bg.wasm");
-				console.log("SWC initialized, starting interpreter...");
+				console.log("Skipping SWC initialization for now...");
+				// Skip SWC initialization temporarily to test landing page
+				// await initSwc("/wasm_bg.wasm");
+				// console.log("SWC initialized, starting interpreter...");
 
 				const newInterpreter = new Interpreter(store);
-				await newInterpreter.init();
-				console.log("Interpreter initialized");
+				// Skip interpreter init that requires SWC
+				// await newInterpreter.init();
+				console.log("Interpreter placeholder set");
 
 				setInterpreter(newInterpreter);
 			} catch (error) {
@@ -60,8 +68,8 @@ function App() {
 			}
 		}
 
-		// Start initialization after a brief delay to allow UI to render
-		setTimeout(importAndRunSwcOnMount, 100);
+		// Start initialization immediately
+		importAndRunSwcOnMount();
 
 		return () => {
 			unlistenUserEmail.then((unlisten) => unlisten());
@@ -103,9 +111,64 @@ function App() {
 		}
 	};
 
+	const testDirectoryPicker = async () => {
+		try {
+			console.log("Testing directory picker...");
+			const result = await invoke<string | null>("open_directory_picker");
+			console.log("Directory picker result:", result);
+			alert(`Selected directory: ${result || "None"}`);
+		} catch (error) {
+			console.error("Directory picker error:", error);
+			alert(`Error: ${error}`);
+		}
+	};
+
+	const toggleLandingPage = () => {
+		console.log("Toggling landing page. Current:", showLandingPage);
+		setShowLandingPage(!showLandingPage);
+		setCurrentProject(null); // Reset current project when toggling to landing page
+	};
+
 	const openNewTerminal = () => {
 		const terminalElement = Terminal.createLocalShell();
 		addElementRef.current?.(terminalElement);
+	};
+
+	const handleProjectSelect = async (project: Project, subfolderId?: string) => {
+		try {
+			// Update project's last opened time
+			projectService.updateProject(project.id, { lastOpened: new Date() });
+			
+			// Set current project in store
+			setCurrentProject(project.id);
+			
+			// Hide landing page
+			setShowLandingPage(false);
+			
+			// Determine which path to open
+			let pathToOpen = project.rootPath;
+			if (subfolderId) {
+				const subfolder = project.subfolderPaths.find(sf => sf.id === subfolderId);
+				if (subfolder && subfolder.relativePath !== "/") {
+					pathToOpen = `${project.rootPath}/${subfolder.relativePath}`.replace(/\/+/g, "/");
+				}
+			}
+			
+			// Open file tree for the selected path
+			const fileTreeElement = FileTreeCanvas.canvasElement(
+				{
+					size: "medium",
+					aspectRatio: 0.6,
+					area: "left",
+				},
+				pathToOpen,
+				1,
+			);
+			
+			addElementRef.current?.(fileTreeElement);
+		} catch (error) {
+			console.error("Failed to open project:", error);
+		}
 	};
 
 	if (loading) {
@@ -116,6 +179,15 @@ function App() {
 				)}
 			>
 				Loading user config...
+				<button 
+					onClick={() => {
+						setShowLandingPage(true);
+						setCurrentProject(null);
+					}}
+					className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+				>
+					Skip to Landing Page
+				</button>
 			</div>
 		);
 	}
@@ -185,10 +257,28 @@ function App() {
 										type="button"
 										onClick={openNewTerminal}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] transition-colors cursor-pointer",
 										)}
 									>
 										💻
+									</button>
+									<button
+										type="button"
+										onClick={testDirectoryPicker}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] transition-colors cursor-pointer",
+										)}
+									>
+										🔍
+									</button>
+									<button
+										type="button"
+										onClick={toggleLandingPage}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-50)] hover:bg-[var(--base-400)] rounded-r-md transition-colors cursor-pointer",
+										)}
+									>
+										🏠
 									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>
@@ -229,14 +319,14 @@ function App() {
 						</div>
 					)}
 
-					<CanvasView onAddElementRef={addElementRef} />
-
-					{/* <div
-						className={cn("flex-1 font-mono flex items-center justify-center")}
-					>
-						<Onboarding userEmail={userEmail} />
-					</div> */}
-					<Repl />
+					{showLandingPage ? (
+						<LandingPage onProjectSelect={handleProjectSelect} />
+					) : (
+						<>
+							<CanvasView onAddElementRef={addElementRef} />
+							<Repl />
+						</>
+					)}
 
 					<div className="absolute bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">
 						{THEMES.map((theme) => (

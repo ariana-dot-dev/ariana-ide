@@ -23,6 +23,7 @@
 		"@swc/wasm-web": "^1.12.6",
 		"@tailwindcss/vite": "^4.1.10",
 		"@tauri-apps/api": "^2.5.0",
+		"@tauri-apps/plugin-dialog": "^2.3.0",
 		"@tauri-apps/plugin-fs": "^2.3.0",
 		"@tauri-apps/plugin-store": "^2.2.1",
 		"@xterm/addon-fit": "^0.10.0",
@@ -33,6 +34,7 @@
 		"framer-motion": "^12.18.1",
 		"material-file-icons": "^2.4.0",
 		"motion": "^12.19.1",
+		"nanoid": "^5.1.5",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
 		"tailwindcss": "^4.1.10"

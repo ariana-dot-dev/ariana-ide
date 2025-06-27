@@ -100,6 +100,50 @@ async fn get_file_tree(path: String) -> Result<Vec<FileNode>, String> {
 	read_directory(&path).await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn open_directory_picker(app: tauri::AppHandle) -> Result<Option<String>, String> {
+	use tauri_plugin_dialog::DialogExt;
+	use std::sync::{Arc, Mutex};
+	use std::time::Duration;
+	use tokio::time;
+	
+	let result = Arc::new(Mutex::new(None));
+	let result_clone = result.clone();
+	let done = Arc::new(Mutex::new(false));
+	let done_clone = done.clone();
+	
+	app.dialog().file().pick_folder(move |folder_path| {
+		{
+			let mut r = result_clone.lock().unwrap();
+			*r = Some(folder_path);
+		}
+		{
+			let mut d = done_clone.lock().unwrap();
+			*d = true;
+		}
+	});
+	
+	// Wait for the dialog to complete, but with a timeout
+	let mut attempts = 0;
+	while attempts < 300 { // 30 seconds max
+		{
+			let is_done = *done.lock().unwrap();
+			if is_done {
+				break;
+			}
+		}
+		time::sleep(Duration::from_millis(100)).await;
+		attempts += 1;
+	}
+	
+	let final_result = result.lock().unwrap().clone();
+	match final_result {
+		Some(Some(path)) => Ok(Some(path.to_string())),
+		Some(None) => Ok(None),
+		None => Err("Dialog timed out".to_string()),
+	}
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	let terminal_manager = Arc::new(TerminalManager::new());
@@ -108,6 +152,7 @@ pub fn run() {
 	tauri::Builder::default()
 		.plugin(tauri_plugin_store::Builder::new().build())
 		.plugin(tauri_plugin_fs::init())
+		.plugin(tauri_plugin_dialog::init())
 		.manage(terminal_manager)
 		.manage(custom_terminal_state)
 		.invoke_handler(tauri::generate_handler![
@@ -132,7 +177,8 @@ pub fn run() {
 			custom_resize_terminal,
 			// File tree commands
 			get_current_dir,
-			get_file_tree
+			get_file_tree,
+			open_directory_picker
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
