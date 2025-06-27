@@ -1,6 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
 import { motion, type PanInfo } from "framer-motion";
 import type React from "react";
 import { useState } from "react";
+import { useEditorStore } from "../canvas/editor/EditorStore";
 import { FileTree } from "../components/FileTree";
 import { useStore } from "../state";
 import { cn } from "../utils";
@@ -51,8 +53,15 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 		propOnDragEnd(element);
 	};
 
-	const handleFileSelect = (path: string) => {
-		// TODO: Implement file opening logic
+	const handleFileSelect = async (path: string) => {
+		try {
+			const content = await invoke<string>("read_file", { path });
+			const { openFile } = useEditorStore.getState();
+			openFile(path, content);
+		} catch (error) {
+			console.error("Failed to open file:", error);
+			// TODO: Show error notification to user
+		}
 	};
 
 	const changeDirectory = () => {

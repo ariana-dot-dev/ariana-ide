@@ -6,10 +6,18 @@ interface Selection {
 	active: Position;
 }
 
-interface EditorState {
+interface FileData {
+	id: string;
+	name: string;
+	content: string;
 	document: Document;
 	cursor: Position;
 	selections: Selection[];
+}
+
+interface EditorState {
+	files: Record<string, FileData>;
+	activeFileId: string;
 
 	// actions
 	setText: (text: string) => void;
@@ -20,25 +28,48 @@ interface EditorState {
 	moveCursorRelative: (lineDelta: number, columnDelta: number) => void;
 	setSelection: (selection: Selection) => void;
 	clearSelections: () => void;
+
+	// file actions
+	setActiveFile: (fileId: string) => void;
+	updateFileContent: (fileId: string, content: string) => void;
+	openFile: (path: string, content: string) => void;
+	closeFile: (fileId: string) => void;
 }
 
+// start with no files open
+const initialFiles: Record<string, FileData> = {};
+
+// todo: dig further into how zustand mutates state because we cant just naively
+// spread things `...` because our performance will suffer
 export const useEditorStore = create<EditorState>((set, get) => ({
-	document: new Document(
-		"// Welcome to the code editor\nfunction hello() {\n  console.log('Hello, world!');\n}\n\nhello();",
-	),
-	cursor: { line: 0, column: 0 },
-	selections: [],
+	files: initialFiles,
+	activeFileId: "",
 
 	setText: (text: string) =>
-		set({
-			document: new Document(text),
-			cursor: { line: 0, column: 0 },
-			selections: [],
+		set((state) => {
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			return {
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						content: text,
+						document: new Document(text),
+						cursor: { line: 0, column: 0 },
+						selections: [],
+					},
+				},
+			};
 		}),
 
 	insertText: (text: string) =>
 		set((state) => {
-			const { document, cursor, selections } = state;
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			const { document, cursor, selections } = activeFile;
 
 			// if there's a selection, delete it first
 			if (selections.length > 0) {
@@ -72,9 +103,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 						: lastLineLength;
 
 				return {
-					document: docAfterInsert,
-					cursor: { line: cursorLine, column: cursorColumn },
-					selections: [],
+					files: {
+						...state.files,
+						[state.activeFileId]: {
+							...activeFile,
+							content: docAfterInsert.toString(),
+							document: docAfterInsert,
+							cursor: { line: cursorLine, column: cursorColumn },
+							selections: [],
+						},
+					},
 				};
 			}
 
@@ -89,14 +127,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 				lines.length === 1 ? cursor.column + lastLineLength : lastLineLength;
 
 			return {
-				document: newDoc,
-				cursor: { line: newLine, column: newColumn },
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						content: newDoc.toString(),
+						document: newDoc,
+						cursor: { line: newLine, column: newColumn },
+					},
+				},
 			};
 		}),
 
 	deleteBackward: () =>
 		set((state) => {
-			const { document, cursor, selections } = state;
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			const { document, cursor, selections } = activeFile;
 
 			// if there's a selection, delete it
 			if (selections.length > 0) {
@@ -116,10 +164,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 					range.end = selection.anchor;
 				}
 
+				const newDoc = document.delete(range);
 				return {
-					document: document.delete(range),
-					cursor: range.start,
-					selections: [],
+					files: {
+						...state.files,
+						[state.activeFileId]: {
+							...activeFile,
+							content: newDoc.toString(),
+							document: newDoc,
+							cursor: range.start,
+							selections: [],
+						},
+					},
 				};
 			}
 
@@ -144,15 +200,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
 			const range: Range = { start: deleteFrom, end: cursor };
 
+			const newDoc = document.delete(range);
 			return {
-				document: document.delete(range),
-				cursor: deleteFrom,
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						content: newDoc.toString(),
+						document: newDoc,
+						cursor: deleteFrom,
+					},
+				},
 			};
 		}),
 
 	deleteForward: () =>
 		set((state) => {
-			const { document, cursor, selections } = state;
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			const { document, cursor, selections } = activeFile;
 
 			// if there's a selection, delete it
 			if (selections.length > 0) {
@@ -172,10 +239,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 					range.end = selection.anchor;
 				}
 
+				const newDoc = document.delete(range);
 				return {
-					document: document.delete(range),
-					cursor: range.start,
-					selections: [],
+					files: {
+						...state.files,
+						[state.activeFileId]: {
+							...activeFile,
+							content: newDoc.toString(),
+							document: newDoc,
+							cursor: range.start,
+							selections: [],
+						},
+					},
 				};
 			}
 
@@ -199,21 +274,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
 			const range: Range = { start: cursor, end: deleteTo };
 
+			const newDoc = document.delete(range);
 			return {
-				document: document.delete(range),
-				cursor: cursor, // cursor stays in same position
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						content: newDoc.toString(),
+						document: newDoc,
+						cursor: cursor, // cursor stays in same position
+					},
+				},
 			};
 		}),
 
 	moveCursor: (position: Position) =>
-		set({
-			cursor: position,
-			selections: [], // clear selections when moving cursor
+		set((state) => {
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			return {
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						cursor: position,
+						selections: [], // clear selections when moving cursor
+					},
+				},
+			};
 		}),
 
 	moveCursorRelative: (lineDelta: number, columnDelta: number) =>
 		set((state) => {
-			const { document, cursor } = state;
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			const { document, cursor } = activeFile;
 			const lineCount = document.getLineCount();
 
 			let newLine = cursor.line + lineDelta;
@@ -252,18 +349,118 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 			}
 
 			return {
-				cursor: { line: newLine, column: newColumn },
-				selections: [],
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						cursor: { line: newLine, column: newColumn },
+						selections: [],
+					},
+				},
 			};
 		}),
 
 	setSelection: (selection: Selection) =>
-		set({
-			selections: [selection],
+		set((state) => {
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			return {
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						selections: [selection],
+					},
+				},
+			};
 		}),
 
 	clearSelections: () =>
-		set({
-			selections: [],
+		set((state) => {
+			const activeFile = state.files[state.activeFileId];
+			if (!activeFile) return state;
+
+			return {
+				files: {
+					...state.files,
+					[state.activeFileId]: {
+						...activeFile,
+						selections: [],
+					},
+				},
+			};
+		}),
+
+	// file actions
+	setActiveFile: (fileId: string) =>
+		set((state) => {
+			if (!state.files[fileId]) return state;
+			return { activeFileId: fileId };
+		}),
+
+	updateFileContent: (fileId: string, content: string) =>
+		set((state) => {
+			const file = state.files[fileId];
+			if (!file) return state;
+
+			return {
+				files: {
+					...state.files,
+					[fileId]: {
+						...file,
+						content,
+						document: new Document(content),
+					},
+				},
+			};
+		}),
+
+	openFile: (path: string, content: string) =>
+		set((state) => {
+			// check if file is already open
+			const existingFileId = Object.keys(state.files).find(
+				(id) => state.files[id].name === path,
+			);
+			if (existingFileId) {
+				return { activeFileId: existingFileId };
+			}
+
+			// create new file
+			const fileId = `file_${Date.now()}`;
+			const fileName = path.split("/").pop() || path;
+			const newFile: FileData = {
+				id: fileId,
+				name: path,
+				content,
+				document: new Document(content),
+				cursor: { line: 0, column: 0 },
+				selections: [],
+			};
+
+			return {
+				files: {
+					...state.files,
+					[fileId]: newFile,
+				},
+				activeFileId: fileId,
+			};
+		}),
+
+	closeFile: (fileId: string) =>
+		set((state) => {
+			const { [fileId]: removed, ...remainingFiles } = state.files;
+			const fileIds = Object.keys(remainingFiles);
+
+			// if we're closing the active file, switch to another file or empty
+			let newActiveFileId = state.activeFileId;
+			if (state.activeFileId === fileId) {
+				newActiveFileId = fileIds.length > 0 ? fileIds[0] : "";
+			}
+
+			return {
+				files: remainingFiles,
+				activeFileId: newActiveFileId,
+			};
 		}),
 }));

@@ -61,6 +61,7 @@ pub fn run() {
 			// File tree commands
 			get_current_dir,
 			get_file_tree,
+			read_file,
 			// Git search commands
 			start_git_directories_search,
 			get_found_git_directories_so_far,
@@ -139,6 +140,13 @@ async fn get_file_tree(
 ) -> Result<Vec<FileNode>, String> {
 	os_session
 		.read_directory(&path)
+		.await
+		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn read_file(path: String) -> Result<String, String> {
+	tokio::fs::read_to_string(&path)
 		.await
 		.map_err(|e| e.to_string())
 }
