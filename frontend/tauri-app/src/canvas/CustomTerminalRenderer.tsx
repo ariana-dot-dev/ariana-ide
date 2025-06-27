@@ -531,7 +531,7 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		<div
 			ref={terminalRef}
 			className={cn(
-				"rounded-md text-base backdrop-blur-md bg-[var(--base-200)]/10 text-[var(--blackest)] font-mono p-4 focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
+				"rounded-md text-sm p-3 bg-[var(--base-200)]/10 text-[var(--blackest)] font-mono focus:outline-none relative overflow-hidden h-full max-h-full flex flex-col",
 			)}
 			tabIndex={-1}
 			onKeyDown={handleKeyDown}

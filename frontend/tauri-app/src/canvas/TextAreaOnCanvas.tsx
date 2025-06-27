@@ -187,7 +187,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				>
 					{/* Header */}
 					<div className="flex items-center justify-between">
-						<h3 className="text-sm text-[var(--acc-500)]">
+						<h3 className="text-sm text-[var(--base-500)]">
 							Prompt something ↓
 						</h3>
 					</div>
@@ -221,58 +221,54 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 							<button
 								onClick={handleStopClick}
 								className={cn(
-									"px-4 py-2 rounded font-medium transition-all",
-									"bg-[var(--negative-500)] hover:bg-[var(--negative-600)] text-white",
+									"group px-4 py-2 rounded-lg rounded-br-2xl font-medium transition-all border-transparent bg-[var(--base-600)] border-2 text-[var(--base-300)]",
+									"hover:border-[var(--acc-300)] hover:bg-transparent hover:rounded-br-xs hover:text-[var(--acc-500)] cursor-pointer",
 									"flex items-center gap-2"
 								)}
 							>
-								<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-								Stop
+								<div className="w-4 h-4 border-2 border-[var(--base-300)] group-hover:border-[var(--acc-300)] border-t-transparent group-hover:border-t-transparent rounded-full animate-spin" />
+								<div className="relative overflow-hidden">
+									<div className="absolute -translate-y-full group-hover:translate-y-0 transition-all">
+										Stop
+									</div>
+									<div className="absolute translate-y-0 group-hover:translate-y-full transition-all">
+										Running...
+									</div>
+									<div className="opacity-0">
+										Running...
+									</div>
+								</div>
 							</button>
 						) : (
 							<button
 								onClick={handleGoClick}
 								disabled={!text.trim()}
 								className={cn(
-									"px-4 py-2 rounded font-medium transition-all",
+									"px-4 py-2 rounded-lg rounded-br-2xl font-medium transition-all border-[var(--base-300)] border-2 text-[var(--base-500)]",
 									text.trim()
-										? "bg-[var(--accent-500)] hover:bg-[var(--accent-600)] text-white"
-										: "bg-[var(--base-300)] text-[var(--acc-500)] cursor-not-allowed"
+										? "cursor-pointer hover:border-[var(--acc-300)] hover:rounded-br-xs hover:text-[var(--acc-500)]"
+										: "opacity-0 cursor-not-allowed"
 								)}
 							>
 								Go
 							</button>
 						)}
 					</div>
-					
-					{/* Status */}
-					{claudeAgent && (
-						<div className="text-xs text-[var(--acc-600)]">
-							Status: {isLoading ? "Running..." : "Ready"}
-							{terminalId && (
-								<span className="ml-2">Terminal: {terminalId.slice(0, 8)}...</span>
-							)}
-						</div>
-					)}
 				</div>
 				
 				{/* Terminal Section */}
 				{showTerminal && terminalId && (
 					<div className="w-1/2 pl-2">
-						<div className="w-full h-full rounded-md backdrop-blur-md bg-[var(--base-200)]/10 p-2">
-							<div className="w-full h-full">
-								<CustomTerminalRenderer
-									elementId={`claude-terminal-${terminalId}`}
-									existingTerminalId={terminalId}
-									onTerminalReady={(id) => {
-										console.log("Claude terminal ready:", id);
-									}}
-									onTerminalError={(error) => {
-										console.error("Claude terminal error:", error);
-									}}
-								/>
-							</div>
-						</div>
+						<CustomTerminalRenderer
+							elementId={`claude-terminal-${terminalId}`}
+							existingTerminalId={terminalId}
+							onTerminalReady={(id) => {
+								console.log("Claude terminal ready:", id);
+							}}
+							onTerminalError={(error) => {
+								console.error("Claude terminal error:", error);
+							}}
+						/>
 					</div>
 				)}
 			</div>

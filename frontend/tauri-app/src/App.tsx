@@ -166,7 +166,7 @@ function App() {
 								<span
 									data-tauri-drag-region
 									className={cn(
-										"starting:opacity-0 text-[var(--acc-500)] opacity-100 text-sm font-medium font-sans w-full text-center",
+										"starting:opacity-0 text-[var(--base-500)] opacity-100 text-sm font-medium font-sans w-full text-center",
 									)}
 								>
 									Ariana IDE
