@@ -54,8 +54,8 @@ const THEMES = {
         "--border-thickness": "2px",
     },
     "light": {
-        "--acc-500": "#dbaf88",  // blue equivalent
-        "--base-500": "#ded4c8",  // ~ oklch(82.8% 0.111 230.318)
+        "--acc-500": "#b8926f",  // blue equivalent
+        "--base-500": "#beaa9c",  // ~ oklch(82.8% 0.111 230.318)
         "--whitest": "#ffffff",
         "--blackest": "#000000",
         "--positive-500": "#1ebc73",  // green
