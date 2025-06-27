@@ -54,10 +54,7 @@ const Canvas: React.FC<CanvasProps> = ({
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const [layouts, setLayouts] = useState<ElementLayout[]>([]);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-	const workerRef = useRef<{
-		worker: Worker;
-		messageCount: number;
-	} | null>(null);
+	const workerRef = useRef<Worker | null>(null);
 
 	const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(
 		null,
@@ -70,57 +67,62 @@ const Canvas: React.FC<CanvasProps> = ({
 
 	// Initialize worker
 	useEffect(() => {
-		const newWorker = createGridWorker();
-		workerRef.current = {
-			worker: newWorker,
-			messageCount: 0,
-		};
+		workerRef.current = createGridWorker();
 
 		return () => {
-			newWorker.terminate();
+			if (workerRef.current) {
+				workerRef.current.terminate();
+			}
 		};
 	}, []);
 
 	// Request layout updates from worker
 	useEffect(() => {
-		const worker = workerRef.current;
-		if (!worker || canvasSize.width === 0 || canvasSize.height === 0) return;
+		if (!workerRef.current || canvasSize.width === 0 || canvasSize.height === 0)
+			return;
 
 		const message: WorkerMessage = {
-			id: ++worker.messageCount,
-			type: "updateLayout",
-			data: {
-				elements,
+			type: "OPTIMIZE_GRID",
+			payload: {
+				elements: elements.map((e) => ({
+					id: e.id,
+					targets: e.targets,
+					weight: e.weight,
+				})),
 				canvasWidth: canvasSize.width,
 				canvasHeight: canvasSize.height,
-				draggedElement,
-				dragPosition,
-				dragTarget,
-				stabilityWeight,
+				options: { stabilityWeight },
 			},
 		};
 
-		worker.worker.postMessage(message);
+		workerRef.current.postMessage(message);
 
 		const handleMessage = (event: MessageEvent<WorkerResponse>) => {
-			if (event.data.id === worker.messageCount) {
-				setLayouts(event.data.layouts);
+			if (event.data.type === "GRID_OPTIMIZED") {
+				const newLayouts = event.data.payload.layouts
+					.map((layout) => {
+						const element = elements.find((e) => e.id === layout.element.id);
+						if (!element) return null;
+						return {
+							element,
+							cell: layout.cell,
+							score: layout.score,
+							previousCell: layout.previousCell,
+						} satisfies ElementLayout;
+					})
+					.filter((l) => l !== null);
+				setLayouts(newLayouts);
 			}
 		};
 
-		worker.worker.addEventListener("message", handleMessage);
+		workerRef.current.addEventListener("message", handleMessage);
 
 		return () => {
-			worker.worker.removeEventListener("message", handleMessage);
+			if (workerRef.current) {
+				workerRef.current.removeEventListener("message", handleMessage);
+			}
 		};
-	}, [
-		elements,
-		canvasSize,
-		draggedElement,
-		dragPosition,
-		dragTarget,
-		stabilityWeight,
-	]);
+	}, [elements, canvasSize, stabilityWeight]);
 
 	// Handle canvas resize
 	useEffect(() => {
@@ -156,9 +158,7 @@ const Canvas: React.FC<CanvasProps> = ({
 				const draggedIndex = elements.findIndex(
 					(el) => el.id === draggedElement.id,
 				);
-				const targetIndex = elements.findIndex(
-					(el) => el.id === dragTarget.id,
-				);
+				const targetIndex = elements.findIndex((el) => el.id === dragTarget.id);
 
 				if (draggedIndex !== -1 && targetIndex !== -1) {
 					// Create a new array with swapped elements
@@ -178,43 +178,51 @@ const Canvas: React.FC<CanvasProps> = ({
 		[dragTarget, draggedElement, elements, onElementsChange],
 	);
 
-	const handleDrag = useCallback((event: unknown, info: PanInfo) => {
-		console.log(`Canvas: handleDrag received. Delta: x=${info.delta.x}, y=${info.delta.y}`);
-		// Find the element under the drag position
-		const point = info.point;
+	const handleDrag = useCallback(
+		(event: unknown, info: PanInfo) => {
+			console.log(
+				`Canvas: handleDrag received. Delta: x=${info.delta.x}, y=${info.delta.y}`,
+			);
+			// Find the element under the drag position
+			const point = info.point;
 
-		// Check all layouts to see if we're over a different element
-		for (const layout of layouts) {
-			const { cell } = layout;
-			if (
-				layout.element !== draggedElement &&
-				point.x >= cell.x &&
-				point.x <= cell.x + cell.width &&
-				point.y >= cell.y &&
-				point.y <= cell.y + cell.height
-			) {
-				if (dragTarget !== layout.element) {
-					setDragTarget(layout.element);
+			// Check all layouts to see if we're over a different element
+			for (const layout of layouts) {
+				const { cell } = layout;
+				if (
+					layout.element !== draggedElement &&
+					point.x >= cell.x &&
+					point.x <= cell.x + cell.width &&
+					point.y >= cell.y &&
+					point.y <= cell.y + cell.height
+				) {
+					if (dragTarget !== layout.element) {
+						setDragTarget(layout.element);
+					}
+					break;
 				}
-				break;
 			}
-		}
 
-		setDragPosition({
-			x: info.point.x,
-			y: info.point.y,
-		});
-	}, [layouts, draggedElement, dragTarget]);
+			setDragPosition({
+				x: info.point.x,
+				y: info.point.y,
+			});
+		},
+		[layouts, draggedElement, dragTarget],
+	);
 
 	// CRUD operations for elements
 	const handleRectangleUpdate = useCallback(
 		(element: Rectangle, newTargets: ElementTargets) => {
 			// Find and update the element
 			const newElements = elements.map((el) => {
-				if (el.id === element.id && "rectangle" in el.kind) {
-					element.size = newTargets.size;
-					element.aspectRatio = newTargets.aspectRatio;
-					element.area = newTargets.area;
+				if ("rectangle" in el.kind && el.kind.rectangle === element) {
+					const rect = (el.kind as { rectangle: Rectangle }).rectangle;
+					rect.updateTargets({
+						size: newTargets.size || rect.targets().size,
+						aspectRatio: newTargets.aspectRatio || rect.targets().aspectRatio,
+						area: newTargets.area || rect.targets().area,
+					});
 					return el;
 				}
 				return el;
@@ -228,10 +236,14 @@ const Canvas: React.FC<CanvasProps> = ({
 		(element: FileTreeCanvas, newTargets: ElementTargets) => {
 			// Find and update the element
 			const newElements = elements.map((el) => {
-				if (el.id === element.id && "fileTree" in el.kind) {
-					element.size = newTargets.size;
-					element.aspectRatio = newTargets.aspectRatio;
-					element.area = newTargets.area;
+				if ("fileTree" in el.kind && el.kind.fileTree === element) {
+					const fileTree = (el.kind as { fileTree: FileTreeCanvas }).fileTree;
+					fileTree.updateTargets({
+						size: newTargets.size || fileTree.targets().size,
+						aspectRatio:
+							newTargets.aspectRatio || fileTree.targets().aspectRatio,
+						area: newTargets.area || fileTree.targets().area,
+					});
 					return el;
 				}
 				return el;
@@ -245,10 +257,14 @@ const Canvas: React.FC<CanvasProps> = ({
 		(element: CodeEditor, newTargets: ElementTargets) => {
 			// Find and update the element
 			const newElements = elements.map((el) => {
-				if (el.id === element.id && "codeEditor" in el.kind) {
-					element.size = newTargets.size;
-					element.aspectRatio = newTargets.aspectRatio;
-					element.area = newTargets.area;
+				if ("codeEditor" in el.kind && el.kind.codeEditor === element) {
+					const codeEditor = (el.kind as { codeEditor: CodeEditor }).codeEditor;
+					codeEditor.updateTargets({
+						size: newTargets.size || codeEditor.targets().size,
+						aspectRatio:
+							newTargets.aspectRatio || codeEditor.targets().aspectRatio,
+						area: newTargets.area || codeEditor.targets().area,
+					});
 					return el;
 				}
 				return el;
