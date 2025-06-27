@@ -1,13 +1,7 @@
-export interface ProjectSubfolder {
-  id: string;
-  relativePath: string;
-}
-
 export interface Project {
   id: string;
   name: string;
   rootPath: string;
-  subfolderPaths: ProjectSubfolder[];
   lastOpened: Date;
   createdAt: Date;
 }

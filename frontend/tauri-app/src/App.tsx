@@ -134,7 +134,7 @@ function App() {
 		addElementRef.current?.(terminalElement);
 	};
 
-	const handleProjectSelect = async (project: Project, subfolderId?: string) => {
+	const handleProjectSelect = async (project: Project) => {
 		try {
 			// Update project's last opened time
 			projectService.updateProject(project.id, { lastOpened: new Date() });
@@ -145,23 +145,14 @@ function App() {
 			// Hide landing page
 			setShowLandingPage(false);
 			
-			// Determine which path to open
-			let pathToOpen = project.rootPath;
-			if (subfolderId) {
-				const subfolder = project.subfolderPaths.find(sf => sf.id === subfolderId);
-				if (subfolder && subfolder.relativePath !== "/") {
-					pathToOpen = `${project.rootPath}/${subfolder.relativePath}`.replace(/\/+/g, "/");
-				}
-			}
-			
-			// Open file tree for the selected path
+			// Open file tree for the project root path
 			const fileTreeElement = FileTreeCanvas.canvasElement(
 				{
 					size: "medium",
 					aspectRatio: 0.6,
 					area: "left",
 				},
-				pathToOpen,
+				project.rootPath,
 				1,
 			);
 			
