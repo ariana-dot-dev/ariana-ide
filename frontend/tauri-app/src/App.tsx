@@ -319,7 +319,7 @@ function App() {
 						</>
 					)}
 
-					<div className="absolute bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">
+					<div className="absolute bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-[60]">
 						{THEMES.map((theme) => (
 							<button
 								type="button"
