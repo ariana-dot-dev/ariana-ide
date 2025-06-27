@@ -18,7 +18,7 @@ const appWindow = getCurrentWebviewWindow();
 
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
-const THEMES = ["light", "light-sand", "semi-sky"];
+const THEMES = ["light", "light-sand", "semi-sky", "dark"];
 
 function App() {
 	const store = useStore();

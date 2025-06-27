@@ -23,6 +23,16 @@ const path = require('path');
 // Configuration – themes with base colours expressed in 6-digit sRGB hex
 // ---------------------------------------------------------------------------
 const THEMES = {
+    "dark": {
+        "--acc-500": "#feae34",
+        "--base-500": "#3a4466",
+        "--blackest": "#e8b796",
+        "--whitest": "#181425",
+        "--positive-500": "#1ebc73",  // green
+        "--negative-500": "#a24b6f",  // red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
+    },
     "dark-red": {
         "--acc-500": "#b33831",  // blue equivalent
         "--base-500": "#6e2727",  // ~ oklch(82.8% 0.111 230.318)
