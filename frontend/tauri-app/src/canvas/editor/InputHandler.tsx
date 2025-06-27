@@ -4,7 +4,7 @@ import { useEditorStore } from "./EditorStore";
 import { columnToX, lineToY } from "./utils/measurements";
 
 interface InputHandlerProps {
-	containerRef: React.RefObject<HTMLDivElement>;
+	containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
