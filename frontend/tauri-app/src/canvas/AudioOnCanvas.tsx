@@ -78,7 +78,7 @@ const MicrophoneButton: React.FC<{
         </svg>
       ) : (
         <svg
-          className={cn(iconSizeClasses[size], "text-[var(--fg-400)]")}
+          className={cn(iconSizeClasses[size], "text-white")}
           fill="currentColor"
           viewBox="0 0 16 16"
         >
@@ -517,11 +517,9 @@ const AudioOnCanvas: React.FC<AudioOnCanvasProps> = ({
   return (
     <motion.div
       className={cn(
-        "absolute bg-[var(--bg-500)] border border-[var(--fg-800)] rounded-lg overflow-hidden",
-        "shadow-lg backdrop-blur-sm",
-        isDragTarget && "ring-2 ring-[var(--positive-500)]",
-        isDragging && "opacity-50",
-        isHovered && "shadow-xl"
+        "absolute p-1 cursor-move select-none overflow-hidden",
+        isDragging ? "z-30" : "z-10",
+        isDragTarget && "ring-2 ring-[var(--positive-500)]"
       )}
       style={{
         left: cell.x,
@@ -536,30 +534,25 @@ const AudioOnCanvas: React.FC<AudioOnCanvasProps> = ({
       onDrag={propOnDrag}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      whileHover={{ scale: 1.02 }}
-      whileDrag={{ scale: 1.05 }}
     >
-      {/* Header with controls */}
       <div className={cn(
-        "flex items-center justify-between p-2 bg-[var(--bg-600)] border-b border-[var(--fg-800)]",
-        "text-xs text-[var(--fg-300)]"
+        "w-full h-full rounded-md backdrop-blur-md bg-[var(--bg-400)]/90 border border-[var(--fg-600)]/20 overflow-hidden flex flex-col",
+        isHovered && "shadow-xl",
+        isDragging && "opacity-50"
       )}>
-        <span>🎤 Audio {isRecording && '(Recording...)'} {isTauriEnv && '(Tauri)'}</span>
-        <div className="flex gap-1">
+        {/* Header with controls */}
+        <div className="flex items-center justify-between p-2 border-b border-[var(--fg-600)]/20 bg-[var(--bg-500)]/50">
+          <span className="text-xs font-medium">🎤 Audio {isRecording && '(Recording...)'}</span>
           <button
             onClick={handleRemove}
-            className={cn(
-              "w-4 h-4 rounded-full bg-[var(--negative-500)] hover:bg-[var(--negative-400)]",
-              "flex items-center justify-center text-white text-xs"
-            )}
+            className="text-xs w-6 h-6 bg-[var(--fg-800)] hover:bg-[var(--fg-700)] rounded transition-colors text-[var(--bg-white)] flex items-center justify-center"
           >
             ×
           </button>
         </div>
-      </div>
 
-      {/* Audio Component */}
-      <div className="p-4 h-full overflow-hidden flex flex-col">
+        {/* Audio Component */}
+        <div className="p-4 h-full overflow-hidden flex flex-col">
         {/* Error Display */}
         {error && (
           <div className="mb-3 p-2 bg-red-500/20 border border-red-300/40 rounded text-xs text-red-300">
@@ -567,12 +560,6 @@ const AudioOnCanvas: React.FC<AudioOnCanvasProps> = ({
           </div>
         )}
 
-        {/* Tauri Info */}
-        {isTauriEnv && (
-          <div className="mb-3 p-2 bg-blue-500/20 border border-blue-300/40 rounded text-xs text-blue-300">
-            Running in Tauri - Speech recognition available without explicit microphone permissions.
-          </div>
-        )}
 
         {/* Permission Status */}
         {!isTauriEnv && permissionStatus === 'denied' && (
@@ -628,7 +615,7 @@ const AudioOnCanvas: React.FC<AudioOnCanvasProps> = ({
                 disabled={!transcription.trim()}
                 className={cn(
                   "px-3 py-1 text-xs rounded",
-                  "bg-[var(--positive-500)] hover:bg-[var(--positive-400)]",
+                  "bg-blue-600 hover:bg-blue-500",
                   "text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
@@ -662,18 +649,19 @@ const AudioOnCanvas: React.FC<AudioOnCanvasProps> = ({
           </div>
         )}
 
-        {/* Debug Info (only in development) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-2 p-2 bg-[var(--bg-700)] rounded text-xs text-[var(--fg-500)]">
-            <div>Environment: {isTauriEnv ? '🏗️ Tauri' : '🌐 Web'}</div>
-            <div>Support: {isSupported ? '✅' : '❌'}</div>
-            <div>Permission: {permissionStatus}</div>
-            <div>Recording: {isRecording ? '🔴' : '⚫'}</div>
-            <div>MediaDevices: {navigator.mediaDevices ? '✅' : '❌'}</div>
-            <div>GetUserMedia: {(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') ? '✅' : '❌'}</div>
-            {interimTranscript && <div>Interim: "{interimTranscript}"</div>}
-          </div>
-        )}
+          {/* Debug Info (only in development) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-2 p-2 bg-[var(--bg-700)] rounded text-xs text-[var(--fg-500)]">
+              <div>Environment: {isTauriEnv ? '🏗️ Tauri' : '🌐 Web'}</div>
+              <div>Support: {isSupported ? '✅' : '❌'}</div>
+              <div>Permission: {permissionStatus}</div>
+              <div>Recording: {isRecording ? '🔴' : '⚫'}</div>
+              <div>MediaDevices: {navigator.mediaDevices ? '✅' : '❌'}</div>
+              <div>GetUserMedia: {(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') ? '✅' : '❌'}</div>
+              {interimTranscript && <div>Interim: "{interimTranscript}"</div>}
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
   );
