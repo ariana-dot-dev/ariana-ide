@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { Document, type Position, type Range } from "./Document";
 
@@ -13,6 +14,7 @@ interface FileData {
 	document: Document;
 	cursor: Position;
 	selections: Selection[];
+	isDirty: boolean;
 }
 
 interface EditorState {
@@ -34,6 +36,7 @@ interface EditorState {
 	updateFileContent: (fileId: string, content: string) => void;
 	openFile: (path: string, content: string) => void;
 	closeFile: (fileId: string) => void;
+	saveFile: (fileId: string) => Promise<void>;
 }
 
 // start with no files open
@@ -41,7 +44,7 @@ const initialFiles: Record<string, FileData> = {};
 
 // todo: dig further into how zustand mutates state because we cant just naively
 // spread things `...` because our performance will suffer
-export const useEditorStore = create<EditorState>((set, _get) => ({
+export const useEditorStore = create<EditorState>((set, get) => ({
 	files: initialFiles,
 	activeFileId: "",
 
@@ -59,6 +62,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 						document: new Document(text),
 						cursor: { line: 0, column: 0 },
 						selections: [],
+						isDirty: true,
 					},
 				},
 			};
@@ -111,6 +115,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 							document: docAfterInsert,
 							cursor: { line: cursorLine, column: cursorColumn },
 							selections: [],
+							isDirty: true,
 						},
 					},
 				};
@@ -134,6 +139,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 						content: newDoc.toString(),
 						document: newDoc,
 						cursor: { line: newLine, column: newColumn },
+						isDirty: true,
 					},
 				},
 			};
@@ -174,6 +180,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 							document: newDoc,
 							cursor: range.start,
 							selections: [],
+							isDirty: true,
 						},
 					},
 				};
@@ -209,6 +216,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 						content: newDoc.toString(),
 						document: newDoc,
 						cursor: deleteFrom,
+						isDirty: true,
 					},
 				},
 			};
@@ -249,6 +257,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 							document: newDoc,
 							cursor: range.start,
 							selections: [],
+							isDirty: true,
 						},
 					},
 				};
@@ -283,6 +292,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 						content: newDoc.toString(),
 						document: newDoc,
 						cursor: cursor, // cursor stays in same position
+						isDirty: true,
 					},
 				},
 			};
@@ -436,6 +446,7 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 				document: new Document(content),
 				cursor: { line: 0, column: 0 },
 				selections: [],
+				isDirty: false,
 			};
 
 			return {
@@ -463,4 +474,33 @@ export const useEditorStore = create<EditorState>((set, _get) => ({
 				activeFileId: newActiveFileId,
 			};
 		}),
+
+	saveFile: async (fileId: string) => {
+		const state = useEditorStore.getState();
+		const file = state.files[fileId];
+		if (!file || !file.isDirty) return;
+
+		try {
+			// save file using tauri command
+			await invoke("write_file", {
+				path: file.name,
+				content: file.content,
+			});
+
+			// update state to mark file as saved
+			set((state) => ({
+				files: {
+					...state.files,
+					[fileId]: {
+						...state.files[fileId],
+						isDirty: false,
+					},
+				},
+			}));
+
+			console.log(`Saved file: ${file.name}`);
+		} catch (error) {
+			console.error(`Failed to save file: ${file.name}`, error);
+		}
+	},
 }));

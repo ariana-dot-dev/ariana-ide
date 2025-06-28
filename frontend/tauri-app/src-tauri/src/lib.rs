@@ -107,6 +107,13 @@ async fn read_file(path: String) -> Result<String, String> {
 		.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn write_file(path: String, content: String) -> Result<(), String> {
+	tokio::fs::write(&path, content)
+		.await
+		.map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	let terminal_manager = Arc::new(TerminalManager::new());
@@ -140,7 +147,8 @@ pub fn run() {
 			// File tree commands
 			get_current_dir,
 			get_file_tree,
-			read_file
+			read_file,
+			write_file
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");

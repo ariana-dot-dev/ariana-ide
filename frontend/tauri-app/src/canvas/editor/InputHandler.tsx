@@ -18,6 +18,7 @@ export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 	const moveCursorRelative = useEditorStore(
 		(state) => state.moveCursorRelative,
 	);
+	const saveFile = useEditorStore((state) => state.saveFile);
 
 	// position hidden textarea at cursor position
 	useEffect(() => {
@@ -124,6 +125,14 @@ export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 					});
 				}
 				break;
+			}
+		}
+
+		// handle save shortcut
+		if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+			e.preventDefault();
+			if (activeFileId) {
+				saveFile(activeFileId);
 			}
 		}
 	};

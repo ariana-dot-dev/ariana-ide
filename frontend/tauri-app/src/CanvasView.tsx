@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Canvas from "./canvas/Canvas";
 import { CodeEditor } from "./canvas/CodeEditor";
 import { CustomTerminal } from "./canvas/CustomTerminal";
+import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Rectangle } from "./canvas/Rectangle";
 import { Terminal } from "./canvas/Terminal";
 import { TextArea } from "./canvas/TextArea";
@@ -13,42 +14,62 @@ interface CanvasViewProps {
 }
 
 // Demo elements for testing
-const createDemoElements = (): CanvasElement[] => {
+const createDemoElements = async (): Promise<CanvasElement[]> => {
 	const isWindows = navigator.platform.includes("Win");
 	const _isMac = navigator.platform.includes("Mac");
 	const _isLinux = navigator.platform.includes("Linux");
 
-	return isWindows
-		? [
-				// Create a Claude Code text area with a default prompt
-				TextArea.canvasElement(""),
-				// CustomTerminal.canvasElement(
-				// 	{
-				// 		kind: {
-				// 			$type: "wsl",
-				// 			distribution: "Ubuntu",
-				// 			workingDirectory: "~",
-				// 		},
-				// 		lines: 5,
-				// 		cols: 10,
-				// 	},
-				// 	1,
-				// ),
-			]
-		: [
-				CodeEditor.canvasElement(
-					{ size: "large", aspectRatio: 16 / 9, area: "center" },
-					1,
-				),
-				Terminal.createLocalShell(),
-			];
+	try {
+		// Get current directory for file tree
+		const { invoke } = await import("@tauri-apps/api/core");
+		const currentDir = await invoke<string>("get_current_dir");
+
+		// Create file tree on left and code editor on right
+		const fileTree = FileTreeCanvas.canvasElement(
+			{
+				size: "medium",
+				aspectRatio: 0.6,
+				area: "left",
+			},
+			currentDir,
+			1,
+		);
+
+		const codeEditor = CodeEditor.canvasElement(
+			{
+				size: "large",
+				aspectRatio: 16 / 9,
+				area: "right",
+			},
+			1,
+			"Code Editor",
+			"// Open a file from the file tree to start editing\n",
+		);
+
+		return isWindows ? [fileTree, codeEditor] : [fileTree, codeEditor];
+	} catch (error) {
+		console.error("Failed to get current directory:", error);
+		// Fallback to default elements
+		return isWindows
+			? [TextArea.canvasElement("")]
+			: [
+					CodeEditor.canvasElement(
+						{ size: "large", aspectRatio: 16 / 9, area: "center" },
+						1,
+					),
+					Terminal.createLocalShell(),
+				];
+	}
 };
 
 const CanvasView: React.FC<CanvasViewProps> = ({ onAddElementRef }) => {
-	const [elements, setElements] = useState<CanvasElement[]>(() =>
-		createDemoElements(),
-	);
+	const [elements, setElements] = useState<CanvasElement[]>([]);
 	const [stabilityWeight, _setStabilityWeight] = useState(0.3);
+
+	// Initialize elements asynchronously
+	React.useEffect(() => {
+		createDemoElements().then(setElements);
+	}, []);
 
 	const handleElementsChange = (newElements: CanvasElement[]) => {
 		setElements(newElements);
