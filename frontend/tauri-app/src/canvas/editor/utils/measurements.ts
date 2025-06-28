@@ -79,13 +79,59 @@ export function getCharWidth(): number {
 	return charWidthCache.get("0") || measureText("0");
 }
 
-export function columnToX(column: number): number {
-	// for monospace fonts, this is simple
+export function columnToX(column: number, lineContent?: string): number {
+	// if we have the line content, calculate actual position considering tabs
+	if (lineContent) {
+		let x = 0;
+		const charWidth = getCharWidth();
+		const tabSize = 4; // typical tab size
+
+		for (let i = 0; i < column && i < lineContent.length; i++) {
+			if (lineContent[i] === "\t") {
+				// calculate tab stop position
+				const currentTabStop = Math.floor(x / (charWidth * tabSize));
+				x = (currentTabStop + 1) * charWidth * tabSize;
+			} else {
+				x += charWidth;
+			}
+		}
+		return x;
+	}
+
+	// fallback: simple calculation
 	return column * getCharWidth();
 }
 
-export function xToColumn(x: number): number {
+export function xToColumn(x: number, lineContent?: string): number {
 	const charWidth = getCharWidth();
+
+	// if we have the line content, calculate actual column considering tabs
+	if (lineContent) {
+		let currentX = 0;
+		const tabSize = 4;
+
+		for (let i = 0; i < lineContent.length; i++) {
+			if (lineContent[i] === "\t") {
+				// calculate tab stop position
+				const currentTabStop = Math.floor(currentX / (charWidth * tabSize));
+				const nextX = (currentTabStop + 1) * charWidth * tabSize;
+
+				if (x < nextX) {
+					return i;
+				}
+				currentX = nextX;
+			} else {
+				if (x < currentX + charWidth) {
+					return i;
+				}
+				currentX += charWidth;
+			}
+		}
+
+		return lineContent.length;
+	}
+
+	// fallback: simple calculation
 	return Math.max(0, Math.floor(x / charWidth));
 }
 

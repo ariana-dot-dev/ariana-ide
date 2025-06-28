@@ -34,13 +34,14 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
 	// auto-scroll to keep cursor in view
 	useEffect(() => {
-		if (!containerRef.current || !cursor) return;
+		if (!containerRef.current || !cursor || !document) return;
 
 		const container = containerRef.current;
 		const lineNumberWidth = showLineNumbers ? 64 : 0;
 
 		// calculate cursor position
-		const cursorX = columnToX(cursor.column) + lineNumberWidth;
+		const lineContent = document.getLine(cursor.line) || "";
+		const cursorX = columnToX(cursor.column, lineContent) + lineNumberWidth;
 		const cursorY = lineToY(cursor.line);
 		const lineHeight = getLineHeight();
 		const charWidth = getCharWidth();
@@ -67,7 +68,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 		} else if (cursorX + charWidth > scrollLeft + containerWidth - padding) {
 			container.scrollLeft = cursorX + charWidth - containerWidth + padding;
 		}
-	}, [cursor, showLineNumbers]);
+	}, [cursor, showLineNumbers, document]);
 
 	const handleClick = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
@@ -85,13 +86,13 @@ export const EditorView: React.FC<EditorViewProps> = ({
 			const adjustedX = x - lineNumberWidth;
 
 			const line = yToLine(y);
-			const column = xToColumn(Math.max(0, adjustedX));
 
 			if (!document) return;
 
 			// clamp to valid position
-			const lineContent = document.getLine(line);
 			const maxLine = Math.min(line, document.getLineCount() - 1);
+			const lineContent = document.getLine(maxLine);
+			const column = xToColumn(Math.max(0, adjustedX), lineContent);
 			const maxColumn = lineContent ? lineContent.length : 0;
 
 			moveCursor({

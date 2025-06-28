@@ -2,6 +2,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { cn } from "../../utils";
 import type { Position } from "./Document";
+import { useEditorStore } from "./EditorStore";
 import { columnToX, getLineHeight, lineToY } from "./utils/measurements";
 
 interface CursorProps {
@@ -11,6 +12,9 @@ interface CursorProps {
 
 export const Cursor: React.FC<CursorProps> = ({ position, isActive }) => {
 	const [visible, setVisible] = useState(true);
+	const activeFileId = useEditorStore((state) => state.activeFileId);
+	const activeFile = useEditorStore((state) => state.files[activeFileId]);
+	const lineContent = activeFile?.document.getLine(position.line) || "";
 
 	// blinking animation
 	useEffect(() => {
@@ -27,7 +31,7 @@ export const Cursor: React.FC<CursorProps> = ({ position, isActive }) => {
 		return () => clearInterval(interval);
 	}, [isActive, position]); // reset blink on position change
 
-	const x = columnToX(position.column);
+	const x = columnToX(position.column, lineContent);
 	const y = lineToY(position.line);
 
 	return (
