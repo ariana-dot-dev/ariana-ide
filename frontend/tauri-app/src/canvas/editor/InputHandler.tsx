@@ -10,9 +10,8 @@ interface InputHandlerProps {
 export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const activeFileId = useEditorStore((state) => state.activeFileId);
-	const cursor = useEditorStore(
-		(state) => state.files[activeFileId]?.cursor || { line: 0, column: 0 },
-	);
+	const activeFile = useEditorStore((state) => state.files[activeFileId]);
+	const cursor = activeFile?.cursor || { line: 0, column: 0 };
 	const insertText = useEditorStore((state) => state.insertText);
 	const deleteBackward = useEditorStore((state) => state.deleteBackward);
 	const deleteForward = useEditorStore((state) => state.deleteForward);
@@ -22,14 +21,15 @@ export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 
 	// position hidden textarea at cursor position
 	useEffect(() => {
-		if (inputRef.current) {
-			const x = columnToX(cursor.column);
+		if (inputRef.current && activeFile) {
+			const lineContent = activeFile.document.getLine(cursor.line) || "";
+			const x = columnToX(cursor.column, lineContent);
 			const y = lineToY(cursor.line);
 
 			inputRef.current.style.left = `${x}px`;
 			inputRef.current.style.top = `${y}px`;
 		}
-	}, [cursor]);
+	}, [cursor, activeFile]);
 
 	// focus management
 	useEffect(() => {
@@ -116,11 +116,9 @@ export const InputHandler: React.FC<InputHandlerProps> = ({ containerRef }) => {
 				break;
 
 			case "End": {
-				const state = useEditorStore.getState();
-				const activeFile = state.files[state.activeFileId];
 				if (activeFile) {
 					const line = activeFile.document.getLine(cursor.line);
-					state.moveCursor({
+					useEditorStore.getState().moveCursor({
 						line: cursor.line,
 						column: line ? line.length : 0,
 					});
