@@ -41,7 +41,7 @@ const initialFiles: Record<string, FileData> = {};
 
 // todo: dig further into how zustand mutates state because we cant just naively
 // spread things `...` because our performance will suffer
-export const useEditorStore = create<EditorState>((set, get) => ({
+export const useEditorStore = create<EditorState>((set, _get) => ({
 	files: initialFiles,
 	activeFileId: "",
 
@@ -428,7 +428,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
 			// create new file
 			const fileId = `file_${Date.now()}`;
-			const fileName = path.split("/").pop() || path;
+			const _fileName = path.split("/").pop() || path;
 			const newFile: FileData = {
 				id: fileId,
 				name: path,
@@ -449,7 +449,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
 	closeFile: (fileId: string) =>
 		set((state) => {
-			const { [fileId]: removed, ...remainingFiles } = state.files;
+			const { [fileId]: _removed, ...remainingFiles } = state.files;
 			const fileIds = Object.keys(remainingFiles);
 
 			// if we're closing the active file, switch to another file or empty

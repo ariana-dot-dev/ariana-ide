@@ -102,7 +102,7 @@ const CodeEditorCanvas: React.FC<CodeEditorCanvasProps> = ({
 			>
 				<CanvasHeader title={codeEditor.getTitle()} onRemove={handleRemove} />
 				<TabBar />
-				<div className="flex-1 p-2">
+				<div className="flex-1 p-2 min-h-0">
 					<EditorView className="rounded-b-lg h-full" showLineNumbers={true} />
 				</div>
 			</div>
