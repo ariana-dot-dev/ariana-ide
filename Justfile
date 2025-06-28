@@ -18,7 +18,7 @@ dev-frontend:
     @echo "Installing frontend dependencies..."
     cd frontend/tauri-app && npm install
     @echo "Starting Tauri development server..."
-    cd ../frontend && npm run dev-tauri
+    cd frontend && npm run dev-tauri
 
 # Install and run frontend via CLI (requires backend running)
 dev-cli:
