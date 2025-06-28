@@ -62,6 +62,7 @@ pub fn run() {
 			get_current_dir,
 			get_file_tree,
 			read_file,
+			write_file,
 			// Git search commands
 			start_git_directories_search,
 			get_found_git_directories_so_far,
@@ -147,6 +148,13 @@ async fn get_file_tree(
 #[tauri::command]
 async fn read_file(path: String) -> Result<String, String> {
 	tokio::fs::read_to_string(&path)
+		.await
+		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn write_file(path: String, content: String) -> Result<(), String> {
+	tokio::fs::write(&path, content)
 		.await
 		.map_err(|e| e.to_string())
 }

@@ -13,6 +13,7 @@
     "core:default",
     "fs:allow-read-file",
     "fs:allow-write-file",
+    "fs:allow-write-text-file",
     "fs:allow-read-dir",
     "fs:allow-copy-file",
     "fs:allow-mkdir",
@@ -26,7 +27,8 @@
         "$HOME/.ariana/*",
         "$HOME/.ariana",
         "$APPCONFIG/*",
-        "$APPDATA/*"
+        "$APPDATA/*",
+        "**"
       ]
     },
     "core:window:allow-maximize",

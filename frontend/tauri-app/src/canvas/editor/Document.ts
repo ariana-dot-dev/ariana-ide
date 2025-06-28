@@ -166,4 +166,8 @@ export class Document {
 	getVersion(): number {
 		return this.version;
 	}
+
+	toString(): string {
+		return this.getText();
+	}
 }

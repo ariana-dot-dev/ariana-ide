@@ -46,7 +46,12 @@ export const TabBar: React.FC<TabBarProps> = ({ className }) => {
 					)}
 					title={file.name}
 				>
-					<span>{getFileName(file.name)}</span>
+					<span className="flex items-center gap-1">
+						<span>{getFileName(file.name)}</span>
+						{file.isDirty && (
+							<span className="w-2 h-2 bg-[var(--acc-500)] rounded-full" />
+						)}
+					</span>
 					<span
 						onClick={() => closeFile(fileId)}
 						className="opacity-0 group-hover:opacity-100 hover:text-[var(--acc-500)] transition-opacity ml-1"

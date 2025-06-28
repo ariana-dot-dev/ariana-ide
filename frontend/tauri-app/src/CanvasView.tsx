@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Canvas from "./canvas/Canvas";
 import { CodeEditor } from "./canvas/CodeEditor";
 import { CustomTerminal } from "./canvas/CustomTerminal";
+import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Rectangle } from "./canvas/Rectangle";
 import { Terminal } from "./canvas/Terminal";
 import { TextArea } from "./canvas/TextArea";
@@ -15,7 +16,6 @@ interface CanvasViewProps {
 
 const CanvasView: React.FC<CanvasViewProps> = ({ elements, onElementsChange, onAddElementRef }) => {
 	const [stabilityWeight, _setStabilityWeight] = useState(0.3);
-
 	return (
 		<div className="w-full h-full">
 			<Canvas
