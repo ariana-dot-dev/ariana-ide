@@ -1,11 +1,12 @@
 import type React from "react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { cn } from "../../utils";
 import { Cursor } from "./Cursor";
 import { useEditorStore } from "./EditorStore";
 import { InputHandler } from "./InputHandler";
 import { Line } from "./Line";
 import {
+	columnToX,
 	getCharWidth,
 	getLineHeight,
 	lineToY,
@@ -31,13 +32,53 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const cursor = activeFile?.cursor || { line: 0, column: 0 };
 	const moveCursor = useEditorStore((state) => state.moveCursor);
 
+	// auto-scroll to keep cursor in view
+	useEffect(() => {
+		if (!containerRef.current || !cursor) return;
+
+		const container = containerRef.current;
+		const lineNumberWidth = showLineNumbers ? 64 : 0;
+
+		// calculate cursor position
+		const cursorX = columnToX(cursor.column) + lineNumberWidth;
+		const cursorY = lineToY(cursor.line);
+		const lineHeight = getLineHeight();
+		const charWidth = getCharWidth();
+
+		// get container scroll position and dimensions
+		const scrollTop = container.scrollTop;
+		const scrollLeft = container.scrollLeft;
+		const containerHeight = container.clientHeight;
+		const containerWidth = container.clientWidth;
+
+		// calculate if cursor is out of view and scroll accordingly
+		const padding = 20; // padding around cursor
+
+		// vertical scrolling
+		if (cursorY < scrollTop + padding) {
+			container.scrollTop = Math.max(0, cursorY - padding);
+		} else if (cursorY + lineHeight > scrollTop + containerHeight - padding) {
+			container.scrollTop = cursorY + lineHeight - containerHeight + padding;
+		}
+
+		// horizontal scrolling
+		if (cursorX < scrollLeft + padding) {
+			container.scrollLeft = Math.max(0, cursorX - padding);
+		} else if (cursorX + charWidth > scrollLeft + containerWidth - padding) {
+			container.scrollLeft = cursorX + charWidth - containerWidth + padding;
+		}
+	}, [cursor, showLineNumbers]);
+
 	const handleClick = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
-			if (!contentRef.current) return;
+			if (!contentRef.current || !containerRef.current) return;
 
 			const rect = contentRef.current.getBoundingClientRect();
+			const containerRect = containerRef.current.getBoundingClientRect();
+
+			// calculate position relative to the scrolled content
 			const x = e.clientX - rect.left;
-			const y = e.clientY - rect.top;
+			const y = e.clientY - containerRect.top + containerRef.current.scrollTop;
 
 			// account for line numbers width if shown
 			const lineNumberWidth = showLineNumbers ? 64 : 0; // 3rem = 48px + pr-4 = 16px
