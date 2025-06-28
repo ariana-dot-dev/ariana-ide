@@ -5,10 +5,13 @@
 )]
 
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Manager, State};
 
 mod terminal;
 use terminal::{TerminalConfig, TerminalManager};
+
+mod file_watcher;
+use file_watcher::FileWatcher;
 
 mod custom_terminal;
 mod custom_terminal_commands;
@@ -114,6 +117,40 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
 		.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn watch_file(
+	path: String,
+	file_watcher: State<'_, Arc<FileWatcher>>,
+) -> Result<(), String> {
+	println!("[Command] watch_file command called with path: {}", path);
+	let result = file_watcher
+		.watch_file(path.clone())
+		.await
+		.map_err(|e| e.to_string());
+	match &result {
+		Ok(_) => println!("[Command] watch_file command succeeded for: {}", path),
+		Err(e) => println!("[Command] watch_file command failed for {}: {}", path, e),
+	}
+	result
+}
+
+#[tauri::command]
+async fn unwatch_file(
+	path: String,
+	file_watcher: State<'_, Arc<FileWatcher>>,
+) -> Result<(), String> {
+	println!("[Command] unwatch_file command called with path: {}", path);
+	let result = file_watcher
+		.unwatch_file(path.clone())
+		.await
+		.map_err(|e| e.to_string());
+	match &result {
+		Ok(_) => println!("[Command] unwatch_file command succeeded for: {}", path),
+		Err(e) => println!("[Command] unwatch_file command failed for {}: {}", path, e),
+	}
+	result
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	let terminal_manager = Arc::new(TerminalManager::new());
@@ -122,6 +159,11 @@ pub fn run() {
 	tauri::Builder::default()
 		.plugin(tauri_plugin_store::Builder::new().build())
 		.plugin(tauri_plugin_fs::init())
+		.setup(|app| {
+			let file_watcher = Arc::new(FileWatcher::new(app.handle().clone()));
+			app.manage(file_watcher);
+			Ok(())
+		})
 		.manage(terminal_manager)
 		.manage(custom_terminal_state)
 		.invoke_handler(tauri::generate_handler![
@@ -148,7 +190,10 @@ pub fn run() {
 			get_current_dir,
 			get_file_tree,
 			read_file,
-			write_file
+			write_file,
+			// File watcher commands
+			watch_file,
+			unwatch_file
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");

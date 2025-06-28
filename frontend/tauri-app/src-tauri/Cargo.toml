@@ -35,6 +35,7 @@ walkdir = "2.5.0"
 
 # Local CLI agents library
 cli-agents = { path = "../../../cli-agents" }
+notify = "8.0.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
