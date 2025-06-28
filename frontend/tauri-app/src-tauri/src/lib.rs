@@ -7,10 +7,13 @@
 use std::sync::Arc;
 use std::process::Command;
 use std::path::Path;
-use tauri::State;
+use tauri::{Manager, State};
 
 mod terminal;
 use terminal::TerminalManager;
+
+mod file_watcher;
+use file_watcher::FileWatcher;
 
 mod custom_terminal;
 mod custom_terminal_commands;
@@ -38,6 +41,11 @@ pub fn run() {
 		.plugin(tauri_plugin_os::init())
 		.plugin(tauri_plugin_store::Builder::new().build())
 		.plugin(tauri_plugin_fs::init())
+		.setup(|app| {
+			let file_watcher = Arc::new(FileWatcher::new(app.handle().clone()));
+			app.manage(file_watcher);
+			Ok(())
+		})
 		.manage(terminals_manager)
 		.manage(custom_terminals_manager)
 		.manage(git_search_manager)
@@ -63,6 +71,9 @@ pub fn run() {
 			get_file_tree,
 			read_file,
 			write_file,
+			// File watcher commands
+			watch_file,
+			unwatch_file,
 			// Git search commands
 			start_git_directories_search,
 			get_found_git_directories_so_far,
@@ -157,6 +168,40 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
 	tokio::fs::write(&path, content)
 		.await
 		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn watch_file(
+	path: String,
+	file_watcher: State<'_, Arc<FileWatcher>>,
+) -> Result<(), String> {
+	println!("[Command] watch_file command called with path: {}", path);
+	let result = file_watcher
+		.watch_file(path.clone())
+		.await
+		.map_err(|e| e.to_string());
+	match &result {
+		Ok(_) => println!("[Command] watch_file command succeeded for: {}", path),
+		Err(e) => println!("[Command] watch_file command failed for {}: {}", path, e),
+	}
+	result
+}
+
+#[tauri::command]
+async fn unwatch_file(
+	path: String,
+	file_watcher: State<'_, Arc<FileWatcher>>,
+) -> Result<(), String> {
+	println!("[Command] unwatch_file command called with path: {}", path);
+	let result = file_watcher
+		.unwatch_file(path.clone())
+		.await
+		.map_err(|e| e.to_string());
+	match &result {
+		Ok(_) => println!("[Command] unwatch_file command succeeded for: {}", path),
+		Err(e) => println!("[Command] unwatch_file command failed for {}: {}", path, e),
+	}
+	result
 }
 
 #[tauri::command]

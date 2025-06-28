@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { Document, type Position, type Range } from "./Document";
 
@@ -20,6 +21,7 @@ interface FileData {
 interface EditorState {
 	files: Record<string, FileData>;
 	activeFileId: string;
+	fileWatchers: Record<string, UnlistenFn>;
 
 	// actions
 	setText: (text: string) => void;
@@ -37,6 +39,10 @@ interface EditorState {
 	openFile: (path: string, content: string) => void;
 	closeFile: (fileId: string) => void;
 	saveFile: (fileId: string) => Promise<void>;
+
+	// file watcher actions
+	setupFileWatching: () => Promise<void>;
+	cleanupFileWatching: () => Promise<void>;
 }
 
 // start with no files open
@@ -47,6 +53,7 @@ const initialFiles: Record<string, FileData> = {};
 export const useEditorStore = create<EditorState>((set, get) => ({
 	files: initialFiles,
 	activeFileId: "",
+	fileWatchers: {},
 
 	setText: (text: string) =>
 		set((state) => {
@@ -449,6 +456,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 				isDirty: false,
 			};
 
+			// start watching the new file
+			invoke("watch_file", { path }).catch((error) =>
+				console.error(`Failed to watch file: ${path}`, error),
+			);
+
 			return {
 				files: {
 					...state.files,
@@ -460,6 +472,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
 	closeFile: (fileId: string) =>
 		set((state) => {
+			const fileToClose = state.files[fileId];
+			if (!fileToClose) return state;
+
+			// stop watching the file
+			invoke("unwatch_file", { path: fileToClose.name }).catch((error) =>
+				console.error(`Failed to unwatch file: ${fileToClose.name}`, error),
+			);
+
 			const { [fileId]: _removed, ...remainingFiles } = state.files;
 			const fileIds = Object.keys(remainingFiles);
 
@@ -497,10 +517,124 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 					},
 				},
 			}));
-
-			console.log(`Saved file: ${file.name}`);
 		} catch (error) {
 			console.error(`Failed to save file: ${file.name}`, error);
 		}
+	},
+
+	setupFileWatching: async () => {
+		// set up file change listener
+		const unlistenFileChanged = await listen<string>(
+			"file-changed",
+			async (event) => {
+				const changedPath = event.payload;
+
+				// get current state inside the listener
+				const currentState = get();
+
+				// find the file by path
+				const fileEntry = Object.entries(currentState.files).find(
+					([_, file]) => file.name === changedPath,
+				);
+				if (!fileEntry) {
+					return;
+				}
+
+				const [fileId, file] = fileEntry;
+
+				// don't reload if file is dirty (has unsaved changes)
+				if (file.isDirty) {
+					return;
+				}
+
+				try {
+					// read the updated content
+					const newContent = await invoke<string>("read_file", {
+						path: changedPath,
+					});
+
+					// update the file content
+					set((state) => {
+						const file = state.files[fileId];
+						if (!file) return state;
+
+						// preserve cursor position
+						const cursor = file.cursor;
+						const document = new Document(newContent);
+
+						// adjust cursor if it's out of bounds
+						const lineCount = document.getLineCount();
+						const adjustedLine = Math.min(cursor.line, lineCount - 1);
+						const lineContent = document.getLine(adjustedLine) || "";
+						const adjustedColumn = Math.min(cursor.column, lineContent.length);
+
+						return {
+							files: {
+								...state.files,
+								[fileId]: {
+									...file,
+									content: newContent,
+									document,
+									cursor: { line: adjustedLine, column: adjustedColumn },
+									selections: [],
+								},
+							},
+						};
+					});
+				} catch (error) {
+					console.error(`Failed to reload file: ${changedPath}`, error);
+				}
+			},
+		);
+
+		// set up file removed listener
+		const unlistenFileRemoved = await listen<string>(
+			"file-removed",
+			(event) => {
+				const removedPath = event.payload;
+				// optionally close the file or show a notification
+			},
+		);
+
+		// store the unlisteners
+		set((state) => ({
+			fileWatchers: {
+				...state.fileWatchers,
+				"file-changed": unlistenFileChanged,
+				"file-removed": unlistenFileRemoved,
+			},
+		}));
+
+		// get current state to watch open files
+		const currentState = get();
+
+		// start watching all open files
+		for (const file of Object.values(currentState.files)) {
+			try {
+				await invoke("watch_file", { path: file.name });
+			} catch (error) {
+				console.error(`Failed to watch file: ${file.name}`, error);
+			}
+		}
+	},
+
+	cleanupFileWatching: async () => {
+		const state = get();
+
+		// unwatch all files
+		for (const file of Object.values(state.files)) {
+			try {
+				await invoke("unwatch_file", { path: file.name });
+			} catch (error) {
+				console.error(`Failed to unwatch file: ${file.name}`, error);
+			}
+		}
+
+		// remove all event listeners
+		for (const unlisten of Object.values(state.fileWatchers)) {
+			unlisten();
+		}
+
+		set({ fileWatchers: {} });
 	},
 }));

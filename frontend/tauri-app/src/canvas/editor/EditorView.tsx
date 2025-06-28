@@ -31,6 +31,20 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const document = activeFile?.document || null;
 	const cursor = activeFile?.cursor || { line: 0, column: 0 };
 	const moveCursor = useEditorStore((state) => state.moveCursor);
+	const setupFileWatching = useEditorStore((state) => state.setupFileWatching);
+	const cleanupFileWatching = useEditorStore(
+		(state) => state.cleanupFileWatching,
+	);
+
+	// set up file watching on mount
+	useEffect(() => {
+		console.log("[EditorView] useEffect for file watching triggered");
+		setupFileWatching();
+		return () => {
+			console.log("[EditorView] useEffect cleanup for file watching triggered");
+			cleanupFileWatching();
+		};
+	}, []); // remove dependencies to prevent re-running
 
 	// auto-scroll to keep cursor in view
 	useEffect(() => {
