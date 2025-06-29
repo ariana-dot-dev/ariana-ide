@@ -62,18 +62,18 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
-				x: cell.x,
-				y: cell.y,
-				width: cell.width,
-				height: cell.height,
+				x: cell.x + 4,
+				y: cell.y + 4,
+				width: cell.width - 8,
+				height: cell.height - 8,
 			}}
 			animate={
 				!dragging
 					? {
-							x: cell.x,
-							y: cell.y,
-							width: cell.width,
-							height: cell.height,
+							x: cell.x + 4,
+							y: cell.y + 4,
+							width: cell.width - 8,
+							height: cell.height - 8,
 						}
 					: undefined
 			}
