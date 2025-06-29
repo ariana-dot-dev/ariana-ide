@@ -32,11 +32,11 @@ export function useBuildConfig() {
 				// Set default config if file doesn't exist
 				setBuildConfig({
 					buildParams: {
-						executableName: "ariana-ide"
+						executableName: "ariana-ide",
 					},
 					runtimeParams: {
-						serverUrl: "https://api.ariana.dev"
-					}
+						serverUrl: "https://api.ariana.dev",
+					},
 				});
 			} finally {
 				setLoading(false);

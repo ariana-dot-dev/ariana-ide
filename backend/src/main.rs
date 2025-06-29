@@ -1,9 +1,9 @@
 use actix_cors::Cors;
 use actix_web::{
-    get,
-    middleware::{Logger, NormalizePath},
-    web::{self, Data},
-    App, HttpServer, Responder,
+	get,
+	middleware::{Logger, NormalizePath},
+	web::{self, Data},
+	App, HttpServer, Responder,
 };
 use dotenvy::dotenv;
 use log::info;
@@ -16,64 +16,69 @@ mod llm;
 
 #[get("/ping")]
 async fn ping() -> impl Responder {
-    "pong"
+	"pong"
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    dotenv().ok();
-    
-    // Initialize logging
-    fern::Dispatch::new()
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .apply()
-        .expect("Failed to initialize logging");
+	dotenv().ok();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = database::create_pool(&database_url).await
-        .expect("Failed to create database pool");
-    
-    // Run migrations
-    database::run_migrations(&pool).await
-        .expect("Failed to run migrations");
+	// Initialize logging
+	fern::Dispatch::new()
+		.level(log::LevelFilter::Info)
+		.chain(std::io::stdout())
+		.apply()
+		.expect("Failed to initialize logging");
 
-    let email_service = email::EmailService::new()
-        .expect("Failed to initialize email service");
+	let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+	let pool = database::create_pool(&database_url)
+		.await
+		.expect("Failed to create database pool");
 
-    let port = env::var("PORT")
-        .unwrap_or_else(|_| "8080".to_string())
-        .parse::<u16>()
-        .expect("PORT must be a valid number");
+	// Run migrations
+	database::run_migrations(&pool)
+		.await
+		.expect("Failed to run migrations");
 
-    info!("Starting server on port {}", port);
+	let email_service =
+		email::EmailService::new().expect("Failed to initialize email service");
 
-    HttpServer::new(move || {
-        App::new()
-            .app_data(Data::new(pool.clone()))
-            .app_data(Data::new(email_service.clone()))
-            .wrap(NormalizePath::trim())
-            .wrap(Logger::default())
-            .wrap(
-                Cors::default()
-                    .allow_any_header()
-                    .allow_any_method()
-                    .allow_any_origin(),
-            )
-            .service(ping)
-            .service(
-                web::scope("/auth")
-                    .service(auth::request_login_code)
-                    .service(auth::validate_login_code),
-            )
-            .service(
-                web::scope("/api")
-                    .route("/providers", web::get().to(llm::api::list_providers))
-                    .route("/inference", web::post().to(llm::api::inference))
-                    .route("/inference/stream", web::post().to(llm::api::inference_stream)),
-            )
-    })
-    .bind(("127.0.0.1", port))?
-    .run()
-    .await
+	let port = env::var("PORT")
+		.unwrap_or_else(|_| "8080".to_string())
+		.parse::<u16>()
+		.expect("PORT must be a valid number");
+
+	info!("Starting server on port {}", port);
+
+	HttpServer::new(move || {
+		App::new()
+			.app_data(Data::new(pool.clone()))
+			.app_data(Data::new(email_service.clone()))
+			.wrap(NormalizePath::trim())
+			.wrap(Logger::default())
+			.wrap(
+				Cors::default()
+					.allow_any_header()
+					.allow_any_method()
+					.allow_any_origin(),
+			)
+			.service(ping)
+			.service(
+				web::scope("/auth")
+					.service(auth::request_login_code)
+					.service(auth::validate_login_code),
+			)
+			.service(
+				web::scope("/api")
+					.route("/providers", web::get().to(llm::api::list_providers))
+					.route("/inference", web::post().to(llm::api::inference))
+					.route(
+						"/inference/stream",
+						web::post().to(llm::api::inference_stream),
+					),
+			)
+	})
+	.bind(("127.0.0.1", port))?
+	.run()
+	.await
 }

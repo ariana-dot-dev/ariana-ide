@@ -16,10 +16,9 @@ mod custom_terminal_commands;
 mod machine;
 
 use custom_terminal_commands::{
-	custom_connect_terminal, custom_kill_terminal,
-	custom_resize_terminal, custom_send_ctrl_c, custom_send_ctrl_d,
-	custom_send_input_lines, custom_send_raw_input, custom_send_scroll_down,
-	custom_send_scroll_up,
+	custom_connect_terminal, custom_kill_terminal, custom_resize_terminal,
+	custom_send_ctrl_c, custom_send_ctrl_d, custom_send_input_lines,
+	custom_send_raw_input, custom_send_scroll_down, custom_send_scroll_up,
 };
 
 mod file_tree;

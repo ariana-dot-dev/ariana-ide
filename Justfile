@@ -51,5 +51,4 @@ format:
     @echo "Formatting code..."
     cd backend && cargo fmt
     cd frontend/tauri-app/src-tauri && cargo fmt
-    cd cli-agents && cargo fmt
     cd frontend && npm run format:write

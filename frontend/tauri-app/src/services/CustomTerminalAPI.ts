@@ -119,7 +119,7 @@ export class CustomTerminalAPI {
 			}
 
 			await invoke("custom_kill_terminal", { id });
-			
+
 			if (this.terminalId === id) {
 				this.terminalId = null;
 				this.isConnected = false;

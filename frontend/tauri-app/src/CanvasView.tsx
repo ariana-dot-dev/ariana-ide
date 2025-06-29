@@ -7,9 +7,7 @@ import { cn } from "./utils";
 import { TextArea } from "./canvas/TextArea";
 
 interface CanvasViewProps {
-	onAddElementRef?: React.RefObject<
-		((element: CanvasElement) => void) | null
-	>;
+	onAddElementRef?: React.RefObject<((element: CanvasElement) => void) | null>;
 }
 
 // Demo elements for testing
@@ -18,28 +16,30 @@ const createDemoElements = (): CanvasElement[] => {
 	const _isMac = navigator.platform.includes("Mac");
 	const _isLinux = navigator.platform.includes("Linux");
 
-	return isWindows ? [
-		// Create a Claude Code text area with a default prompt
-		TextArea.canvasElement("")		
-		// CustomTerminal.canvasElement(
-		// 	{
-		// 		kind: {
-		// 			$type: "wsl",
-		// 			distribution: "Ubuntu",
-		// 			workingDirectory: "~",
-		// 		},
-		// 		lines: 5,
-		// 		cols: 10,
-		// 	},
-		// 	1,
-		// ),
-	] : [
-		Rectangle.canvasElement(
-			{ size: "large", aspectRatio: 1 / 1, area: "center" },
-			1,
-		),
-		Terminal.createLocalShell(),
-	]
+	return isWindows
+		? [
+				// Create a Claude Code text area with a default prompt
+				TextArea.canvasElement(""),
+				// CustomTerminal.canvasElement(
+				// 	{
+				// 		kind: {
+				// 			$type: "wsl",
+				// 			distribution: "Ubuntu",
+				// 			workingDirectory: "~",
+				// 		},
+				// 		lines: 5,
+				// 		cols: 10,
+				// 	},
+				// 	1,
+				// ),
+			]
+		: [
+				Rectangle.canvasElement(
+					{ size: "large", aspectRatio: 1 / 1, area: "center" },
+					1,
+				),
+				Terminal.createLocalShell(),
+			];
 };
 
 const CanvasView: React.FC<CanvasViewProps> = ({ onAddElementRef }) => {

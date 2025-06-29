@@ -250,7 +250,9 @@ async function status(): Promise<void> {
 	} else {
 		const buildConfig = await loadBuildConfig();
 		const executableName = buildConfig?.buildParams?.executableName || "ariana";
-		console.log(`You are not logged in. Run \`${executableName} login\` to authenticate.`);
+		console.log(
+			`You are not logged in. Run \`${executableName} login\` to authenticate.`,
+		);
 	}
 }
 
@@ -312,28 +314,29 @@ async function install(): Promise<void> {
 }
 
 // Get version from package.json (ground truth) and description
-async function getVersionAndDescription(): Promise<{version: string, description: string}> {
+async function getVersionAndDescription(): Promise<{
+	version: string;
+	description: string;
+}> {
 	try {
 		const packageJsonPath = path.join(__dirname, "..", "package.json");
 		const packageJsonContent = await fs.readFile(packageJsonPath, "utf8");
 		const packageJson = JSON.parse(packageJsonContent);
 		return {
 			version: packageJson.version || "0.1.0",
-			description: "ariana IDE - A modern development environment"
+			description: "ariana IDE - A modern development environment",
 		};
 	} catch {
 		return {
 			version: "0.1.0",
-			description: "ariana IDE - A modern development environment"
+			description: "ariana IDE - A modern development environment",
 		};
 	}
 }
 
 // Main CLI logic
 const { version, description } = await getVersionAndDescription();
-program
-	.version(version)
-	.description(description);
+program.version(version).description(description);
 
 program
 	.command("login")
