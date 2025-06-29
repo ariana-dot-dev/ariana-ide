@@ -2,6 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { Document, type Position, type Range } from "./Document";
+import {
+	type HighlightedLine,
+	SyntaxHighlighter,
+} from "./syntax/SyntaxHighlighter";
 
 interface Selection {
 	anchor: Position;
@@ -16,12 +20,14 @@ interface FileData {
 	cursor: Position;
 	selections: Selection[];
 	isDirty: boolean;
+	highlightedLines?: Map<number, HighlightedLine>;
 }
 
 interface EditorState {
 	files: Record<string, FileData>;
 	activeFileId: string;
 	fileWatchers: Record<string, UnlistenFn>;
+	syntaxHighlighter: SyntaxHighlighter | null;
 
 	// actions
 	setText: (text: string) => void;
@@ -43,6 +49,10 @@ interface EditorState {
 	// file watcher actions
 	setupFileWatching: () => Promise<void>;
 	cleanupFileWatching: () => Promise<void>;
+
+	// syntax highlighting actions
+	initializeSyntaxHighlighting: () => Promise<void>;
+	updateSyntaxHighlighting: (fileId: string) => void;
 }
 
 // start with no files open
@@ -54,13 +64,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 	files: initialFiles,
 	activeFileId: "",
 	fileWatchers: {},
+	syntaxHighlighter: null,
 
 	setText: (text: string) =>
 		set((state) => {
 			const activeFile = state.files[state.activeFileId];
 			if (!activeFile) return state;
 
-			return {
+			const newState = {
 				files: {
 					...state.files,
 					[state.activeFileId]: {
@@ -73,6 +84,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 					},
 				},
 			};
+			// update syntax highlighting
+			setTimeout(() => get().updateSyntaxHighlighting(state.activeFileId), 0);
+			return newState;
 		}),
 
 	insertText: (text: string) =>
@@ -138,7 +152,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 			const newColumn =
 				lines.length === 1 ? cursor.column + lastLineLength : lastLineLength;
 
-			return {
+			const newState = {
 				files: {
 					...state.files,
 					[state.activeFileId]: {
@@ -150,6 +164,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 					},
 				},
 			};
+			// update syntax highlighting
+			setTimeout(() => get().updateSyntaxHighlighting(state.activeFileId), 0);
+			return newState;
 		}),
 
 	deleteBackward: () =>
@@ -461,13 +478,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 				console.error(`Failed to watch file: ${path}`, error),
 			);
 
-			return {
+			const newState = {
 				files: {
 					...state.files,
 					[fileId]: newFile,
 				},
 				activeFileId: fileId,
 			};
+
+			// update syntax highlighting for new file
+			setTimeout(() => {
+				console.log(
+					"[EditorStore] Triggering syntax highlighting for newly opened file",
+				);
+				get().updateSyntaxHighlighting(fileId);
+			}, 100);
+
+			return newState;
 		}),
 
 	closeFile: (fileId: string) =>
@@ -568,7 +595,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 						const lineContent = document.getLine(adjustedLine) || "";
 						const adjustedColumn = Math.min(cursor.column, lineContent.length);
 
-						return {
+						const newState = {
 							files: {
 								...state.files,
 								[fileId]: {
@@ -580,6 +607,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 								},
 							},
 						};
+
+						// update syntax highlighting after file change
+						setTimeout(() => get().updateSyntaxHighlighting(fileId), 0);
+
+						return newState;
 					});
 				} catch (error) {
 					console.error(`Failed to reload file: ${changedPath}`, error);
@@ -636,5 +668,79 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 		}
 
 		set({ fileWatchers: {} });
+	},
+
+	initializeSyntaxHighlighting: async () => {
+		const state = get();
+		if (!state.syntaxHighlighter) {
+			try {
+				console.log("[EditorStore] Initializing syntax highlighter...");
+				const highlighter = new SyntaxHighlighter();
+				await highlighter.initialize();
+				set({ syntaxHighlighter: highlighter });
+				console.log(
+					"[EditorStore] Syntax highlighter initialized successfully",
+				);
+
+				// highlight all open files
+				for (const fileId of Object.keys(state.files)) {
+					get().updateSyntaxHighlighting(fileId);
+				}
+			} catch (error) {
+				console.error(
+					"[EditorStore] Failed to initialize syntax highlighter:",
+					error,
+				);
+			}
+		}
+	},
+
+	updateSyntaxHighlighting: (fileId: string) => {
+		const state = get();
+		const file = state.files[fileId];
+		const highlighter = state.syntaxHighlighter;
+
+		console.log(
+			"[EditorStore] updateSyntaxHighlighting called for:",
+			fileId,
+			file?.name,
+		);
+
+		if (!file || !highlighter) {
+			console.log("[EditorStore] Missing file or highlighter", {
+				file: !!file,
+				highlighter: !!highlighter,
+			});
+			return;
+		}
+
+		// only highlight typescript/javascript files for now
+		const isTypeScript =
+			file.name.endsWith(".ts") ||
+			file.name.endsWith(".tsx") ||
+			file.name.endsWith(".js") ||
+			file.name.endsWith(".jsx");
+
+		if (!isTypeScript) {
+			console.log("[EditorStore] Not a TypeScript file:", file.name);
+			return;
+		}
+
+		console.log("[EditorStore] Highlighting TypeScript file:", file.name);
+		const highlightedLines = highlighter.getHighlightedLines(
+			file.content,
+			file.name,
+		);
+		console.log("[EditorStore] Highlighted lines:", highlightedLines.size);
+
+		set((state) => ({
+			files: {
+				...state.files,
+				[fileId]: {
+					...state.files[fileId],
+					highlightedLines,
+				},
+			},
+		}));
 	},
 }));
