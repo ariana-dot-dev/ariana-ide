@@ -63,6 +63,16 @@ const THEMES = {
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
+    "ghi": {
+        "--acc-500": "#000000",  // blue equivalent
+        "--base-500": "#ffffff",  // ~ oklch(82.8% 0.111 230.318)
+        "--whitest": "#00AEED",
+        "--blackest": "#000000",
+        "--positive-500": "#1ebc73",  // green
+        "--negative-500": "#a24b6f",  // red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
+    },
     "light": {
         "--acc-500": "#ff4f69",
         "--base-500": "#8b8396",
