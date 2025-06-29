@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { TerminalConfig } from "../canvas/Terminal";
+import { OsSession } from "../bindings/os";
 
 interface TerminalConnection {
 	id: string;
-	config: TerminalConfig;
+	osSession: OsSession;
 	onData?: (data: string) => void;
 	onDisconnect?: () => void;
 }
@@ -17,7 +17,7 @@ class TerminalServiceImpl {
 	private lastSentTime: Map<string, number> = new Map(); // key -> timestamp for debouncing
 
 	async createConnection(
-		config: TerminalConfig,
+		osSession: OsSession,
 		terminalElementId?: string,
 	): Promise<string> {
 		try {
@@ -45,12 +45,12 @@ class TerminalServiceImpl {
 			const creationPromise = (async () => {
 				const connectionId = await invoke<string>(
 					"create_terminal_connection",
-					{ config },
+					{ osSession },
 				);
 
 				const connection: TerminalConnection = {
 					id: connectionId,
-					config,
+					osSession,
 				};
 				this.connections.set(connectionId, connection);
 
@@ -187,25 +187,6 @@ class TerminalServiceImpl {
 			unlistenData();
 			unlistenDisconnect();
 		});
-	}
-
-	// Utility methods for detecting available terminal types
-	async getAvailableTerminalTypes(): Promise<string[]> {
-		try {
-			return await invoke<string[]>("get_available_terminal_types");
-		} catch (error) {
-			console.error("Failed to get available terminal types:", error);
-			return ["ssh"]; // Fallback to SSH only
-		}
-	}
-
-	async validateTerminalConfig(config: TerminalConfig): Promise<boolean> {
-		try {
-			return await invoke<boolean>("validate_terminal_config", { config });
-		} catch (error) {
-			console.error("Failed to validate terminal config:", error);
-			return false;
-		}
 	}
 
 	async cleanupDeadConnections(): Promise<void> {

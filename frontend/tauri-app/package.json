@@ -24,6 +24,7 @@
 		"@tailwindcss/vite": "^4.1.10",
 		"@tauri-apps/api": "^2.5.0",
 		"@tauri-apps/plugin-fs": "^2.3.0",
+		"@tauri-apps/plugin-os": "^2.3.0",
 		"@tauri-apps/plugin-store": "^2.2.1",
 		"@xterm/addon-fit": "^0.10.0",
 		"@xterm/addon-image": "^0.8.0",

@@ -11,7 +11,7 @@ import { resolveColor } from "../utils/colors";
 import "@xterm/xterm/css/xterm.css";
 import { TerminalService } from "../services/TerminalService";
 import { cn } from "../utils";
-import type { Terminal, TerminalConfig } from "./Terminal";
+import type { Terminal } from "./Terminal";
 import type { CanvasElement, ElementLayout } from "./types";
 
 interface TerminalOnCanvasProps {
@@ -22,7 +22,6 @@ interface TerminalOnCanvasProps {
 		event: MouseEvent | TouchEvent | PointerEvent,
 		info: PanInfo,
 	) => void;
-	onTerminalUpdate: (element: Terminal, newConfig: TerminalConfig) => void;
 	onRemoveElement: (elementId: string) => void;
 	isDragTarget: boolean;
 	isDragging: boolean;
@@ -33,7 +32,6 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 	onDragStart: propOnDragStart,
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
-	onTerminalUpdate,
 	onRemoveElement,
 	isDragTarget,
 	isDragging,
@@ -95,10 +93,8 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 
 		const xterm = new XTerm({
 			theme,
-			fontSize: terminal.config.fontSize || 14,
-			fontFamily: terminal.config.fontFamily
-				? `"${terminal.config.fontFamily}"`
-				: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", Monaco, Menlo, "Ubuntu Mono", monospace',
+			fontSize: 14,
+			fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", Monaco, Menlo, "Ubuntu Mono", monospace',
 			cursorBlink: true,
 			allowTransparency: true,
 			allowProposedApi: true,
@@ -168,7 +164,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 			try {
 				if (!terminal.isConnected || !connectionId) {
 					connectionId = await TerminalService.createConnection(
-						terminal.config,
+						terminal.osSession,
 						element.id,
 					);
 					terminal.setConnection(connectionId, true);
@@ -329,7 +325,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 				{/* Header */}
 				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
 					<span className="text-xs font-medium">
-						💻 {terminal.getTerminalType().toUpperCase()}
+						💻 {terminal.getConnectionString()}
 					</span>
 					<div className="flex items-center gap-2">
 						{/* Connection status indicator */}

@@ -1,16 +1,16 @@
-use crate::custom_terminal::{CustomTerminalManager, TerminalSpec};
-use std::sync::{Arc, Mutex};
+use crate::{custom_terminal::CustomTerminalManager, os::OsSession};
+use std::sync::Arc;
 use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub async fn custom_connect_terminal(
-	spec: TerminalSpec,
+	os_session: OsSession,
 	app_handle: AppHandle,
 	manager: State<'_, Arc<CustomTerminalManager>>,
 ) -> Result<String, String> {
 	let terminal_manager = manager;
 	terminal_manager
-		.connect_terminal(spec, app_handle)
+		.connect_terminal(os_session, app_handle)
 		.map_err(|e| e.to_string())
 }
 

@@ -5,6 +5,7 @@ import {
 	CustomTerminalAPI,
 } from "./CustomTerminalAPI";
 import { EventEmitter } from "../utils/EventEmitter";
+import { OsSession } from "../bindings/os";
 
 export interface ClaudeCodeTaskResult {
 	elapsed: number;
@@ -85,6 +86,7 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	 * Start a new Claude Code task
 	 */
 	async startTask(
+		osSession: OsSession,
 		prompt: string,
 		terminalSpec: TerminalSpec,
 		onTerminalReady?: (terminalId: string) => void,
@@ -114,10 +116,8 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 		this.hasSeenTryPrompt = false;
 
 		try {
-			console.log(this.logPrefix, "Connecting terminal with spec...");
-			// Connect terminal using inherited method with fixed size
-			const fixedSpec = { ...terminalSpec, lines: 24, cols: 60 };
-			await this.connectTerminal(fixedSpec);
+			console.log(this.logPrefix, "Connecting terminal...");
+			await this.connectTerminal(osSession);
 			console.log(
 				this.logPrefix,
 				"Terminal connected with ID:",
@@ -514,6 +514,7 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 				this.logPrefix,
 				"Found trust confirmation prompt, sending Enter...",
 			);
+			await this.delay(1000);
 			await this.sendRawInput(this.terminalId, "\r");
 			return;
 		}

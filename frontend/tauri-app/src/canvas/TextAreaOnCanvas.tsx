@@ -97,7 +97,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				terminalSpec,
 			);
 
-			await agent.startTask(text.trim(), terminalSpec, (terminalId: string) => {
+			await agent.startTask({ Wsl: { distribution: "Ubuntu", working_directory: "~" } }, text.trim(), terminalSpec, (terminalId: string) => {
 				console.log("[TextAreaOnCanvas]", "Terminal ready, ID:", terminalId);
 				setTerminalId(terminalId);
 			});

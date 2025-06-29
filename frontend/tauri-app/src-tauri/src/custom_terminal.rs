@@ -7,13 +7,12 @@
 use std::{
 	collections::HashMap,
 	io::{Read, Write},
-	path::Path,
 	sync::{mpsc, Arc, Mutex},
 	thread,
 };
 
 use anyhow::{anyhow, Result};
-use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
+use portable_pty::{native_pty_system, PtyPair, PtySize};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -21,39 +20,7 @@ use unicode_width::UnicodeWidthStr;
 use uuid::Uuid;
 use vt100::{Cell, Color as VtColor, Parser};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "$type")]
-pub enum TerminalKind {
-	#[serde(rename = "ssh")]
-	Ssh {
-		host: String,
-		username: String,
-		port: Option<u16>,
-	},
-	#[serde(rename = "git-bash")]
-	GitBash {
-		#[serde(rename = "workingDirectory")]
-		working_directory: Option<String>,
-	},
-	#[serde(rename = "wsl")]
-	Wsl {
-		distribution: Option<String>,
-		#[serde(rename = "workingDirectory")]
-		working_directory: Option<String>,
-	},
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TerminalSpec {
-	pub kind: TerminalKind,
-	#[serde(rename = "workingDir")]
-	pub working_dir: Option<String>,
-	#[serde(rename = "shellCommand")]
-	pub shell_command: Option<String>,
-	pub environment: Option<HashMap<String, String>>,
-	pub lines: u16,
-	pub cols: u16,
-}
+use crate::os::OsSession;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Color {
@@ -130,28 +97,6 @@ pub enum TerminalEvent {
 		cursor_col: usize,
 		metadata: Option<EventMetadata>,
 	},
-}
-
-impl TerminalEvent {
-	pub fn r#type(&self) -> &str {
-		match self {
-			TerminalEvent::NewLines { .. } => "newLines",
-			TerminalEvent::Patch { .. } => "patch",
-			TerminalEvent::CursorMove { .. } => "cursorMove",
-			TerminalEvent::Scroll { .. } => "scroll",
-			TerminalEvent::ScreenUpdate { .. } => "screenUpdate",
-		}
-	}
-
-	pub fn metadata(&self) -> &Option<EventMetadata> {
-		match self {
-			TerminalEvent::NewLines { metadata, .. } => metadata,
-			TerminalEvent::Patch { metadata, .. } => metadata,
-			TerminalEvent::CursorMove { metadata, .. } => metadata,
-			TerminalEvent::Scroll { metadata, .. } => metadata,
-			TerminalEvent::ScreenUpdate { metadata, .. } => metadata,
-		}
-	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -439,120 +384,33 @@ fn vt_color_to_color(opt: Option<VtColor>) -> Option<Color> {
 
 pub struct CustomTerminalConnection {
 	pub id: String,
-	pub spec: TerminalSpec,
 	pub pty_pair: PtyPair,
-	pub child: Box<dyn Child + Send + Sync>,
 	pub app_handle: AppHandle,
 	pub terminal_state: Arc<Mutex<TerminalState>>,
 }
 
 impl CustomTerminalConnection {
-	pub fn new(id: String, spec: TerminalSpec, app_handle: AppHandle) -> Result<Self> {
+	pub fn new(id: String, os_session: OsSession, app_handle: AppHandle) -> Result<Self> {
 		// create PTY
 		let pty_pair = native_pty_system().openpty(PtySize {
-			rows: spec.lines,
-			cols: spec.cols,
+			rows: 24,
+			cols: 64,
 			pixel_width: 0,
 			pixel_height: 0,
 		})?;
 
 		// spawn the requested command
-		let cmd = Self::build_command(&spec)?;
-		let child = pty_pair.slave.spawn_command(cmd)?;
+		let cmd = os_session.build_command(false)?;
+		let _ = pty_pair.slave.spawn_command(cmd)?;
 
-		let state = Arc::new(Mutex::new(TerminalState::new(spec.lines, spec.cols)));
+		let state = Arc::new(Mutex::new(TerminalState::new(24, 64)));
 
 		Ok(Self {
 			id,
-			spec,
 			pty_pair,
-			child,
 			app_handle,
 			terminal_state: state,
 		})
-	}
-
-	/// Helper to build the command matching the requested TerminalSpec.
-	fn build_command(spec: &TerminalSpec) -> Result<CommandBuilder> {
-		let mut cmd = match &spec.kind {
-			TerminalKind::Ssh {
-				host,
-				username,
-				port,
-			} => {
-				let mut c = CommandBuilder::new("ssh");
-				c.arg("-p");
-				c.arg(port.unwrap_or(22).to_string());
-				c.arg("-t");
-				c.arg(format!("{}@{}", username, host));
-				c
-			}
-
-			TerminalKind::GitBash { working_directory } => {
-				#[cfg(target_os = "windows")]
-				{
-					let paths = [
-						"C:\\Program Files\\Git\\bin\\bash.exe",
-						"C:\\Program Files (x86)\\Git\\bin\\bash.exe",
-						"C:\\Git\\bin\\bash.exe",
-					];
-					let exe = paths
-						.iter()
-						.map(Path::new)
-						.find(|p| p.exists())
-						.ok_or_else(|| anyhow!("Git Bash not found"))?;
-					let mut c = CommandBuilder::new(exe);
-					c.arg("--login");
-					c.arg("-i");
-					if let Some(wd) =
-						working_directory.as_ref().or(spec.working_dir.as_ref())
-					{
-						c.cwd(wd);
-					}
-					c
-				}
-				#[cfg(not(target_os = "windows"))]
-				{
-					return Err(anyhow!("Git Bash is only available on Windows"));
-				}
-			}
-
-			TerminalKind::Wsl {
-				distribution,
-				working_directory,
-			} => {
-				#[cfg(target_os = "windows")]
-				{
-					let mut c = CommandBuilder::new("wsl");
-					if let Some(d) = distribution {
-						c.arg("-d");
-						c.arg(d);
-					}
-					if let Some(wd) =
-						working_directory.as_ref().or(spec.working_dir.as_ref())
-					{
-						c.arg("--cd");
-						c.arg(wd);
-					}
-					c
-				}
-				#[cfg(not(target_os = "windows"))]
-				{
-					return Err(anyhow!("WSL is only available on Windows"));
-				}
-			}
-		};
-
-		if let Some(sh) = &spec.shell_command {
-			cmd.arg("-c");
-			cmd.arg(sh);
-		}
-		if let Some(env) = &spec.environment {
-			for (k, v) in env {
-				cmd.env(k, v);
-			}
-		}
-		Ok(cmd)
 	}
 
 	/// Start the PTY→parser→frontend pump in a separate thread.
@@ -585,7 +443,6 @@ impl CustomTerminalConnection {
 			let _ = app.emit(&format!("custom-terminal-disconnect-{id_clone}"), ());
 		});
 
-		let app_clone = self.app_handle.clone();
 		thread::spawn(move || {
 			let mut buf = [0u8; 4096];
 			loop {
@@ -657,14 +514,8 @@ impl CustomTerminalConnection {
 			pixel_width: 0,
 			pixel_height: 0,
 		})?;
-		self.spec.lines = rows;
-		self.spec.cols = cols;
 		self.terminal_state.lock().unwrap().resize(rows, cols);
 		Ok(())
-	}
-
-	pub fn is_alive(&mut self) -> bool {
-		matches!(self.child.try_wait(), Ok(None))
 	}
 }
 
@@ -683,12 +534,12 @@ impl CustomTerminalManager {
 
 	pub fn connect_terminal(
 		&self,
-		spec: TerminalSpec,
+		os_session: OsSession,
 		app_handle: AppHandle,
 	) -> Result<String> {
 		let id = Uuid::new_v4().to_string();
 		let mut conn =
-			CustomTerminalConnection::new(id.clone(), spec, app_handle.clone())?;
+			CustomTerminalConnection::new(id.clone(), os_session, app_handle.clone())?;
 		let writer = conn.pty_pair.master.take_writer()?;
 		conn.start_io_loop()?;
 

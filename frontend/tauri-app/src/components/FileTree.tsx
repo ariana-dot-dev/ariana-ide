@@ -103,7 +103,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
 		try {
 			setLoading(true);
 			setError(null);
-			const result = await invoke<FileNode[]>("get_file_tree", { path });
+			const result = await invoke<FileNode[]>("get_file_tree", { path, osSession: { Local: "." } });
 			setFiles(result);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load directory");
@@ -128,6 +128,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
 							try {
 								const children = await invoke<FileNode[]>("get_file_tree", {
 									path: node.path,
+									osSession: { Local: "." }
 								});
 								return { ...node, children };
 							} catch {

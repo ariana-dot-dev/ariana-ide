@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { OsSession } from "../bindings/os";
 
 export interface TerminalKind {
 	$type: "ssh" | "git-bash" | "wsl";
@@ -87,10 +88,10 @@ export class CustomTerminalAPI {
 	/**
 	 * Connect to a terminal by specification
 	 */
-	async connectTerminal(spec: TerminalSpec): Promise<string> {
+	async connectTerminal(osSession: OsSession): Promise<string> {
 		try {
 			const terminalId = await invoke<string>("custom_connect_terminal", {
-				spec,
+				osSession,
 			});
 			this.terminalId = terminalId;
 			this.isConnected = true;

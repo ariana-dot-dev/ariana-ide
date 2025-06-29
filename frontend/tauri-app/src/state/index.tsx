@@ -8,12 +8,15 @@ import {
 } from "react";
 import { load, Store } from "@tauri-apps/plugin-store";
 import { Command } from "../scripting/baseScript";
+import { OsSession } from "../bindings/os";
 
 // Define the shape of the state
 interface AppState {
 	theme: string;
 	showOnboarding: boolean;
 	currentInterpreterScript: string;
+	osSessions: Record<string, OsSession>;
+	currentOsSessionId?: string;
 }
 
 // Define the shape of the store, including state and actions
@@ -22,6 +25,11 @@ export interface IStore extends AppState {
 	setShowOnboarding: (show: boolean) => void;
 	setCurrentInterpreterScript: (script: string) => void;
 	isLightTheme: boolean;
+	addOsSession: (session: OsSession) => string;
+	removeOsSession: (sessionId: string) => void;
+	getOsSession: (sessionId: string) => OsSession | null;
+	osSessions: Record<string, OsSession>;
+	setCurrentOsSessionId?: (sessionId: string) => void;
 	processCommand: (command: Command) => void;
 	revertCommand: () => void;
 }
@@ -38,6 +46,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 	const [processedCommandsStack, setProcessedCommandsStack] = useState<
 		Command[]
 	>([]);
+	const [osSessions, setOsSessions] = useState<Record<string, OsSession>>({});
 	const [tauriStore, setTauriStore] = useState<Store | null>(null);
 
 	// Load state from disk on initial render
@@ -51,6 +60,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					setThemeState(savedState.theme);
 					setShowOnboardingState(savedState.showOnboarding);
 					setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
+					setOsSessions(savedState.osSessions || {});
 				}
 			} catch (error) {
 				console.error("Failed to load state:", error);
@@ -68,6 +78,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					theme,
 					showOnboarding,
 					currentInterpreterScript,
+					osSessions,
 				};
 				await tauriStore.set("appState", stateToSave);
 				await tauriStore.save();
@@ -134,6 +145,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		isLightTheme,
 		processCommand,
 		revertCommand,
+		osSessions,
+		addOsSession: (session: OsSession) => {
+			const sessionId = crypto.randomUUID();
+			setOsSessions((prev) => ({
+				...prev,
+				[sessionId]: session,
+			}));
+			return sessionId;
+		},
+		removeOsSession: (sessionId: string) => {
+			setOsSessions((prev) => {
+				const newSessions = { ...prev };
+				delete newSessions[sessionId];
+				return newSessions;
+			});
+		},
+		getOsSession: (sessionId: string) => {
+			return osSessions[sessionId] || null;
+		}
 	};
 
 	return (

@@ -1,55 +1,19 @@
+import { OsSession, osSessionToString } from "../bindings/os";
 import { CanvasElement, ElementTargets } from "./types";
 
-export type TerminalKind =
-	| {
-			$type: "ssh";
-			host: string;
-			username: string;
-			port?: number;
-	  }
-	| {
-			$type: "git-bash";
-			workingDirectory?: string;
-	  }
-	| {
-			$type: "wsl";
-			distribution?: string;
-			workingDirectory?: string;
-	  }
-	| {
-			$type: "local-shell";
-			shell?: string;
-			workingDirectory?: string;
-	  }
-	| {
-			$type: "iterm";
-			profile?: string;
-			workingDirectory?: string;
-	  };
-
-export interface TerminalConfig {
-	kind: TerminalKind;
-	// Shared optional config
-	environment?: Record<string, string>;
-	shellCommand?: string;
-	colorScheme?: string;
-	fontSize?: number;
-	fontFamily?: string;
-}
-
 export class Terminal {
+	private _osSession: OsSession;
 	private _targets: ElementTargets;
-	private _config: TerminalConfig;
 	private _isConnected: boolean = false;
 	private _connectionId?: string;
 
-	constructor(config: TerminalConfig) {
+	constructor(osSession: OsSession) {
 		this._targets = {
 			size: "medium",
 			aspectRatio: 1 / 10,
 			area: "bottom",
 		};
-		this._config = config;
+		this._osSession = osSession;
 	}
 
 	targets(): ElementTargets {
@@ -60,14 +24,6 @@ export class Terminal {
 		this._targets = { ...this._targets, ...newTargets };
 	}
 
-	get config(): TerminalConfig {
-		return this._config;
-	}
-
-	updateConfig(newConfig: Partial<TerminalConfig>): void {
-		this._config = { ...this._config, ...newConfig };
-	}
-
 	get isConnected(): boolean {
 		return this._isConnected;
 	}
@@ -76,38 +32,24 @@ export class Terminal {
 		return this._connectionId;
 	}
 
+	get osSession(): OsSession {
+		return this._osSession;
+	}
+
 	setConnection(connectionId: string, connected: boolean): void {
 		this._connectionId = connectionId;
 		this._isConnected = connected;
 	}
 
-	getTerminalType(): string {
-		return this._config.kind.$type;
-	}
-
 	getConnectionString(): string {
-		const kind = this._config.kind;
-		switch (kind.$type) {
-			case "ssh":
-				return `${kind.username}@${kind.host}:${kind.port || 22}`;
-			case "wsl":
-				return `WSL: ${kind.distribution || "Default"}`;
-			case "git-bash":
-				return `Git Bash: ${kind.workingDirectory || "~"}`;
-			case "local-shell":
-				return `${kind.shell || "Default Shell"}: ${kind.workingDirectory || "~"}`;
-			case "iterm":
-				return `iTerm: ${kind.profile || "Default"}: ${kind.workingDirectory || "~"}`;
-			default:
-				return "Terminal";
-		}
+		return osSessionToString(this._osSession);
 	}
 
 	static canvasElement(
-		config: TerminalConfig,
+		osSession: OsSession,
 		weight: number = 1,
 	): CanvasElement {
-		return new CanvasElement({ terminal: new Terminal(config) }, weight);
+		return new CanvasElement({ terminal: new Terminal(osSession) }, weight);
 	}
 
 	// Helper methods for creating different terminal types
@@ -116,30 +58,9 @@ export class Terminal {
 		workingDirectory?: string,
 		weight: number = 1,
 	): CanvasElement {
-		const config: TerminalConfig = {
-			kind: {
-				$type: "local-shell",
-				shell,
-				workingDirectory,
-			},
+		const osSession: OsSession = {
+			Local: workingDirectory || "~",
 		};
-		return Terminal.canvasElement(config, weight);
-	}
-
-	static createSSH(
-		host: string,
-		username: string,
-		port?: number,
-		weight: number = 1,
-	): CanvasElement {
-		const config: TerminalConfig = {
-			kind: {
-				$type: "ssh",
-				host,
-				username,
-				port,
-			},
-		};
-		return Terminal.canvasElement(config, weight);
+		return Terminal.canvasElement(osSession, weight);
 	}
 }
