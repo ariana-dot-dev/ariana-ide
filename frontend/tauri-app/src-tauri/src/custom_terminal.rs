@@ -21,9 +21,6 @@ use unicode_width::UnicodeWidthStr;
 use uuid::Uuid;
 use vt100::{Cell, Color as VtColor, Parser};
 
-// -------------------------------------------------------------------------------------------------
-// Public data‐structures – unchanged
-// -------------------------------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "$type")]
 pub enum TerminalKind {
@@ -163,10 +160,6 @@ pub enum ScrollDirection {
     Down,
 }
 
-// -------------------------------------------------------------------------------------------------
-// TerminalState – thin wrapper around vt100::Parser
-// -------------------------------------------------------------------------------------------------
-
 /// How many scroll-back lines to keep.
 const HISTORY_LINES: usize = 100_000;
 
@@ -223,9 +216,6 @@ impl TerminalState {
         self.build_screen_events(full)
     }
 
-    // ---------------------------------------------------------------------
-    // helpers
-    // ---------------------------------------------------------------------
     fn build_screen_events(&mut self, full: bool) -> Vec<TerminalEvent> {
         let screen = self.parser.screen();
 
@@ -443,9 +433,6 @@ fn vt_color_to_color(opt: Option<VtColor>) -> Option<Color> {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-// One PTY connection
-// -------------------------------------------------------------------------------------------------
 pub struct CustomTerminalConnection {
     pub id: String,
     pub spec: TerminalSpec,
@@ -671,9 +658,6 @@ impl CustomTerminalConnection {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-// Manager
-// -------------------------------------------------------------------------------------------------
 pub struct CustomTerminalManager {
     connections: Arc<Mutex<HashMap<String, CustomTerminalConnection>>>,
     writers: Arc<Mutex<HashMap<String, Box<dyn Write + Send>>>>,
@@ -760,33 +744,8 @@ impl CustomTerminalManager {
         self.writers.lock().unwrap().remove(id);
         Ok(())
     }
-
-    pub fn reconnect_terminal(&mut self, id: &str) -> Result<()> {
-        let conns = self.connections.lock().unwrap();
-        if let Some(conn) = conns.get(id) {
-            let mut state = conn.terminal_state.lock().unwrap();
-            let events = state.screen_events(false);
-            for event in events {
-                let _ = conn
-                    .app_handle
-                    .emit(&format!("custom-terminal-event-{id}"), &event);
-            }
-        }
-        Ok(())
-    }
-
-    pub fn is_terminal_alive(&self, id: &str) -> bool {
-        self.connections
-            .lock()
-            .unwrap()
-            .get_mut(id)
-            .map_or(false, |c| c.is_alive())
-    }
 }
 
-// -------------------------------------------------------------------------------------------------
-// Colour helpers (same as before)
-// -------------------------------------------------------------------------------------------------
 fn ansi_color_to_color(code: u16) -> Color {
     match code {
         0 => Color::Black,

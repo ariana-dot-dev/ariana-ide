@@ -54,7 +54,6 @@ pub struct TerminalConfig {
 
 pub struct TerminalConnection {
     pub id: String,
-    pub config: TerminalConfig,
     pub pty_pair: PtyPair,
     pub child: Box<dyn Child + Send + Sync>,
     pub app_handle: AppHandle,
@@ -76,7 +75,6 @@ impl TerminalConnection {
 
         Ok(Self {
             id,
-            config,
             pty_pair,
             child,
             app_handle,
