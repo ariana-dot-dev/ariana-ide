@@ -13,17 +13,17 @@ use terminal::{TerminalConfig, TerminalManager};
 mod custom_terminal;
 mod custom_terminal_commands;
 
-#[cfg(test)]
-mod cli_agents_test;
 use custom_terminal_commands::{
-	custom_connect_terminal, custom_kill_terminal, custom_reconnect_terminal,
+	custom_connect_terminal, custom_kill_terminal,
 	custom_resize_terminal, custom_send_ctrl_c, custom_send_ctrl_d,
 	custom_send_input_lines, custom_send_raw_input, custom_send_scroll_down,
-	custom_send_scroll_up, AppState,
+	custom_send_scroll_up,
 };
 
 mod file_tree;
 use file_tree::{read_directory, FileNode};
+
+use crate::custom_terminal::CustomTerminalManager;
 
 #[tauri::command]
 async fn create_terminal_connection(
@@ -102,14 +102,14 @@ async fn get_file_tree(path: String) -> Result<Vec<FileNode>, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-	let terminal_manager = Arc::new(TerminalManager::new());
-	let custom_terminal_state = AppState::new();
+	let terminals_manager = Arc::new(TerminalManager::new());
+	let custom_terminals_manager = Arc::new(CustomTerminalManager::new());
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_store::Builder::new().build())
 		.plugin(tauri_plugin_fs::init())
-		.manage(terminal_manager)
-		.manage(custom_terminal_state)
+		.manage(terminals_manager)
+		.manage(custom_terminals_manager)
 		.invoke_handler(tauri::generate_handler![
 			// Original terminal commands
 			create_terminal_connection,
@@ -121,7 +121,6 @@ pub fn run() {
 			cleanup_dead_connections,
 			// New custom terminal commands
 			custom_connect_terminal,
-			custom_reconnect_terminal,
 			custom_kill_terminal,
 			custom_send_input_lines,
 			custom_send_raw_input,

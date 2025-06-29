@@ -101,17 +101,6 @@ export class CustomTerminalAPI {
 	}
 
 	/**
-	 * Reconnect to a terminal by ID
-	 */
-	async reconnectTerminal(id: string): Promise<void> {
-		try {
-			await invoke("custom_reconnect_terminal", { id });
-		} catch (error) {
-			throw new Error(`Failed to reconnect terminal: ${error}`);
-		}
-	}
-
-	/**
 	 * Kill a terminal by ID
 	 */
 	async killTerminal(id: string): Promise<void> {
