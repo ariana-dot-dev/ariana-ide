@@ -13,6 +13,8 @@ use terminal::{TerminalConfig, TerminalManager};
 mod custom_terminal;
 mod custom_terminal_commands;
 
+mod machine;
+
 use custom_terminal_commands::{
 	custom_connect_terminal, custom_kill_terminal,
 	custom_resize_terminal, custom_send_ctrl_c, custom_send_ctrl_d,
