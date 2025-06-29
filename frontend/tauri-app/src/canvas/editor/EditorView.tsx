@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { cn } from "../../utils";
 import { Cursor } from "./Cursor";
 import { useEditorStore } from "./EditorStore";
+import { HighlightedLine } from "./HighlightedLine";
 import { InputHandler } from "./InputHandler";
-import { Line } from "./Line";
 import {
 	columnToX,
 	getCharWidth,
@@ -30,16 +30,21 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const activeFile = useEditorStore((state) => state.files[activeFileId]);
 	const document = activeFile?.document || null;
 	const cursor = activeFile?.cursor || { line: 0, column: 0 };
+	const highlightedLines = activeFile?.highlightedLines;
 	const moveCursor = useEditorStore((state) => state.moveCursor);
 	const setupFileWatching = useEditorStore((state) => state.setupFileWatching);
 	const cleanupFileWatching = useEditorStore(
 		(state) => state.cleanupFileWatching,
 	);
+	const initializeSyntaxHighlighting = useEditorStore(
+		(state) => state.initializeSyntaxHighlighting,
+	);
 
-	// set up file watching on mount
+	// set up file watching and syntax highlighting on mount
 	useEffect(() => {
 		console.log("[EditorView] useEffect for file watching triggered");
 		setupFileWatching();
+		initializeSyntaxHighlighting();
 		return () => {
 			console.log("[EditorView] useEffect cleanup for file watching triggered");
 			cleanupFileWatching();
@@ -159,11 +164,17 @@ export const EditorView: React.FC<EditorViewProps> = ({
 				{/* lines */}
 				{Array.from({ length: document.getLineCount() }, (_, i) => {
 					const lineContent = document.getLine(i) || "";
+					const lineHighlighting = highlightedLines?.get(i);
+					const hasHighlighting =
+						lineHighlighting && lineHighlighting.tokens.length > 0;
+
+					// always use HighlightedLine component to avoid double rendering
 					return (
-						<Line
-							key={i}
+						<HighlightedLine
+							key={`line-${i}-${hasHighlighting ? "highlighted" : "plain"}`}
 							lineNumber={i}
 							content={lineContent}
+							tokens={hasHighlighting ? lineHighlighting.tokens : []}
 							showLineNumbers={showLineNumbers}
 						/>
 					);
