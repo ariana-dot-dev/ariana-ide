@@ -11,7 +11,6 @@ import { resolveColor } from "../utils/colors";
 import "@xterm/xterm/css/xterm.css";
 import { TerminalService } from "../services/TerminalService";
 import { cn } from "../utils";
-import type { Terminal } from "./Terminal";
 import type { CanvasElement, ElementLayout } from "./types";
 
 interface TerminalOnCanvasProps {

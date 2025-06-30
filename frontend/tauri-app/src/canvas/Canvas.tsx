@@ -12,7 +12,7 @@ import {
 } from "./gridWorker";
 import type { Rectangle } from "./Rectangle";
 import RectangleOnCanvas from "./RectangleOnCanvas";
-import type { Terminal, TerminalConfig } from "./Terminal";
+import type { Terminal } from "./Terminal";
 import TerminalOnCanvas from "./TerminalOnCanvas";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 import TextAreaOnCanvas from "./TextAreaOnCanvas";
@@ -258,15 +258,6 @@ const Canvas: React.FC<CanvasProps> = ({
 		[elements, onElementsChange],
 	);
 
-	const handleTerminalUpdate = useCallback(
-		(element: Terminal, newConfig: TerminalConfig) => {
-			element.updateConfig(newConfig);
-			// Trigger re-optimization by updating the elements array
-			onElementsChange([...elements]);
-		},
-		[elements, onElementsChange],
-	);
-
 	const handleFileTreeUpdate = useCallback(
 		(element: FileTreeCanvas, newTargets: ElementTargets) => {
 			element.updateTargets(newTargets);
@@ -309,7 +300,6 @@ const Canvas: React.FC<CanvasProps> = ({
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
 							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
-							onTerminalUpdate={handleTerminalUpdate}
 							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
