@@ -7,18 +7,20 @@ import CanvasView from "./CanvasView";
 import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Terminal } from "./canvas/Terminal";
 import type { CanvasElement } from "./canvas/types";
+import { ProjectSelector } from "./components/ProjectSelector";
 import { useUserConfig } from "./hooks/useUserConfig";
 import Onboarding from "./Onboarding";
 import Repl from "./Repl";
 import { Interpreter } from "./scripting/interpreter";
 import { useStore } from "./state";
 import { cn } from "./utils";
+import Logo from "./components/Logo";
 
 const appWindow = getCurrentWebviewWindow();
 
 export const InterpreterContext = React.createContext<Interpreter | null>(null);
 
-const THEMES = ["light", "light-sand", "semi-sky", "dark"];
+const THEMES = ["light", "light-sand", "semi-sky", "dark", "ghi"];
 
 function App() {
 	const store = useStore();
@@ -108,6 +110,10 @@ function App() {
 		addElementRef.current?.(terminalElement);
 	};
 
+	const handleResetSessions = () => {
+		store.clearAllOsSessions();
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -124,16 +130,16 @@ function App() {
 		<InterpreterContext value={interpreter}>
 			<div
 				className={cn(
-					"relative font-sans font-semibold h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)] bg-[var(--whitest)]",
+					"relative font-sans font-semibold h-screen max-h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)] bg-[var(--whitest)]",
 					isMaximized ? "rounded-none" : "rounded-lg",
 					`theme-${store.theme}`,
 				)}
 			>
 				<div
-					className="fixed w-full h-full opacity-40"
+					className="fixed w-full h-full opacity-40 z-0"
 					style={{ background: 'url("assets/noise.png")' }}
 				></div>
-				<div className="w-full h-full flex flex-col gap-1.5 p-2">
+				<div className="w-full h-full max-h-full flex flex-col gap-1.5 p-2">
 					{/* Custom Titlebar */}
 					<div
 						onMouseEnter={() => {
@@ -186,10 +192,20 @@ function App() {
 										type="button"
 										onClick={openNewTerminal}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 									>
 										💻
+									</button>
+									<button
+										type="button"
+										onClick={handleResetSessions}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+										)}
+										title="Reset all sessions"
+									>
+										🔄
 									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>
@@ -230,14 +246,25 @@ function App() {
 						</div>
 					)}
 
-					<CanvasView onAddElementRef={addElementRef} />
-
-					{/* <div
-						className={cn("flex-1 font-mono flex items-center justify-center")}
-					>
-						<Onboarding userEmail={userEmail} />
-					</div> */}
-					<Repl />
+					{/* Show ProjectSelector if no current session, otherwise show CanvasView */}
+					{!store.currentOsSessionId ? (
+						<div className="z-10 justify-self-center h-[95%] max-h-[95%] flex flex-col items-center justify-center">
+							<div className="flex flex-col items-center gap-3 mb-4 opacity-50 text-[var(--acc-700)]">
+								<div className="w-32">
+									<Logo className="" />
+								</div>
+								<h1 className="text-2xl font-semibold">
+									Welcome to the Ariana IDE
+								</h1>
+							</div>
+							<ProjectSelector onSessionCreated={() => {}} />
+						</div>
+					) : (
+						<>
+							<CanvasView onAddElementRef={addElementRef} />
+							<Repl />
+						</>
+					)}
 
 					<div className="absolute hover:opacity-100 opacity-0 bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">
 						{THEMES.map((theme) => (

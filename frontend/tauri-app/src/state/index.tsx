@@ -28,8 +28,10 @@ export interface IStore extends AppState {
 	addOsSession: (session: OsSession) => string;
 	removeOsSession: (sessionId: string) => void;
 	getOsSession: (sessionId: string) => OsSession | null;
+	clearAllOsSessions: () => void;
 	osSessions: Record<string, OsSession>;
-	setCurrentOsSessionId?: (sessionId: string) => void;
+	currentOsSessionId?: string;
+	setCurrentOsSessionId: (sessionId: string) => void;
 	processCommand: (command: Command) => void;
 	revertCommand: () => void;
 }
@@ -47,6 +49,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		Command[]
 	>([]);
 	const [osSessions, setOsSessions] = useState<Record<string, OsSession>>({});
+	const [currentOsSessionId, setCurrentOsSessionIdState] = useState<string | undefined>(undefined);
 	const [tauriStore, setTauriStore] = useState<Store | null>(null);
 
 	// Load state from disk on initial render
@@ -61,6 +64,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					setShowOnboardingState(savedState.showOnboarding);
 					setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
 					setOsSessions(savedState.osSessions || {});
+					setCurrentOsSessionIdState(savedState.currentOsSessionId);
 				}
 			} catch (error) {
 				console.error("Failed to load state:", error);
@@ -79,6 +83,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					showOnboarding,
 					currentInterpreterScript,
 					osSessions,
+					currentOsSessionId,
 				};
 				await tauriStore.set("appState", stateToSave);
 				await tauriStore.save();
@@ -87,7 +92,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			}
 		};
 		saveState();
-	}, [theme, showOnboarding, currentInterpreterScript]);
+	}, [theme, showOnboarding, currentInterpreterScript, osSessions, currentOsSessionId]);
 
 	const setTheme = (newTheme: string) => setThemeState(newTheme);
 	const setShowOnboarding = (show: boolean) => setShowOnboardingState(show);
@@ -146,6 +151,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		processCommand,
 		revertCommand,
 		osSessions,
+		currentOsSessionId,
+		setCurrentOsSessionId: setCurrentOsSessionIdState,
 		addOsSession: (session: OsSession) => {
 			const sessionId = crypto.randomUUID();
 			setOsSessions((prev) => ({
@@ -163,6 +170,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		},
 		getOsSession: (sessionId: string) => {
 			return osSessions[sessionId] || null;
+		},
+		clearAllOsSessions: () => {
+			setOsSessions({});
+			setCurrentOsSessionIdState(undefined);
 		}
 	};
 

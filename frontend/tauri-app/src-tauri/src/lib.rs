@@ -23,13 +23,14 @@ use custom_terminal_commands::{
 
 use crate::{
 	custom_terminal::CustomTerminalManager,
-	os::{FileNode, OsSession},
+	os::{FileNode, GitSearchManager, GitSearchResult, OsSession, OsSessionKind},
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	let terminals_manager = Arc::new(TerminalManager::new());
 	let custom_terminals_manager = Arc::new(CustomTerminalManager::new());
+	let git_search_manager = Arc::new(GitSearchManager::new());
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_os::init())
@@ -37,6 +38,7 @@ pub fn run() {
 		.plugin(tauri_plugin_fs::init())
 		.manage(terminals_manager)
 		.manage(custom_terminals_manager)
+		.manage(git_search_manager)
 		.invoke_handler(tauri::generate_handler![
 			// Original terminal commands
 			create_terminal_connection,
@@ -56,7 +58,11 @@ pub fn run() {
 			custom_resize_terminal,
 			// File tree commands
 			get_current_dir,
-			get_file_tree
+			get_file_tree,
+			// Git search commands
+			start_git_directories_search,
+			get_found_git_directories_so_far,
+			list_available_os_session_kinds
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -129,4 +135,28 @@ async fn get_file_tree(
 		.read_directory(&path)
 		.await
 		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn start_git_directories_search(
+	os_session_kind: OsSessionKind,
+	git_search_manager: State<'_, Arc<GitSearchManager>>,
+) -> Result<String, String> {
+	let search_id = git_search_manager.start_search(os_session_kind);
+	Ok(search_id)
+}
+
+#[tauri::command]
+async fn get_found_git_directories_so_far(
+	search_id: String,
+	git_search_manager: State<'_, Arc<GitSearchManager>>,
+) -> Result<GitSearchResult, String> {
+	git_search_manager
+		.get_results(&search_id)
+		.ok_or_else(|| "Search ID not found".to_string())
+}
+
+#[tauri::command]
+async fn list_available_os_session_kinds() -> Result<Vec<OsSessionKind>, String> {
+	OsSessionKind::list_available().map_err(|e| e.to_string())
 }

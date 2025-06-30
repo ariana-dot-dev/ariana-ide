@@ -1,9 +1,13 @@
 use anyhow::{anyhow, Result};
 use portable_pty::CommandBuilder;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use walkdir::{DirEntry, WalkDir};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OsSessionKind {
@@ -25,8 +29,14 @@ impl OsSessionKind {
 			if output.status.success() {
 				let distributions = String::from_utf8_lossy(&output.stdout);
 				for line in distributions.lines() {
-					if !line.trim().is_empty() {
-						result.push(Self::Wsl(line.trim().to_string()));
+					let cleaned = line
+						.chars()
+						.filter(|c| c.is_alphanumeric() || *c == ' ')
+						.collect::<String>()
+						.trim()
+						.to_string();
+					if !cleaned.is_empty() {
+						result.push(Self::Wsl(cleaned));
 					}
 				}
 			}
@@ -345,5 +355,231 @@ impl OsSession {
 		}
 
 		Ok(cmd)
+	}
+}
+
+// Git search functionality
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitSearchResult {
+	pub directories: Vec<String>,
+	pub is_complete: bool,
+}
+
+pub struct GitSearchManager {
+	searches: Arc<Mutex<HashMap<String, GitSearchResult>>>,
+}
+
+impl GitSearchManager {
+	pub fn new() -> Self {
+		Self {
+			searches: Arc::new(Mutex::new(HashMap::new())),
+		}
+	}
+
+	pub fn start_search(&self, os_session_kind: OsSessionKind) -> String {
+		let search_id = Uuid::new_v4().to_string();
+		
+		// Initialize empty result
+		{
+			let mut searches = self.searches.lock().unwrap();
+			searches.insert(search_id.clone(), GitSearchResult {
+				directories: Vec::new(),
+				is_complete: false,
+			});
+		}
+
+		// Start background search
+		let searches_clone = Arc::clone(&self.searches);
+		let search_id_clone = search_id.clone();
+		
+		thread::spawn(move || {
+			let root_dirs = Self::get_root_directories(&os_session_kind);
+			let mut found_dirs = Vec::new();
+
+			for root_dir in root_dirs {
+				Self::search_git_directories(&root_dir, &mut found_dirs, &searches_clone, &search_id_clone, &os_session_kind);
+			}
+
+			// Mark search as complete
+			let mut searches = searches_clone.lock().unwrap();
+			if let Some(result) = searches.get_mut(&search_id_clone) {
+				result.is_complete = true;
+			}
+		});
+
+		search_id
+	}
+
+	pub fn get_results(&self, search_id: &str) -> Option<GitSearchResult> {
+		let searches = self.searches.lock().unwrap();
+		searches.get(search_id).cloned()
+	}
+
+	fn get_root_directories(os_session_kind: &OsSessionKind) -> Vec<String> {
+		match os_session_kind {
+			OsSessionKind::Local => {
+				#[cfg(target_os = "windows")]
+				{
+					// On Windows, search common drives
+					let mut roots = Vec::new();
+					for drive in ['C', 'D', 'E', 'F', 'G', 'H'] {
+						let path = format!("{}:\\Users", drive);
+						if Path::new(&path).exists() {
+							roots.push(path);
+						}
+					}
+					roots
+				}
+				#[cfg(target_os = "linux")]
+				{
+					vec!["/home".to_string()]
+				}
+				#[cfg(target_os = "macos")]
+				{
+					vec!["/Users".to_string()]
+				}
+			}
+			OsSessionKind::Wsl(_) => {
+				// WSL: search both Linux home and mounted Windows drives
+				let mut roots = vec!["/home".to_string()];
+				for drive in ['c', 'd', 'e', 'f', 'g', 'h'] {
+					let path = format!("/mnt/{}/Users", drive);
+					// We can't easily check if path exists in WSL context here,
+					// so we'll add them all and let the search handle non-existent paths
+					roots.push(path);
+				}
+				roots
+			}
+		}
+	}
+
+	fn search_git_directories(
+		root_path: &str,
+		found_dirs: &mut Vec<String>,
+		searches: &Arc<Mutex<HashMap<String, GitSearchResult>>>,
+		search_id: &str,
+		os_session_kind: &OsSessionKind,
+	) {
+		// Check if this is a WSL path (starts with /mnt/ or /home)
+		if root_path.starts_with("/mnt/") || root_path.starts_with("/home") {
+			Self::search_git_directories_wsl(root_path, found_dirs, searches, search_id, os_session_kind);
+		} else {
+			Self::search_git_directories_local(root_path, found_dirs, searches, search_id);
+		}
+	}
+
+	fn search_git_directories_local(
+		root_path: &str,
+		found_dirs: &mut Vec<String>,
+		searches: &Arc<Mutex<HashMap<String, GitSearchResult>>>,
+		search_id: &str,
+	) {
+		let walker = WalkDir::new(root_path)
+			.follow_links(false)
+			.into_iter()
+			.filter_entry(|e| {
+				// Skip hidden directories except .git
+				if let Some(name) = e.file_name().to_str() {
+					if name.starts_with('.') && name != ".git" {
+						return false;
+					}
+				}
+				true
+			});
+
+		for entry in walker {
+			if let Ok(entry) = entry {
+				if entry.file_type().is_dir() {
+					if let Some(dir_name) = entry.file_name().to_str() {
+						if dir_name == ".git" {
+							// Found a git directory, add its parent
+							if let Some(parent) = entry.path().parent() {
+								let git_repo_path = parent.to_string_lossy().replace('\\', "/");
+								found_dirs.push(git_repo_path.clone());
+
+								// Update the search results
+								let mut searches_lock = searches.lock().unwrap();
+								if let Some(result) = searches_lock.get_mut(search_id) {
+									result.directories.push(git_repo_path);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	#[cfg(target_os = "windows")]
+	fn search_git_directories_wsl(
+		root_path: &str,
+		found_dirs: &mut Vec<String>,
+		searches: &Arc<Mutex<HashMap<String, GitSearchResult>>>,
+		search_id: &str,
+		os_session_kind: &OsSessionKind,
+	) {
+		// Extract WSL distribution from OsSessionKind
+		let distribution = match os_session_kind {
+			OsSessionKind::Wsl(dist_name) => dist_name.clone(),
+			_ => {
+				// Try to get first available WSL distribution
+				if let Ok(available) = OsSessionKind::list_available() {
+					for session in available {
+						if let OsSessionKind::Wsl(dist_name) = session {
+							return Self::search_git_directories_wsl(root_path, found_dirs, searches, search_id, &OsSessionKind::Wsl(dist_name));
+						}
+					}
+				}
+				return; // No WSL distribution available
+			}
+		};
+
+		// Skip path existence check - let find handle non-existent paths
+
+		// Use WSL find command to search for .git directories
+		// Limit depth to avoid very deep searches and improve performance
+		let find_command = format!("find '{}' -maxdepth 6 -name '.git' -type d 2>/dev/null", root_path.replace("'", "'\"'\"'"));
+		
+		let output = Command::new("wsl")
+			.arg("-d")
+			.arg(&distribution)
+			.arg("bash")
+			.arg("-c")
+			.arg(&find_command)
+			.output();
+
+		if let Ok(output) = output {
+			if output.status.success() {
+				let output_str = String::from_utf8_lossy(&output.stdout);
+				
+				for line in output_str.lines() {
+					let git_path = line.trim();
+					if !git_path.is_empty() && git_path.ends_with("/.git") {
+						// Get the parent directory (remove /.git)
+						let repo_path = &git_path[..git_path.len() - 5];
+						let normalized_path = repo_path.replace('\\', "/");
+						
+						found_dirs.push(normalized_path.clone());
+
+						// Update the search results
+						let mut searches_lock = searches.lock().unwrap();
+						if let Some(result) = searches_lock.get_mut(search_id) {
+							result.directories.push(normalized_path);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	#[cfg(not(target_os = "windows"))]
+	fn search_git_directories_wsl(
+		_root_path: &str,
+		_found_dirs: &mut Vec<String>,
+		_searches: &Arc<Mutex<HashMap<String, GitSearchResult>>>,
+		_search_id: &str,
+		_os_session_kind: &OsSessionKind,
+	) {
+		// WSL search is only available on Windows
 	}
 }
