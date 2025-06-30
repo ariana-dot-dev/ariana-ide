@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DiffSummary, MainLogicChange, DiffChange, SubLogicPath, GitDiffFile, GitDiffLine, GitBranch, GitCommit, BranchComparison } from "../types/diff";
 import { diffService } from "../services/DiffService";
@@ -364,15 +364,25 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
     
     if (change && change.files[currentFileIndex]) {
       const currentFile = change.files[currentFileIndex];
+      console.log(`[HUNK_NAV] Current hunk index: ${currentLineIndex}, Total hunks: ${currentFile.hunks.length}`);
       if (currentLineIndex < currentFile.hunks.length - 1) {
-        setCurrentLineIndex(currentLineIndex + 1);
+        const newIndex = currentLineIndex + 1;
+        console.log(`[HUNK_NAV] Moving to next hunk: ${newIndex}`);
+        setCurrentLineIndex(newIndex);
+      } else {
+        console.log(`[HUNK_NAV] Already at last hunk`);
       }
     }
   };
 
   const navigateToPreviousHunk = () => {
+    console.log(`[HUNK_NAV] Current hunk index: ${currentLineIndex}`);
     if (currentLineIndex > 0) {
-      setCurrentLineIndex(currentLineIndex - 1);
+      const newIndex = currentLineIndex - 1;
+      console.log(`[HUNK_NAV] Moving to previous hunk: ${newIndex}`);
+      setCurrentLineIndex(newIndex);
+    } else {
+      console.log(`[HUNK_NAV] Already at first hunk`);
     }
   };
 
@@ -871,6 +881,14 @@ function DetailedMode({
             event.preventDefault();
             onPreviousChange();
             break;
+          case 'j':
+            event.preventDefault();
+            onNextHunk();
+            break;
+          case 'k':
+            event.preventDefault();
+            onPreviousHunk();
+            break;
         }
       }
     };
@@ -911,6 +929,12 @@ function DetailedMode({
             </p>
             <p className="text-xs text-[var(--base-500)]">
               Hunk {currentLineIndex + 1} of {currentFile.hunks.length}
+              {currentFile.hunks[currentLineIndex] && (
+                <span className="ml-2">
+                  (Lines -{currentFile.hunks[currentLineIndex].oldStart},{currentFile.hunks[currentLineIndex].oldCount} 
+                  +{currentFile.hunks[currentLineIndex].newStart},{currentFile.hunks[currentLineIndex].newCount})
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -961,7 +985,7 @@ function DetailedMode({
               onClick={onPreviousHunk}
               disabled={currentLineIndex <= 0}
               className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Previous Hunk (Ctrl+↑)"
+              title="Previous Hunk (K or Ctrl+↑)"
             >
               ◀
             </button>
@@ -969,7 +993,7 @@ function DetailedMode({
               onClick={onNextHunk}
               disabled={currentLineIndex >= currentFile.hunks.length - 1}
               className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Next Hunk (Ctrl+↓)"
+              title="Next Hunk (J or Ctrl+↓)"
             >
               ▶
             </button>
@@ -991,7 +1015,7 @@ function DetailedMode({
       </div>
 
       {/* File Diff Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 relative">
         <FileDiffViewer file={currentFile} currentHunkIndex={currentLineIndex} />
       </div>
     </div>
@@ -1001,35 +1025,195 @@ function DetailedMode({
 // File Diff Viewer Component
 interface FileDiffViewerProps {
   file: GitDiffFile;
+  currentHunkIndex?: number;
 }
 
-function FileDiffViewer({ file }: FileDiffViewerProps) {
+function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
+  const currentHunkRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Debug container dimensions
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      console.log('[DEBUG] Container dimensions:', {
+        clientHeight: container.clientHeight,
+        scrollHeight: container.scrollHeight,
+        offsetHeight: container.offsetHeight,
+        isScrollable: container.scrollHeight > container.clientHeight
+      });
+    }
+  }, []);
+
+  // Scroll to current hunk when it changes
+  useEffect(() => {
+    if (currentHunkRef.current && scrollContainerRef.current) {
+      const scrollContainer = scrollContainerRef.current;
+      const hunkElement = currentHunkRef.current;
+      
+      // Calculate the position to scroll to (center the hunk in the view)
+      const containerHeight = scrollContainer.clientHeight;
+      const hunkTop = hunkElement.offsetTop;
+      const hunkHeight = hunkElement.clientHeight;
+      
+      // Calculate scroll position to center the hunk
+      const scrollTop = hunkTop - (containerHeight / 2) + (hunkHeight / 2);
+      
+      console.log(`[SCROLL] Scrolling to hunk ${currentHunkIndex}`);
+      console.log(`[SCROLL] Container height: ${containerHeight}, Hunk top: ${hunkTop}, Target scroll: ${scrollTop}`);
+      console.log(`[SCROLL] Container scrollable: ${scrollContainer.scrollHeight > scrollContainer.clientHeight}`);
+      
+      if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+        scrollContainer.scrollTo({
+          top: Math.max(0, scrollTop),
+          behavior: 'smooth'
+        });
+      } else {
+        console.log('[SCROLL] Container is not scrollable - content fits within container');
+      }
+    }
+  }, [currentHunkIndex]);
+
+  // Track scroll progress
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollContainerRef.current) {
+        const scrollContainer = scrollContainerRef.current;
+        const scrollTop = scrollContainer.scrollTop;
+        const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+        const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+        setScrollProgress(progress);
+        
+        console.log(`[SCROLL_PROGRESS] ScrollTop: ${scrollTop}, ScrollHeight: ${scrollHeight}, Progress: ${progress}%`);
+        console.log(`[SCROLL_PROGRESS] Container dimensions: ${scrollContainer.clientHeight}x${scrollContainer.scrollHeight}`);
+      }
+    };
+
+    if (scrollContainerRef.current) {
+      const scrollContainer = scrollContainerRef.current;
+      console.log('[SCROLL_PROGRESS] Attaching scroll listener to container:', scrollContainer);
+      scrollContainer.addEventListener('scroll', handleScroll);
+      // Initial scroll progress calculation
+      handleScroll();
+      
+      return () => {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, []);
+
   return (
-    <div className="p-4">
-      <div className="bg-[var(--base-200)] rounded-lg overflow-hidden">
-        <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)]">
-          <div className="flex items-center justify-between">
-            <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
-            <div className="flex items-center space-x-4 text-sm">
-              <span className="text-green-600">+{file.additions}</span>
-              <span className="text-red-600">-{file.deletions}</span>
-            </div>
+    <div ref={scrollContainerRef} className="absolute inset-0 overflow-auto">
+      <div className="relative min-h-full">
+        {/* Scroll Progress Indicator */}
+        <div className="fixed right-4 top-20 z-20 bg-[var(--base-800)]/90 text-white px-3 py-1 rounded-md text-xs border border-[var(--base-600)]/30">
+          <div className="flex items-center space-x-1">
+            <span className="text-[var(--base-300)]">Scroll:</span>
+            <span className="font-medium">{Math.round(scrollProgress)}%</span>
+          </div>
+        </div>
+        
+        {/* Scroll to Top Button */}
+        {scrollProgress > 10 && (
+          <button
+            onClick={() => {
+              if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+            className="fixed right-4 top-28 z-20 bg-[var(--acc-500)] text-white p-1 rounded-full hover:bg-[var(--acc-600)] transition-colors"
+            title="Scroll to top"
+          >
+            ↑
+          </button>
+        )}
+        
+        {/* Mini Hunk Map */}
+        <div className="fixed right-4 top-40 z-20 bg-[var(--base-200)] border border-[var(--base-300)] rounded p-1">
+          <div className="text-xs text-[var(--base-600)] mb-1">Hunks ({file.hunks.length})</div>
+          <div className="space-y-0.5 max-h-32 overflow-y-auto">
+            {file.hunks.map((_, hunkIndex) => (
+              <div
+                key={hunkIndex}
+                className={cn(
+                  "w-3 h-1 rounded-sm cursor-pointer transition-colors",
+                  hunkIndex === currentHunkIndex 
+                    ? "bg-[var(--acc-500)]" 
+                    : "bg-[var(--base-400)] hover:bg-[var(--base-500)]"
+                )}
+                onClick={() => {
+                  // Scroll to specific hunk when clicked
+                  const hunkElement = document.querySelector(`[data-hunk-index="${hunkIndex}"]`) as HTMLElement;
+                  
+                  if (hunkElement && scrollContainerRef.current) {
+                    const scrollContainer = scrollContainerRef.current;
+                    const containerHeight = scrollContainer.clientHeight;
+                    const hunkTop = hunkElement.offsetTop;
+                    const scrollTop = hunkTop - (containerHeight / 2);
+                    
+                    scrollContainer.scrollTo({
+                      top: Math.max(0, scrollTop),
+                      behavior: 'smooth'
+                    });
+                  }
+                }}
+                title={`Jump to Hunk ${hunkIndex + 1}: Lines ${file.hunks[hunkIndex].oldStart}-${file.hunks[hunkIndex].oldStart + file.hunks[hunkIndex].oldCount}`}
+              />
+            ))}
           </div>
         </div>
 
-        {file.hunks.map((hunk, hunkIndex) => (
-          <div key={hunkIndex} className="border-b border-[var(--base-400)] last:border-b-0">
-            <div className="bg-[var(--base-250)] px-4 py-1 text-xs font-mono text-[var(--base-600)]">
-              @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+        <div className="p-4">
+          <div className="bg-[var(--base-200)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
+                <div className="flex items-center space-x-4 text-sm">
+                  <span className="text-green-600">+{file.additions}</span>
+                  <span className="text-red-600">-{file.deletions}</span>
+                  <span className="text-[var(--base-600)]">
+                    Hunk {currentHunkIndex + 1}/{file.hunks.length}
+                  </span>
+                </div>
+              </div>
             </div>
-            
-            <div className="divide-y divide-[var(--base-300)]">
-              {hunk.lines.map((line, lineIndex) => (
-                <DiffLine key={lineIndex} line={line} />
-              ))}
-            </div>
+
+            {file.hunks.map((hunk, hunkIndex) => (
+              <div 
+                key={hunkIndex} 
+                data-hunk-index={hunkIndex}
+                ref={hunkIndex === currentHunkIndex ? currentHunkRef : null}
+                className={cn(
+                  "border-b border-[var(--base-400)] last:border-b-0 transition-all duration-300",
+                  hunkIndex === currentHunkIndex ? "ring-2 ring-[var(--acc-500)] ring-opacity-50 shadow-lg" : ""
+                )}
+              >
+                <div className={cn(
+                  "px-4 py-2 text-xs font-mono sticky top-12 z-5 transition-colors duration-300",
+                  hunkIndex === currentHunkIndex 
+                    ? "bg-[var(--acc-200)] text-[var(--acc-800)] border-l-4 border-[var(--acc-500)]" 
+                    : "bg-[var(--base-250)] text-[var(--base-600)]"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <span>
+                      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+                    </span>
+                    {hunkIndex === currentHunkIndex && (
+                      <span className="text-[var(--acc-600)] font-medium text-xs">← Current</span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="divide-y divide-[var(--base-300)]">
+                  {hunk.lines.map((line, lineIndex) => (
+                    <DiffLine key={lineIndex} line={line} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -1428,8 +1612,7 @@ function BranchSelectionPage({
                   {selectedTargetCommit === 'STAGED' && "Comparing staged changes against HEAD"}
                   {selectedBaseCommit === 'UNSTAGED' && "Comparing unstaged changes against HEAD"}
                   {selectedBaseCommit === 'STAGED' && "Comparing staged changes against HEAD"}
-                  {(selectedTargetCommit !== 'UNSTAGED' && selectedTargetCommit !== 'STAGED' && 
-                    selectedBaseCommit !== 'UNSTAGED' && selectedBaseCommit !== 'STAGED') && 
+                  {(selectedTargetCommit !== 'UNSTAGED' && selectedTargetCommit !== 'STAGED' && selectedBaseCommit !== 'UNSTAGED' && selectedBaseCommit !== 'STAGED') && 
                     `Comparing changes from ${selectedTargetBranch} against ${selectedBaseBranch}`}
                 </span>
               </div>
