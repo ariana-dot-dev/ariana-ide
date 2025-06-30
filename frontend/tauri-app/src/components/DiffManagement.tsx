@@ -959,26 +959,6 @@ function DetailedMode({
             </button>
           </div>
 
-          {/* File Navigation */}
-          <div className="flex items-center space-x-1 mr-2">
-            <button
-              onClick={onPreviousFile}
-              disabled={currentFileIndex <= 0}
-              className="px-2 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Previous File (Ctrl+←)"
-            >
-              ↑
-            </button>
-            <button
-              onClick={onNextFile}
-              disabled={currentFileIndex >= change.files.length - 1}
-              className="px-2 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Next File (Ctrl+→)"
-            >
-              ↓
-            </button>
-          </div>
-
           {/* Hunk Navigation */}
           <div className="flex items-center space-x-1 mr-2">
             <button
@@ -1106,64 +1086,6 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
   return (
     <div ref={scrollContainerRef} className="absolute inset-0 overflow-auto">
       <div className="relative min-h-full">
-        {/* Scroll Progress Indicator */}
-        <div className="fixed right-4 top-20 z-20 bg-[var(--base-800)]/90 text-white px-3 py-1 rounded-md text-xs border border-[var(--base-600)]/30">
-          <div className="flex items-center space-x-1">
-            <span className="text-[var(--base-300)]">Scroll:</span>
-            <span className="font-medium">{Math.round(scrollProgress)}%</span>
-          </div>
-        </div>
-        
-        {/* Scroll to Top Button */}
-        {scrollProgress > 10 && (
-          <button
-            onClick={() => {
-              if (scrollContainerRef.current) {
-                scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-              }
-            }}
-            className="fixed right-4 top-28 z-20 bg-[var(--acc-500)] text-white p-1 rounded-full hover:bg-[var(--acc-600)] transition-colors"
-            title="Scroll to top"
-          >
-            ↑
-          </button>
-        )}
-        
-        {/* Mini Hunk Map */}
-        <div className="fixed right-4 top-40 z-20 bg-[var(--base-200)] border border-[var(--base-300)] rounded p-1">
-          <div className="text-xs text-[var(--base-600)] mb-1">Hunks ({file.hunks.length})</div>
-          <div className="space-y-0.5 max-h-32 overflow-y-auto">
-            {file.hunks.map((_, hunkIndex) => (
-              <div
-                key={hunkIndex}
-                className={cn(
-                  "w-3 h-1 rounded-sm cursor-pointer transition-colors",
-                  hunkIndex === currentHunkIndex 
-                    ? "bg-[var(--acc-500)]" 
-                    : "bg-[var(--base-400)] hover:bg-[var(--base-500)]"
-                )}
-                onClick={() => {
-                  // Scroll to specific hunk when clicked
-                  const hunkElement = document.querySelector(`[data-hunk-index="${hunkIndex}"]`) as HTMLElement;
-                  
-                  if (hunkElement && scrollContainerRef.current) {
-                    const scrollContainer = scrollContainerRef.current;
-                    const containerHeight = scrollContainer.clientHeight;
-                    const hunkTop = hunkElement.offsetTop;
-                    const scrollTop = hunkTop - (containerHeight / 2);
-                    
-                    scrollContainer.scrollTo({
-                      top: Math.max(0, scrollTop),
-                      behavior: 'smooth'
-                    });
-                  }
-                }}
-                title={`Jump to Hunk ${hunkIndex + 1}: Lines ${file.hunks[hunkIndex].oldStart}-${file.hunks[hunkIndex].oldStart + file.hunks[hunkIndex].oldCount}`}
-              />
-            ))}
-          </div>
-        </div>
-
         <div className="p-4">
           <div className="bg-[var(--base-200)] rounded-lg overflow-hidden">
             <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] sticky top-0 z-10">
