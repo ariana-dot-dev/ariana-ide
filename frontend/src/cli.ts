@@ -1,11 +1,11 @@
-import { program } from "commander";
-import inquirer from "inquirer";
-import axios, { AxiosError } from "axios";
-import fs from "fs/promises";
-import path from "path";
-import os from "os";
+import axios, { type AxiosError } from "axios";
 import { spawn } from "child_process";
+import { program } from "commander";
 import dotenv from "dotenv";
+import fs from "fs/promises";
+import inquirer from "inquirer";
+import os from "os";
+import path from "path";
 import { fileURLToPath } from "url";
 
 // Define types for better safety

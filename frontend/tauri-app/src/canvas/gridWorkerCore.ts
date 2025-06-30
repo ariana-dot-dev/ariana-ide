@@ -88,8 +88,7 @@ class WorkerGridOptimizer {
 
 		const targetPos = targetPositions[target];
 		const distance = Math.sqrt(
-			Math.pow(normalizedX - targetPos.x, 2) +
-				Math.pow(normalizedY - targetPos.y, 2),
+			(normalizedX - targetPos.x) ** 2 + (normalizedY - targetPos.y) ** 2,
 		);
 		return 1 - Math.min(distance / Math.sqrt(2), 1);
 	}
@@ -108,13 +107,11 @@ class WorkerGridOptimizer {
 		const newCenterY = cell.y + cell.height / 2;
 
 		const distance = Math.sqrt(
-			Math.pow(newCenterX - prevCenterX, 2) +
-				Math.pow(newCenterY - prevCenterY, 2),
+			(newCenterX - prevCenterX) ** 2 + (newCenterY - prevCenterY) ** 2,
 		);
 
 		const maxDistance = Math.sqrt(
-			Math.pow(this.config.canvasWidth, 2) +
-				Math.pow(this.config.canvasHeight, 2),
+			this.config.canvasWidth ** 2 + this.config.canvasHeight ** 2,
 		);
 		const normalizedDistance = distance / maxDistance;
 
@@ -273,7 +270,7 @@ class WorkerGridOptimizer {
 }
 
 // Worker message handler
-self.onmessage = function (event) {
+self.onmessage = (event) => {
 	const { type, payload } = event.data;
 
 	if (type === "OPTIMIZE_GRID") {

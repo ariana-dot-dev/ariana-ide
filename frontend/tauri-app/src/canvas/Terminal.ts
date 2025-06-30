@@ -1,5 +1,5 @@
 import { OsSession, osSessionToString } from "../bindings/os";
-import { CanvasElement, ElementTargets } from "./types";
+import { CanvasElement, type ElementTargets } from "./types";
 
 export class Terminal {
 	private _osSession: OsSession;

@@ -51,7 +51,7 @@ export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
 	const canProceed = selectedKind && selectedPath;
 
 	return (
-		<div className="flex flex-col items-center justify-center w-full max-h-full">
+		<div className="flex flex-col items-center justify-center w-full h-full max-h-full">
 			<div className="flex justify-center items-center gap-8 max-w-4xl w-full h-full max-h-full">
 				{/* OS Session Kind Selector */}
 				<div className="flex-shrink-0" style={{ width: selectedKind ? '300px' : '400px' }}>
@@ -63,7 +63,7 @@ export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
 
 				{/* Project Directory List - only show when kind is selected */}
 				{selectedKind && (
-					<div className="flex-1 overflow-y-auto max-h-full overflow-x-hidden">
+					<div className="flex-1 h-full max-h-full">
 						<ProjectDirectoryList
 							osSessionKind={selectedKind}
 							onSelect={handlePathSelect}

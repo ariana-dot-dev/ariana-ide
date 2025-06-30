@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import Canvas from "./canvas/Canvas";
 import { Rectangle } from "./canvas/Rectangle";
 import { Terminal } from "./canvas/Terminal";
-import { CanvasElement } from "./canvas/types";
-import { cn } from "./utils";
 import { TextArea } from "./canvas/TextArea";
+import type { CanvasElement } from "./canvas/types";
+import { cn } from "./utils";
 
 interface CanvasViewProps {
 	onAddElementRef?: React.RefObject<((element: CanvasElement) => void) | null>;

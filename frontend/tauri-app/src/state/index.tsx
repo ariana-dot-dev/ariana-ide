@@ -1,12 +1,12 @@
+import { load, type Store } from "@tauri-apps/plugin-store";
 import {
 	createContext,
+	type ReactNode,
 	useContext,
-	useState,
-	useMemo,
-	ReactNode,
 	useEffect,
+	useMemo,
+	useState,
 } from "react";
-import { load, Store } from "@tauri-apps/plugin-store";
 import { Command } from "../scripting/baseScript";
 import { OsSession } from "../bindings/os";
 

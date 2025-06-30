@@ -1,4 +1,4 @@
-import { CanvasElement, ElementTargets } from "./types";
+import { CanvasElement, type ElementTargets } from "./types";
 
 export class TextArea {
 	public id: string;

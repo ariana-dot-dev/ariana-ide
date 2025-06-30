@@ -45,6 +45,11 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	private startTime: number = 0;
 	private logPrefix: string;
 	private hasSeenTryPrompt = false;
+	private hasSeenTrustPrompt = false;
+	private isProcessingEvents = false;
+	private eventQueue: TerminalEvent[][] = [];
+	private lastActivityTime: number = 0;
+	private completionTimeoutId: NodeJS.Timeout | null = null;
 
 	constructor() {
 		super();
@@ -237,6 +242,14 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 		this.currentPrompt = null;
 		this.screenLines = [];
 		this.hasSeenTryPrompt = false;
+		this.hasSeenTrustPrompt = false;
+		this.isProcessingEvents = false;
+		this.eventQueue = [];
+		this.lastActivityTime = 0;
+		if (this.completionTimeoutId) {
+			clearTimeout(this.completionTimeoutId);
+			this.completionTimeoutId = null;
+		}
 		this.removeAllListeners();
 	}
 
@@ -246,10 +259,32 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 		if (!this.terminalId) return;
 
 		this.onTerminalEvent(this.terminalId, (events: TerminalEvent[]) => {
-			this.handleTerminalEvents(events).catch((error) => {
-				console.error(this.logPrefix, "Error handling terminal events:", error);
-			});
+			this.queueEventBatch(events);
 		});
+	}
+
+	private queueEventBatch(events: TerminalEvent[]): void {
+		this.eventQueue.push(events);
+		this.processEventQueue();
+	}
+
+	private async processEventQueue(): Promise<void> {
+		if (this.isProcessingEvents || this.eventQueue.length === 0) {
+			return;
+		}
+
+		this.isProcessingEvents = true;
+
+		try {
+			while (this.eventQueue.length > 0) {
+				const events = this.eventQueue.shift()!;
+				await this.handleTerminalEvents(events);
+			}
+		} catch (error) {
+			console.error(this.logPrefix, "Error processing event queue:", error);
+		} finally {
+			this.isProcessingEvents = false;
+		}
 	}
 
 	private async handleTerminalEvents(events: TerminalEvent[]): Promise<void> {
@@ -333,6 +368,10 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			}
 		}
 
+		// Update last activity time
+		this.lastActivityTime = Date.now();
+		this.resetCompletionTimeout();
+
 		// Get current TUI lines for CLI agents library
 		const tuiLines = this.getCurrentTuiLines();
 		// Emit screen update event
@@ -340,9 +379,6 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 		// Process TUI interactions based on new lines
 		await this.processTuiInteraction(tuiLines);
-
-		// Check for task completion patterns
-		this.checkForTaskCompletion();
 	}
 
 	private async initializeClaudeCode(): Promise<void> {
@@ -438,52 +474,40 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 		await this.sendRawInput(this.terminalId, keyData);
 	}
 
-	private checkForTaskCompletion(): void {
-		if (!this.terminalId) return;
-
-		try {
-			const recentLines = this.screenLines
-				.slice(-5)
-				.map((line) => line.map((item) => item.lexeme).join(""));
-			const recentText = recentLines.join("\n").toLowerCase();
-
-			// Look for common completion patterns
-			if (
-				recentText.includes("task completed") ||
-				recentText.includes("✓") ||
-				recentText.includes("finished") ||
-				recentText.includes("done") ||
-				(recentText.includes("$") && !this.hasRecentActivity())
-			) {
-				// Task likely completed
-				setTimeout(() => {
-					this.handleTaskCompletion();
-				}, 2000); // Wait a bit to ensure it's really done
-			}
-		} catch (error) {
-			console.error("Error checking for task completion:", error);
+	private resetCompletionTimeout(): void {
+		if (this.completionTimeoutId) {
+			clearTimeout(this.completionTimeoutId);
+		}
+		
+		// Only set timeout if we've seen the Try prompt (task has started)
+		if (this.hasSeenTryPrompt) {
+			this.completionTimeoutId = setTimeout(() => {
+				this.handleTaskCompletion();
+			}, 5000); // 5 seconds of inactivity
 		}
 	}
 
-	private hasRecentActivity(): boolean {
-		// Simple heuristic: if we've seen new content in the last few seconds
-		// This is a placeholder - in practice you'd want more sophisticated detection
-		return false;
-	}
-
 	private async handleTaskCompletion(): Promise<void> {
-		const elapsed = Date.now() - this.startTime;
+		if (!this.terminalId || !this.hasSeenTryPrompt) return;
 
-		// Create a simple result object
-		const result: ClaudeCodeTaskResult = {
-			elapsed,
-			tokens: undefined, // Would need to parse from Claude output
-			diff: {
-				file_changes: [], // Would need to compute actual file changes
-			},
-		};
-
-		this.isRunning = false;
+		console.log(
+			this.logPrefix,
+			"Task appears to be complete after 5 seconds of inactivity, sending Ctrl+D twice...",
+		);
+		
+		try {
+			await this.sendCtrlD(this.terminalId);
+			await this.delay(Math.random() * 500 + 500);
+			await this.sendCtrlD(this.terminalId);
+			
+			const elapsed = Date.now() - this.startTime;
+			this.emit("taskCompleted", {
+				prompt: this.currentPrompt,
+				elapsed,
+			});
+		} catch (error) {
+			console.error(this.logPrefix, "Error sending completion sequence:", error);
+		}
 	}
 
 	private async processTuiInteraction(tuiLines: TuiLine[]): Promise<void> {
@@ -509,13 +533,14 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			line.includes("Do you trust the files in this folder?"),
 		);
 
-		if (hasEnterToConfirm && hasTrustQuestion) {
+		if (hasEnterToConfirm && hasTrustQuestion && !this.hasSeenTrustPrompt) {
 			console.log(
 				this.logPrefix,
 				"Found trust confirmation prompt, sending Enter...",
 			);
-			await this.delay(1000);
+			await this.delay(Math.random() * 500 + 500);
 			await this.sendRawInput(this.terminalId, "\r");
+			this.hasSeenTrustPrompt = true;
 			return;
 		}
 
@@ -541,26 +566,22 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 				this.currentPrompt,
 			);
 			this.hasSeenTryPrompt = true;
-			await this.sendRawInput(this.terminalId, this.currentPrompt);
-			await this.delay(1000);
+			// Send the prompt key by key, simulating typing
+			for (const char of this.currentPrompt) {
+				if (char === "\n") {
+					await this.sendRawInput(this.terminalId, "\\");
+					await this.delay(Math.random() * 50 + 50);
+					await this.sendRawInput(this.terminalId, "\r");
+				} else {
+					await this.sendRawInput(this.terminalId, char);
+				}
+				await this.delay(Math.random() * 50 + 50);
+			}
+			await this.delay(Math.random() * 500 + 500);
 			await this.sendRawInput(this.terminalId, "\r");
 			return;
 		}
 
-		// Check for task completion: "│ > " without "Try"
-		const hasPromptWithoutTry = newLines.some(
-			(line) => line.includes("│ > ") && !line.includes("│ > Try"),
-		);
-		if (hasPromptWithoutTry && this.hasSeenTryPrompt) {
-			console.log(
-				this.logPrefix,
-				"Task appears to be complete, sending Ctrl+D twice...",
-			);
-			await this.sendCtrlD(this.terminalId);
-			await this.delay(1000);
-			await this.sendCtrlD(this.terminalId);
-			return;
-		}
 
 		// Check for "esc to interrupt" - do nothing
 		const hasEscToInterrupt = newLines.some((line) =>

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { readTextFile } from "@tauri-apps/plugin-fs";
 import { homeDir, join } from "@tauri-apps/api/path";
+import { readTextFile } from "@tauri-apps/plugin-fs";
+import { useEffect, useState } from "react";
 
 interface UserConfig {
 	email: string;

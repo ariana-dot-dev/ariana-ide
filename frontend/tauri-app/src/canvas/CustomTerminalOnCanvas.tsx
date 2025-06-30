@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, PanInfo } from "framer-motion";
+import { motion, type PanInfo } from "framer-motion";
+import type React from "react";
+import { useState } from "react";
 import { cn } from "../utils";
-import { CanvasElement, ElementLayout } from "./types";
 import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
-import { TerminalSpec } from "../services/CustomTerminalAPI";
+import type { CanvasElement, ElementLayout } from "./types";
+import { OsSession } from "../bindings/os";
 
 interface CustomTerminalOnCanvasProps {
 	layout: ElementLayout;
-	spec: TerminalSpec;
+	osSession: OsSession;
 	onDragStart: (element: CanvasElement) => void;
 	onDragEnd: (element: CanvasElement) => void;
 	onDrag: (
@@ -22,7 +23,7 @@ interface CustomTerminalOnCanvasProps {
 
 const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 	layout,
-	spec,
+	osSession,
 	onDragStart: propOnDragStart,
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
@@ -127,7 +128,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 				<div className={cn("w-full h-full pointer-events-auto")}>
 					<CustomTerminalRenderer
 						elementId={element.id}
-						spec={spec}
+						osSession={osSession}
 						onTerminalReady={handleTerminalReady}
 						onTerminalError={handleTerminalError}
 						fontSize="sm"

@@ -248,8 +248,8 @@ function App() {
 
 					{/* Show ProjectSelector if no current session, otherwise show CanvasView */}
 					{!store.currentOsSessionId ? (
-						<div className="z-10 justify-self-center h-[95%] max-h-[95%] flex flex-col items-center justify-center">
-							<div className="flex flex-col items-center gap-3 mb-4 opacity-50 text-[var(--acc-700)]">
+						<div className="z-10 justify-self-center h-full w-full max-h-full flex flex-col items-center justify-center">
+							<div className="flex flex-col items-center h-fit gap-3 opacity-50 text-[var(--acc-700)]">
 								<div className="w-32">
 									<Logo className="" />
 								</div>
@@ -257,7 +257,9 @@ function App() {
 									Welcome to the Ariana IDE
 								</h1>
 							</div>
-							<ProjectSelector onSessionCreated={() => {}} />
+							<div className="h-fit max-h-[50%] w-full">
+								<ProjectSelector onSessionCreated={() => {}} />
+							</div>
 						</div>
 					) : (
 						<>

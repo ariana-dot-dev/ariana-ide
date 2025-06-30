@@ -11,7 +11,7 @@ export type Command =
 			themeName: string;
 	  };
 
-let __result: Command[] = [];
+const __result: Command[] = [];
 // </hide>
 
 class Onboarding {

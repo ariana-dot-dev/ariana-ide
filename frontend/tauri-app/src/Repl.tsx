@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { InterpreterContext } from "./App";
-import { cn } from "./utils";
 import { useStore } from "./state";
+import { cn } from "./utils";
 
 const Repl = () => {
 	const { currentInterpreterScript } = useStore();

@@ -5,15 +5,15 @@ import {
 	defaultLineItem,
 	type LineItem,
 	type TerminalEvent,
-	type TerminalSpec,
 	type CustomTerminalAPI,
 } from "../services/CustomTerminalAPI";
 import { useStore } from "../state";
 import { cn } from "../utils";
+import { OsSession } from "../bindings/os";
 
 interface CustomTerminalRendererProps {
 	elementId: string;
-	spec?: TerminalSpec;
+	osSession?: OsSession;
 	existingTerminalId?: string;
 	terminalAPI?: CustomTerminalAPI;
 	onTerminalReady?: (terminalId: string) => void;
@@ -44,7 +44,7 @@ class TerminalConnectionManager {
 
 export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 	elementId,
-	spec,
+	osSession,
 	existingTerminalId,
 	terminalAPI,
 	onTerminalReady,
@@ -102,7 +102,6 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 		const connectTerminal = async () => {
 			console.log(logPrefix, "Connecting terminal...");
 			console.log(logPrefix, "existingTerminalId:", existingTerminalId);
-			console.log(logPrefix, "spec:", spec);
 			console.log(logPrefix, "current terminalId:", terminalId);
 
 			// If we have an existing terminal ID passed in, use that
@@ -158,13 +157,12 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 				return;
 			}
 
-			// Don't create new connection if no spec provided (headless case)
-			if (!spec) {
+			if (!osSession) {
 				return;
 			}
 
 			try {
-				const id = await api.connectTerminal(spec);
+				const id = await api.connectTerminal(osSession);
 				// if (!mounted) return;
 
 				// Store the connection mapping

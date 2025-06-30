@@ -12,10 +12,10 @@ import {
 } from "./gridWorker";
 import type { Rectangle } from "./Rectangle";
 import RectangleOnCanvas from "./RectangleOnCanvas";
-import type { Terminal, TerminalConfig } from "./Terminal";
 import TerminalOnCanvas from "./TerminalOnCanvas";
-import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
 import TextAreaOnCanvas from "./TextAreaOnCanvas";
+import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
+import { useStore } from "../state";
 
 interface CanvasProps {
 	elements: CanvasElement[];
@@ -48,6 +48,8 @@ const Canvas: React.FC<CanvasProps> = ({
 	stabilityWeight = 0.1,
 	onElementsChange,
 }) => {
+	const { currentOsSessionId, osSessions } = useStore();
+	const osSession = currentOsSessionId ? osSessions[currentOsSessionId] : null;
 	const [layouts, setLayouts] = useState<ElementLayout[]>([]);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 	const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(
@@ -258,15 +260,6 @@ const Canvas: React.FC<CanvasProps> = ({
 		[elements, onElementsChange],
 	);
 
-	const handleTerminalUpdate = useCallback(
-		(element: Terminal, newConfig: TerminalConfig) => {
-			element.updateConfig(newConfig);
-			// Trigger re-optimization by updating the elements array
-			onElementsChange([...elements]);
-		},
-		[elements, onElementsChange],
-	);
-
 	const handleFileTreeUpdate = useCallback(
 		(element: FileTreeCanvas, newTargets: ElementTargets) => {
 			element.updateTargets(newTargets);
@@ -309,18 +302,17 @@ const Canvas: React.FC<CanvasProps> = ({
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
 							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
-							onTerminalUpdate={handleTerminalUpdate}
 							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
 						/>
 					);
-				} else if ("customTerminal" in layout.element.kind) {
+				} else if ("customTerminal" in layout.element.kind && osSession) {
 					return (
 						<CustomTerminalOnCanvas
 							key={`${layout.element.id}`}
 							layout={layout}
-							spec={layout.element.kind.customTerminal.spec}
+							osSession={osSession}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
 							onDrag={layout.element === draggedElement ? handleDrag : () => {}}

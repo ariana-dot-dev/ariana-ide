@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { join, resourceDir } from "@tauri-apps/api/path";
 import { readTextFile } from "@tauri-apps/plugin-fs";
-import { resourceDir, join } from "@tauri-apps/api/path";
+import { useEffect, useState } from "react";
 
 interface BuildConfig {
 	buildParams: {

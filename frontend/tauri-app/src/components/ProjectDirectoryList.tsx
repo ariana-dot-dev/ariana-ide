@@ -72,7 +72,7 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 	};
 
 	return (
-		<div className="flex flex-col gap-2 p-4 max-h-full overflow-y-auto">
+		<div className="flex flex-col gap-2 p-4 h-fit max-h-full">
 			<div className="flex items-center gap-2">
 				<h3 className="text-lg font-semibold text-[var(--blackest)]">Repositories</h3>
 				{!isComplete && (
@@ -89,7 +89,7 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 					<span className="text-[var(--base-500)]">No repositories found</span>
 				</div>
 			) : (
-				<div className="flex flex-col gap-1">
+				<div className="flex flex-col gap-1 h-fit max-h-full overflow-y-auto overflow-x-hidden p-1">
 					{directories.map((path, index) => (
 						<button
 							key={index}
