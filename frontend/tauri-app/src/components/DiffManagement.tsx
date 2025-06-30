@@ -335,6 +335,47 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
     }
   };
 
+  const navigateToPreviousFile = () => {
+    if (!diffSummary || !selectedChange) return;
+    
+    if (currentFileIndex > 0) {
+      setCurrentFileIndex(currentFileIndex - 1);
+      setCurrentLineIndex(0);
+    }
+  };
+
+  const navigateToPreviousChange = () => {
+    if (!diffSummary || !selectedChange) return;
+    
+    const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+    const currentIndex = allChanges.findIndex(c => c.id === selectedChange);
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : allChanges.length - 1;
+    
+    setSelectedChange(allChanges[prevIndex].id);
+    setCurrentFileIndex(0);
+    setCurrentLineIndex(0);
+  };
+
+  const navigateToNextHunk = () => {
+    if (!diffSummary || !selectedChange) return;
+    
+    const change = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges]
+      .find(c => c.id === selectedChange);
+    
+    if (change && change.files[currentFileIndex]) {
+      const currentFile = change.files[currentFileIndex];
+      if (currentLineIndex < currentFile.hunks.length - 1) {
+        setCurrentLineIndex(currentLineIndex + 1);
+      }
+    }
+  };
+
+  const navigateToPreviousHunk = () => {
+    if (currentLineIndex > 0) {
+      setCurrentLineIndex(currentLineIndex - 1);
+    }
+  };
+
   const getCurrentFile = (): GitDiffFile | null => {
     if (!diffSummary || !selectedChange) return null;
     
@@ -553,7 +594,11 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
           currentLineIndex={currentLineIndex}
           onValidateChange={validateChange}
           onNextChange={navigateToNextChange}
+          onPreviousChange={navigateToPreviousChange}
           onNextFile={navigateToNextFile}
+          onPreviousFile={navigateToPreviousFile}
+          onNextHunk={navigateToNextHunk}
+          onPreviousHunk={navigateToPreviousHunk}
           onBackToOverview={() => setViewMode('overview')}
         />
       )}
@@ -771,7 +816,11 @@ interface DetailedModeProps {
   currentLineIndex: number;
   onValidateChange: (changeId: string) => void;
   onNextChange: () => void;
+  onPreviousChange: () => void;
   onNextFile: () => void;
+  onPreviousFile: () => void;
+  onNextHunk: () => void;
+  onPreviousHunk: () => void;
   onBackToOverview: () => void;
 }
 
@@ -780,11 +829,56 @@ function DetailedMode({
   selectedChange,
   currentFile,
   currentFileIndex,
+  currentLineIndex,
   onValidateChange,
   onNextChange,
+  onPreviousChange,
   onNextFile,
+  onPreviousFile,
+  onNextHunk,
+  onPreviousHunk,
   onBackToOverview
 }: DetailedModeProps) {
+  // Keyboard navigation
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 'ArrowLeft':
+            event.preventDefault();
+            onPreviousFile();
+            break;
+          case 'ArrowRight':
+            event.preventDefault();
+            onNextFile();
+            break;
+          case 'ArrowUp':
+            event.preventDefault();
+            onPreviousHunk();
+            break;
+          case 'ArrowDown':
+            event.preventDefault();
+            onNextHunk();
+            break;
+        }
+      } else {
+        switch (event.key) {
+          case 'n':
+            event.preventDefault();
+            onNextChange();
+            break;
+          case 'p':
+            event.preventDefault();
+            onPreviousChange();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onNextChange, onPreviousChange, onNextFile, onPreviousFile, onNextHunk, onPreviousHunk]);
+
   if (!selectedChange || !currentFile) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -815,24 +909,71 @@ function DetailedMode({
             <p className="text-sm text-[var(--base-600)]">
               File {currentFileIndex + 1} of {change.files.length}: {currentFile.filePath}
             </p>
+            <p className="text-xs text-[var(--base-500)]">
+              Hunk {currentLineIndex + 1} of {currentFile.hunks.length}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={onNextFile}
-            disabled={currentFileIndex >= change.files.length - 1}
-            className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next File
-          </button>
-          
-          <button
-            onClick={onNextChange}
-            className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors"
-          >
-            Next Change
-          </button>
+        {/* Navigation Controls */}
+        <div className="flex items-center space-x-1">
+          {/* Change Navigation */}
+          <div className="flex items-center space-x-1 mr-2">
+            <button
+              onClick={onPreviousChange}
+              className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
+              title="Previous Change (P)"
+            >
+              ←
+            </button>
+            <button
+              onClick={onNextChange}
+              className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
+              title="Next Change (N)"
+            >
+              →
+            </button>
+          </div>
+
+          {/* File Navigation */}
+          <div className="flex items-center space-x-1 mr-2">
+            <button
+              onClick={onPreviousFile}
+              disabled={currentFileIndex <= 0}
+              className="px-2 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              title="Previous File (Ctrl+←)"
+            >
+              ↑
+            </button>
+            <button
+              onClick={onNextFile}
+              disabled={currentFileIndex >= change.files.length - 1}
+              className="px-2 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              title="Next File (Ctrl+→)"
+            >
+              ↓
+            </button>
+          </div>
+
+          {/* Hunk Navigation */}
+          <div className="flex items-center space-x-1 mr-2">
+            <button
+              onClick={onPreviousHunk}
+              disabled={currentLineIndex <= 0}
+              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              title="Previous Hunk (Ctrl+↑)"
+            >
+              ◀
+            </button>
+            <button
+              onClick={onNextHunk}
+              disabled={currentLineIndex >= currentFile.hunks.length - 1}
+              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              title="Next Hunk (Ctrl+↓)"
+            >
+              ▶
+            </button>
+          </div>
           
           <button
             onClick={() => onValidateChange(selectedChange)}
@@ -851,7 +992,7 @@ function DetailedMode({
 
       {/* File Diff Content */}
       <div className="flex-1 overflow-auto">
-        <FileDiffViewer file={currentFile} />
+        <FileDiffViewer file={currentFile} currentHunkIndex={currentLineIndex} />
       </div>
     </div>
   );
