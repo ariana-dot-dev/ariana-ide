@@ -49,7 +49,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		Command[]
 	>([]);
 	const [osSessions, setOsSessions] = useState<Record<string, OsSession>>({});
-	const [currentOsSessionId, setCurrentOsSessionIdState] = useState<string | undefined>(undefined);
+	const [currentOsSessionId, setCurrentOsSessionIdState] = useState<
+		string | undefined
+	>(undefined);
 	const [tauriStore, setTauriStore] = useState<Store | null>(null);
 
 	// Load state from disk on initial render
@@ -92,7 +94,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			}
 		};
 		saveState();
-	}, [theme, showOnboarding, currentInterpreterScript, osSessions, currentOsSessionId]);
+	}, [
+		theme,
+		showOnboarding,
+		currentInterpreterScript,
+		osSessions,
+		currentOsSessionId,
+	]);
 
 	const setTheme = (newTheme: string) => setThemeState(newTheme);
 	const setShowOnboarding = (show: boolean) => setShowOnboardingState(show);
@@ -174,7 +182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		clearAllOsSessions: () => {
 			setOsSessions({});
 			setCurrentOsSessionIdState(undefined);
-		}
+		},
 	};
 
 	return (

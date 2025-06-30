@@ -478,7 +478,7 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 		if (this.completionTimeoutId) {
 			clearTimeout(this.completionTimeoutId);
 		}
-		
+
 		// Only set timeout if we've seen the Try prompt (task has started)
 		if (this.hasSeenTryPrompt) {
 			this.completionTimeoutId = setTimeout(() => {
@@ -494,19 +494,23 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			this.logPrefix,
 			"Task appears to be complete after 5 seconds of inactivity, sending Ctrl+D twice...",
 		);
-		
+
 		try {
 			await this.sendCtrlD(this.terminalId);
 			await this.delay(Math.random() * 500 + 500);
 			await this.sendCtrlD(this.terminalId);
-			
+
 			const elapsed = Date.now() - this.startTime;
 			this.emit("taskCompleted", {
 				prompt: this.currentPrompt,
 				elapsed,
 			});
 		} catch (error) {
-			console.error(this.logPrefix, "Error sending completion sequence:", error);
+			console.error(
+				this.logPrefix,
+				"Error sending completion sequence:",
+				error,
+			);
 		}
 	}
 
@@ -581,7 +585,6 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			await this.sendRawInput(this.terminalId, "\r");
 			return;
 		}
-
 
 		// Check for "esc to interrupt" - do nothing
 		const hasEscToInterrupt = newLines.some((line) =>

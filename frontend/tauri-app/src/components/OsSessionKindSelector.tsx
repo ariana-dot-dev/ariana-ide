@@ -8,14 +8,19 @@ interface OsSessionKindSelectorProps {
 	selectedKind?: OsSessionKind;
 }
 
-export function OsSessionKindSelector({ onSelect, selectedKind }: OsSessionKindSelectorProps) {
+export function OsSessionKindSelector({
+	onSelect,
+	selectedKind,
+}: OsSessionKindSelectorProps) {
 	const [availableKinds, setAvailableKinds] = useState<OsSessionKind[]>([]);
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
 		const loadAvailableKinds = async () => {
 			try {
-				const kinds = await invoke<OsSessionKind[]>("list_available_os_session_kinds");
+				const kinds = await invoke<OsSessionKind[]>(
+					"list_available_os_session_kinds",
+				);
 				setAvailableKinds(kinds);
 			} catch (error) {
 				console.error("Failed to load available OS session kinds:", error);
@@ -40,8 +45,12 @@ export function OsSessionKindSelector({ onSelect, selectedKind }: OsSessionKindS
 	const isSelected = (kind: OsSessionKind): boolean => {
 		if (!selectedKind) return false;
 		if (kind === "Local" && selectedKind === "Local") return true;
-		if (typeof kind === "object" && typeof selectedKind === "object" && 
-			"Wsl" in kind && "Wsl" in selectedKind) {
+		if (
+			typeof kind === "object" &&
+			typeof selectedKind === "object" &&
+			"Wsl" in kind &&
+			"Wsl" in selectedKind
+		) {
 			return kind.Wsl === selectedKind.Wsl;
 		}
 		return false;
@@ -65,9 +74,9 @@ export function OsSessionKindSelector({ onSelect, selectedKind }: OsSessionKindS
 						className={cn(
 							"p-3 rounded-md text-left transition-colors",
 							"border-2 border-[var(--base-400-50)]",
-							isSelected(kind) 
-								? "bg-[var(--acc-400-50)] text-[var(--acc-900)] border-[var(--acc-500-50)]" 
-								: "bg-[var(--base-200-50)] hover:bg-[var(--base-300-50)] text-[var(--blackest)] cursor-pointer"
+							isSelected(kind)
+								? "bg-[var(--acc-400-50)] text-[var(--acc-900)] border-[var(--acc-500-50)]"
+								: "bg-[var(--base-200-50)] hover:bg-[var(--base-300-50)] text-[var(--blackest)] cursor-pointer",
 						)}
 					>
 						{getKindLabel(kind)}

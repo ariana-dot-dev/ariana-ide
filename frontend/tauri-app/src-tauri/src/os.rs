@@ -6,8 +6,8 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use walkdir::{DirEntry, WalkDir};
 use uuid::Uuid;
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OsSessionKind {
@@ -378,26 +378,35 @@ impl GitSearchManager {
 
 	pub fn start_search(&self, os_session_kind: OsSessionKind) -> String {
 		let search_id = Uuid::new_v4().to_string();
-		
+
 		// Initialize empty result
 		{
 			let mut searches = self.searches.lock().unwrap();
-			searches.insert(search_id.clone(), GitSearchResult {
-				directories: Vec::new(),
-				is_complete: false,
-			});
+			searches.insert(
+				search_id.clone(),
+				GitSearchResult {
+					directories: Vec::new(),
+					is_complete: false,
+				},
+			);
 		}
 
 		// Start background search
 		let searches_clone = Arc::clone(&self.searches);
 		let search_id_clone = search_id.clone();
-		
+
 		thread::spawn(move || {
 			let root_dirs = Self::get_root_directories(&os_session_kind);
 			let mut found_dirs = Vec::new();
 
 			for root_dir in root_dirs {
-				Self::search_git_directories(&root_dir, &mut found_dirs, &searches_clone, &search_id_clone, &os_session_kind);
+				Self::search_git_directories(
+					&root_dir,
+					&mut found_dirs,
+					&searches_clone,
+					&search_id_clone,
+					&os_session_kind,
+				);
 			}
 
 			// Mark search as complete
@@ -462,9 +471,17 @@ impl GitSearchManager {
 	) {
 		// Check if this is a WSL path (starts with /mnt/ or /home)
 		if root_path.starts_with("/mnt/") || root_path.starts_with("/home") {
-			Self::search_git_directories_wsl(root_path, found_dirs, searches, search_id, os_session_kind);
+			Self::search_git_directories_wsl(
+				root_path,
+				found_dirs,
+				searches,
+				search_id,
+				os_session_kind,
+			);
 		} else {
-			Self::search_git_directories_local(root_path, found_dirs, searches, search_id);
+			Self::search_git_directories_local(
+				root_path, found_dirs, searches, search_id,
+			);
 		}
 	}
 
@@ -494,7 +511,8 @@ impl GitSearchManager {
 						if dir_name == ".git" {
 							// Found a git directory, add its parent
 							if let Some(parent) = entry.path().parent() {
-								let git_repo_path = parent.to_string_lossy().replace('\\', "/");
+								let git_repo_path =
+									parent.to_string_lossy().replace('\\', "/");
 								found_dirs.push(git_repo_path.clone());
 
 								// Update the search results
@@ -526,7 +544,13 @@ impl GitSearchManager {
 				if let Ok(available) = OsSessionKind::list_available() {
 					for session in available {
 						if let OsSessionKind::Wsl(dist_name) = session {
-							return Self::search_git_directories_wsl(root_path, found_dirs, searches, search_id, &OsSessionKind::Wsl(dist_name));
+							return Self::search_git_directories_wsl(
+								root_path,
+								found_dirs,
+								searches,
+								search_id,
+								&OsSessionKind::Wsl(dist_name),
+							);
 						}
 					}
 				}
@@ -538,8 +562,11 @@ impl GitSearchManager {
 
 		// Use WSL find command to search for .git directories
 		// Limit depth to avoid very deep searches and improve performance
-		let find_command = format!("find '{}' -maxdepth 6 -name '.git' -type d 2>/dev/null", root_path.replace("'", "'\"'\"'"));
-		
+		let find_command = format!(
+			"find '{}' -maxdepth 6 -name '.git' -type d 2>/dev/null",
+			root_path.replace("'", "'\"'\"'")
+		);
+
 		let output = Command::new("wsl")
 			.arg("-d")
 			.arg(&distribution)
@@ -551,14 +578,14 @@ impl GitSearchManager {
 		if let Ok(output) = output {
 			if output.status.success() {
 				let output_str = String::from_utf8_lossy(&output.stdout);
-				
+
 				for line in output_str.lines() {
 					let git_path = line.trim();
 					if !git_path.is_empty() && git_path.ends_with("/.git") {
 						// Get the parent directory (remove /.git)
 						let repo_path = &git_path[..git_path.len() - 5];
 						let normalized_path = repo_path.replace('\\', "/");
-						
+
 						found_dirs.push(normalized_path.clone());
 
 						// Update the search results
