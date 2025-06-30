@@ -888,7 +888,20 @@ function DetailedMode({
 }: DetailedModeProps) {
   // Keyboard navigation
   React.useEffect(() => {
+    let lastKeyPress: { key: string; timestamp: number } | null = null;
+    const doubleTapThreshold = 300; // milliseconds
+    
     const handleKeyDown = (event: KeyboardEvent) => {
+      const currentTime = Date.now();
+      
+      // Get the scroll container for manual scrolling
+      const scrollContainer = document.querySelector('.absolute.inset-0.overflow-auto') as HTMLElement;
+      
+      // Check for double-tap
+      const isDoubleTap = lastKeyPress && 
+        lastKeyPress.key === event.key && 
+        (currentTime - lastKeyPress.timestamp) < doubleTapThreshold;
+      
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
           case 'ArrowLeft':
@@ -910,6 +923,58 @@ function DetailedMode({
         }
       } else {
         switch (event.key) {
+          case 'ArrowUp':
+            event.preventDefault();
+            if (isDoubleTap) {
+              // Double-tap up arrow = previous hunk
+              onPreviousHunk();
+              lastKeyPress = null; // Reset to prevent triple-tap
+            } else {
+              // Single tap up arrow = scroll up manually
+              if (scrollContainer) {
+                scrollContainer.scrollBy({ top: -100, behavior: 'smooth' });
+              }
+              lastKeyPress = { key: event.key, timestamp: currentTime };
+            }
+            break;
+          case 'ArrowDown':
+            event.preventDefault();
+            if (isDoubleTap) {
+              // Double-tap down arrow = next hunk
+              onNextHunk();
+              lastKeyPress = null; // Reset to prevent triple-tap
+            } else {
+              // Single tap down arrow = scroll down manually
+              if (scrollContainer) {
+                scrollContainer.scrollBy({ top: 100, behavior: 'smooth' });
+              }
+              lastKeyPress = { key: event.key, timestamp: currentTime };
+            }
+            break;
+          case 'ArrowLeft':
+            event.preventDefault();
+            if (isDoubleTap) {
+              // Double-tap left arrow = previous change
+              onPreviousChange();
+              lastKeyPress = null; // Reset to prevent triple-tap
+            } else {
+              // Single tap left arrow = previous file
+              onPreviousFile();
+              lastKeyPress = { key: event.key, timestamp: currentTime };
+            }
+            break;
+          case 'ArrowRight':
+            event.preventDefault();
+            if (isDoubleTap) {
+              // Double-tap right arrow = next change
+              onNextChange();
+              lastKeyPress = null; // Reset to prevent triple-tap
+            } else {
+              // Single tap right arrow = next file
+              onNextFile();
+              lastKeyPress = { key: event.key, timestamp: currentTime };
+            }
+            break;
           case 'n':
             event.preventDefault();
             onNextChange();
@@ -927,6 +992,11 @@ function DetailedMode({
             onPreviousHunk();
             break;
         }
+      }
+      
+      // Clean up old key presses
+      if (!isDoubleTap && event.key.startsWith('Arrow')) {
+        lastKeyPress = { key: event.key, timestamp: currentTime };
       }
     };
 
@@ -1049,6 +1119,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
   const currentHunkRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [showLineNumbers, setShowLineNumbers] = useState(false);
 
   // Debug container dimensions
   useEffect(() => {
@@ -1069,21 +1140,16 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
       const scrollContainer = scrollContainerRef.current;
       const hunkElement = currentHunkRef.current;
       
-      // Calculate the position to scroll to (center the hunk in the view)
-      const containerHeight = scrollContainer.clientHeight;
+      // Calculate the position to scroll to (exactly at the top of the hunk)
       const hunkTop = hunkElement.offsetTop;
-      const hunkHeight = hunkElement.clientHeight;
-      
-      // Calculate scroll position to center the hunk
-      const scrollTop = hunkTop - (containerHeight / 2) + (hunkHeight / 2);
       
       console.log(`[SCROLL] Scrolling to hunk ${currentHunkIndex}`);
-      console.log(`[SCROLL] Container height: ${containerHeight}, Hunk top: ${hunkTop}, Target scroll: ${scrollTop}`);
+      console.log(`[SCROLL] Hunk top: ${hunkTop}, Target scroll: ${hunkTop}`);
       console.log(`[SCROLL] Container scrollable: ${scrollContainer.scrollHeight > scrollContainer.clientHeight}`);
       
       if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
         scrollContainer.scrollTo({
-          top: Math.max(0, scrollTop),
+          top: Math.max(0, hunkTop),
           behavior: 'smooth'
         });
       } else {
@@ -1145,7 +1211,9 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
                 ref={hunkIndex === currentHunkIndex ? currentHunkRef : null}
                 className={cn(
                   "border-b border-[var(--base-400)] last:border-b-0 transition-all duration-300",
-                  hunkIndex === currentHunkIndex ? "ring-2 ring-[var(--acc-500)] ring-opacity-50 shadow-lg" : ""
+                  hunkIndex === currentHunkIndex ? "ring-2 ring-[var(--acc-500)] ring-opacity-50 shadow-lg" : "",
+                  // Add extra padding after the last hunk for better navigation visibility
+                  hunkIndex === file.hunks.length - 1 ? "pb-96" : ""
                 )}
               >
                 <div className={cn(
@@ -1164,9 +1232,15 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
                   </div>
                 </div>
                 
-                <div className="divide-y divide-[var(--base-300)]">
+                <div>
                   {hunk.lines.map((line, lineIndex) => (
-                    <DiffLine key={lineIndex} line={line} />
+                    <DiffLine 
+                      key={lineIndex} 
+                      line={line} 
+                      showLineNumbers={showLineNumbers}
+                      onHoverLineNumber={() => setShowLineNumbers(true)}
+                      onLeaveLineNumber={() => setShowLineNumbers(false)}
+                    />
                   ))}
                 </div>
               </div>
@@ -1181,9 +1255,12 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
 // Diff Line Component
 interface DiffLineProps {
   line: GitDiffLine;
+  showLineNumbers: boolean;
+  onHoverLineNumber: () => void;
+  onLeaveLineNumber: () => void;
 }
 
-function DiffLine({ line }: DiffLineProps) {
+function DiffLine({ line, showLineNumbers, onHoverLineNumber, onLeaveLineNumber }: DiffLineProps) {
   const getLineStyle = () => {
     switch (line.type) {
       case 'added':
@@ -1196,16 +1273,19 @@ function DiffLine({ line }: DiffLineProps) {
   };
 
   const getPrefix = () => {
-    switch (line.type) {
-      case 'added': return '+';
-      case 'removed': return '-';
-      default: return ' ';
-    }
+    return ' '; // No prefix needed since color coding shows the line type
   };
 
   return (
     <div className={cn("px-4 py-1 font-mono text-sm flex", getLineStyle())}>
-      <span className="w-12 text-[var(--base-500)] text-right mr-4 select-none">
+      <span 
+        className={cn(
+          "w-12 text-[var(--base-500)] text-right mr-4 select-none transition-opacity",
+          showLineNumbers ? "opacity-100" : "opacity-0"
+        )}
+        onMouseEnter={onHoverLineNumber}
+        onMouseLeave={onLeaveLineNumber}
+      >
         {line.newLineNumber || line.oldLineNumber || ''}
       </span>
       <span className="w-4 text-center select-none">{getPrefix()}</span>
@@ -1745,7 +1825,7 @@ function UnifiedDiffModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-[var(--base-100)] rounded-lg w-[90%] h-[90%] flex flex-col">
+      <div className="bg-[var(--base-100)] rounded-lg w-full h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
           <div>
