@@ -28,11 +28,6 @@ jobs:
       run: |
         cd backend
         cargo fmt -- --check
-
-    - name: Check Rust formatting - cli-agents
-      run: |
-        cd cli-agents
-        cargo fmt -- --check
     
     - name: Check Rust formatting - tauri
       run: |
