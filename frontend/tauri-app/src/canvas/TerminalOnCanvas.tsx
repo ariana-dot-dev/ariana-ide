@@ -94,7 +94,8 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		const xterm = new XTerm({
 			theme,
 			fontSize: 14,
-			fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", Monaco, Menlo, "Ubuntu Mono", monospace',
+			fontFamily:
+				'"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Hack Nerd Font", "MesloLGS NF", Monaco, Menlo, "Ubuntu Mono", monospace',
 			cursorBlink: true,
 			allowTransparency: true,
 			allowProposedApi: true,

@@ -33,8 +33,8 @@ export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
 			osSession = {
 				Wsl: {
 					distribution: selectedKind.Wsl,
-					working_directory: selectedPath
-				}
+					working_directory: selectedPath,
+				},
 			};
 		} else {
 			console.error("Invalid OS session kind");
@@ -44,7 +44,7 @@ export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
 		// Add session to store and set as current
 		const sessionId = store.addOsSession(osSession);
 		store.setCurrentOsSessionId(sessionId);
-		
+
 		onSessionCreated();
 	};
 
@@ -54,7 +54,10 @@ export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
 		<div className="flex flex-col items-center justify-center w-full max-h-full">
 			<div className="flex justify-center items-center gap-8 max-w-4xl w-full h-full max-h-full">
 				{/* OS Session Kind Selector */}
-				<div className="flex-shrink-0" style={{ width: selectedKind ? '300px' : '400px' }}>
+				<div
+					className="flex-shrink-0"
+					style={{ width: selectedKind ? "300px" : "400px" }}
+				>
 					<OsSessionKindSelector
 						onSelect={handleKindSelect}
 						selectedKind={selectedKind}
