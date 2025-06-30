@@ -88,7 +88,9 @@ function App() {
 
 	const openFileTree = async () => {
 		try {
-			const currentDir = await invoke<string>("get_current_dir", { osSession: { Local: "." } });
+			const currentDir = await invoke<string>("get_current_dir", {
+				osSession: { Local: "." },
+			});
 			const fileTreeElement = FileTreeCanvas.canvasElement(
 				{
 					size: "medium",

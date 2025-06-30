@@ -14,7 +14,11 @@ interface ProjectDirectoryListProps {
 	selectedPath?: string;
 }
 
-export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: ProjectDirectoryListProps) {
+export function ProjectDirectoryList({
+	osSessionKind,
+	onSelect,
+	selectedPath,
+}: ProjectDirectoryListProps) {
 	const [directories, setDirectories] = useState<string[]>([]);
 	const [searchId, setSearchId] = useState<string | null>(null);
 	const [isComplete, setIsComplete] = useState(false);
@@ -24,8 +28,8 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 		const startSearch = async () => {
 			try {
 				setLoading(true);
-				const id = await invoke<string>("start_git_directories_search", { 
-					osSessionKind 
+				const id = await invoke<string>("start_git_directories_search", {
+					osSessionKind,
 				});
 				setSearchId(id);
 			} catch (error) {
@@ -35,7 +39,7 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 		};
 
 		startSearch();
-		
+
 		// Reset state when osSessionKind changes
 		setDirectories([]);
 		setIsComplete(false);
@@ -46,9 +50,12 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 
 		const pollResults = async () => {
 			try {
-				const result = await invoke<GitSearchResult>("get_found_git_directories_so_far", {
-					searchId
-				});
+				const result = await invoke<GitSearchResult>(
+					"get_found_git_directories_so_far",
+					{
+						searchId,
+					},
+				);
 				setDirectories(result.directories);
 				setIsComplete(result.is_complete);
 				setLoading(false);
@@ -68,21 +75,25 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 	}, [searchId, isComplete]);
 
 	const getDirectoryName = (path: string): string => {
-		return path.split('/').pop() || path.split('\\').pop() || path;
+		return path.split("/").pop() || path.split("\\").pop() || path;
 	};
 
 	return (
 		<div className="flex flex-col gap-2 p-4 h-fit max-h-full">
 			<div className="flex items-center gap-2">
-				<h3 className="text-lg font-semibold text-[var(--blackest)]">Repositories</h3>
+				<h3 className="text-lg font-semibold text-[var(--blackest)]">
+					Repositories
+				</h3>
 				{!isComplete && (
 					<div className="w-4 h-4 border-2 border-[var(--acc-400)] border-t-transparent rounded-full animate-spin"></div>
 				)}
 			</div>
-			
+
 			{loading && directories.length === 0 ? (
 				<div className="flex justify-center p-4">
-					<span className="text-[var(--base-500)]">Searching for repositories...</span>
+					<span className="text-[var(--base-500)]">
+						Searching for repositories...
+					</span>
 				</div>
 			) : directories.length === 0 ? (
 				<div className="flex justify-center p-4">
@@ -99,7 +110,7 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 								"border-2 border-[var(--base-400-50)]",
 								selectedPath === path
 									? "bg-[var(--acc-400-50)] text-[var(--acc-900)] border-[var(--acc-500-50)]"
-									: "bg-[var(--base-200-50)] hover:bg-[var(--base-300-50)] text-[var(--blackest)] cursor-pointer"
+									: "bg-[var(--base-200-50)] hover:bg-[var(--base-300-50)] text-[var(--blackest)] cursor-pointer",
 							)}
 						>
 							<div className="mb-0.5">{getDirectoryName(path)}</div>
@@ -108,10 +119,11 @@ export function ProjectDirectoryList({ osSessionKind, onSelect, selectedPath }: 
 					))}
 				</div>
 			)}
-			
+
 			{isComplete && (
 				<div className="text-sm text-[var(--base-500)] mt-2">
-					Search complete • Found {directories.length} project{directories.length !== 1 ? 's' : ''}
+					Search complete • Found {directories.length} project
+					{directories.length !== 1 ? "s" : ""}
 				</div>
 			)}
 		</div>
