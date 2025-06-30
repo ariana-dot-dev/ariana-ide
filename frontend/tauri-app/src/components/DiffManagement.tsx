@@ -6,9 +6,11 @@ import { cn } from "../utils";
 
 interface DiffManagementProps {
   onClose: () => void;
+  initialState?: any;
+  onStateChange?: (state: any) => void;
 }
 
-export default function DiffManagement({ onClose }: DiffManagementProps) {
+export default function DiffManagement({ onClose, initialState, onStateChange }: DiffManagementProps) {
   // Add global error logging
   useEffect(() => {
     const handleError = (error: ErrorEvent) => {
@@ -30,35 +32,77 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
-  const [diffSummary, setDiffSummary] = useState<DiffSummary | null>(null);
+  const [diffSummary, setDiffSummary] = useState<DiffSummary | null>(initialState?.diffSummary ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedChange, setSelectedChange] = useState<string | null>(null);
-  const [selectedSubLogic, setSelectedSubLogic] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('overview');
-  const [currentFileIndex, setCurrentFileIndex] = useState(0);
-  const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [selectedChange, setSelectedChange] = useState<string | null>(initialState?.selectedChange ?? null);
+  const [selectedSubLogic, setSelectedSubLogic] = useState<string | null>(initialState?.selectedSubLogic ?? null);
+  const [viewMode, setViewMode] = useState<'overview' | 'detailed'>(initialState?.viewMode ?? 'overview');
+  const [currentFileIndex, setCurrentFileIndex] = useState(initialState?.currentFileIndex ?? 0);
+  const [currentLineIndex, setCurrentLineIndex] = useState(initialState?.currentLineIndex ?? 0);
   
   // Branch selection state
-  const [showBranchSelection, setShowBranchSelection] = useState(true);
-  const [branches, setBranches] = useState<GitBranch[]>([]);
+  const [showBranchSelection, setShowBranchSelection] = useState(initialState?.showBranchSelection ?? true);
+  const [branches, setBranches] = useState<GitBranch[]>(initialState?.branches ?? []);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchesError, setBranchesError] = useState<string | null>(null);
-  const [selectedBaseBranch, setSelectedBaseBranch] = useState<string>("");
-  const [selectedTargetBranch, setSelectedTargetBranch] = useState<string>("");
-  const [selectedBaseCommit, setSelectedBaseCommit] = useState<string>("");
-  const [selectedTargetCommit, setSelectedTargetCommit] = useState<string>("");
-  const [baseBranchCommits, setBaseBranchCommits] = useState<GitCommit[]>([]);
-  const [targetBranchCommits, setTargetBranchCommits] = useState<GitCommit[]>([]);
+  const [selectedBaseBranch, setSelectedBaseBranch] = useState<string>(initialState?.selectedBaseBranch ?? "");
+  const [selectedTargetBranch, setSelectedTargetBranch] = useState<string>(initialState?.selectedTargetBranch ?? "");
+  const [selectedBaseCommit, setSelectedBaseCommit] = useState<string>(initialState?.selectedBaseCommit ?? "");
+  const [selectedTargetCommit, setSelectedTargetCommit] = useState<string>(initialState?.selectedTargetCommit ?? "");
+  const [baseBranchCommits, setBaseBranchCommits] = useState<GitCommit[]>(initialState?.baseBranchCommits ?? []);
+  const [targetBranchCommits, setTargetBranchCommits] = useState<GitCommit[]>(initialState?.targetBranchCommits ?? []);
   const [loadingCommits, setLoadingCommits] = useState(false);
-  const [selectedDirectory, setSelectedDirectory] = useState<string>("");
-  const [showDirectorySelector, setShowDirectorySelector] = useState(true);
+  const [selectedDirectory, setSelectedDirectory] = useState<string>(initialState?.selectedDirectory ?? "");
+  const [showDirectorySelector, setShowDirectorySelector] = useState(initialState?.showDirectorySelector ?? true);
   const [showUnifiedDiff, setShowUnifiedDiff] = useState(false);
   const [unifiedDiffContent, setUnifiedDiffContent] = useState<string>("");
 
+  // Log state restoration for debugging
   useEffect(() => {
-    // Don't load branches initially - wait for directory selection
+    if (initialState) {
+      console.log("DiffManagement initialized with saved state:", initialState);
+    }
   }, []);
+
+  // Save state whenever it changes
+  useEffect(() => {
+    if (onStateChange) {
+      const currentState = {
+        diffSummary,
+        selectedChange,
+        selectedSubLogic,
+        viewMode,
+        currentFileIndex,
+        currentLineIndex,
+        showBranchSelection,
+        branches,
+        selectedBaseBranch,
+        selectedTargetBranch,
+        selectedBaseCommit,
+        selectedTargetCommit,
+        selectedDirectory,
+        showDirectorySelector
+      };
+      onStateChange(currentState);
+    }
+  }, [
+    diffSummary,
+    selectedChange,
+    selectedSubLogic,
+    viewMode,
+    currentFileIndex,
+    currentLineIndex,
+    showBranchSelection,
+    branches,
+    selectedBaseBranch,
+    selectedTargetBranch,
+    selectedBaseCommit,
+    selectedTargetCommit,
+    selectedDirectory,
+    showDirectorySelector,
+    onStateChange
+  ]);
 
   const loadBranches = async (directory?: string) => {
     console.log("[COMPONENT] loadBranches method entry");
@@ -563,13 +607,6 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
             )}
           >
             {diffSummary.validationState.allValidated ? "✓ All Validated" : "Validate All"}
-          </button>
-          
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
-          >
-            Close
           </button>
         </div>
       </div>
@@ -1240,12 +1277,6 @@ function DirectorySelectionPage({
             Choose the directory containing your git repository
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
-        >
-          Close
-        </button>
       </div>
 
       {/* Content */}
@@ -1406,12 +1437,6 @@ function BranchSelectionPage({
       <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
         <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
           <h1 className="text-2xl font-bold text-[var(--acc-600)]">Select Branches to Compare</h1>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
-          >
-            Close
-          </button>
         </div>
         
         <div className="flex-1 flex items-center justify-center p-8">
@@ -1429,12 +1454,6 @@ function BranchSelectionPage({
       <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
         <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
           <h1 className="text-2xl font-bold text-[var(--acc-600)]">Select Branches to Compare</h1>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
-          >
-            Close
-          </button>
         </div>
         
         <div className="flex-1 flex items-center justify-center p-8">
@@ -1471,12 +1490,6 @@ function BranchSelectionPage({
             className="px-3 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
           >
             ← Change Directory
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
-          >
-            Close
           </button>
         </div>
       </div>

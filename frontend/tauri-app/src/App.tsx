@@ -28,6 +28,7 @@ function App() {
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
 	const [showDiffManagement, setShowDiffManagement] = useState(false);
+	const [diffManagementState, setDiffManagementState] = useState<any>(null);
 	const { isLightTheme } = store;
 	const addElementRef = React.useRef<((element: CanvasElement) => void) | null>(
 		null,
@@ -110,8 +111,8 @@ function App() {
 		addElementRef.current?.(terminalElement);
 	};
 
-	const openDiffManagement = () => {
-		setShowDiffManagement(true);
+	const toggleDiffManagement = () => {
+		setShowDiffManagement(!showDiffManagement);
 	};
 
 	if (loading) {
@@ -142,9 +143,13 @@ function App() {
 				<div className="w-full h-full flex flex-col gap-1.5 p-2">
 					{/* Diff Management Modal */}
 					{showDiffManagement && (
-						<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-							<div className="bg-[var(--base-100)] rounded-lg w-[95%] h-[95%] flex flex-col">
-								<DiffManagement onClose={() => setShowDiffManagement(false)} />
+						<div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+							<div className="bg-[var(--base-100)] rounded-lg w-full h-full flex flex-col">
+								<DiffManagement 
+									onClose={() => setShowDiffManagement(false)}
+									initialState={diffManagementState}
+									onStateChange={setDiffManagementState}
+								/>
 							</div>
 						</div>
 					)}
@@ -208,7 +213,7 @@ function App() {
 									</button>
 									<button
 										type="button"
-										onClick={openDiffManagement}
+										onClick={toggleDiffManagement}
 										className={cn(
 											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
 										)}
