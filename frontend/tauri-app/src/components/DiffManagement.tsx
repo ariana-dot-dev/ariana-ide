@@ -326,11 +326,27 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
   const navigateToNextFile = () => {
     if (!diffSummary || !selectedChange) return;
     
-    const change = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges]
-      .find(c => c.id === selectedChange);
+    // Get all files from all changes
+    const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+    const allFiles: { changeId: string, fileIndex: number, file: GitDiffFile }[] = [];
     
-    if (change && currentFileIndex < change.files.length - 1) {
-      setCurrentFileIndex(currentFileIndex + 1);
+    // Build a flat list of all files with their change and file indices
+    allChanges.forEach(change => {
+      change.files.forEach((file, fileIndex) => {
+        allFiles.push({ changeId: change.id, fileIndex, file });
+      });
+    });
+    
+    // Find current file position in the flat list
+    const currentGlobalIndex = allFiles.findIndex(item => 
+      item.changeId === selectedChange && item.fileIndex === currentFileIndex
+    );
+    
+    // Navigate to next file
+    if (currentGlobalIndex < allFiles.length - 1) {
+      const nextFile = allFiles[currentGlobalIndex + 1];
+      setSelectedChange(nextFile.changeId);
+      setCurrentFileIndex(nextFile.fileIndex);
       setCurrentLineIndex(0);
     }
   };
@@ -338,8 +354,27 @@ export default function DiffManagement({ onClose }: DiffManagementProps) {
   const navigateToPreviousFile = () => {
     if (!diffSummary || !selectedChange) return;
     
-    if (currentFileIndex > 0) {
-      setCurrentFileIndex(currentFileIndex - 1);
+    // Get all files from all changes
+    const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+    const allFiles: { changeId: string, fileIndex: number, file: GitDiffFile }[] = [];
+    
+    // Build a flat list of all files with their change and file indices
+    allChanges.forEach(change => {
+      change.files.forEach((file, fileIndex) => {
+        allFiles.push({ changeId: change.id, fileIndex, file });
+      });
+    });
+    
+    // Find current file position in the flat list
+    const currentGlobalIndex = allFiles.findIndex(item => 
+      item.changeId === selectedChange && item.fileIndex === currentFileIndex
+    );
+    
+    // Navigate to previous file
+    if (currentGlobalIndex > 0) {
+      const prevFile = allFiles[currentGlobalIndex - 1];
+      setSelectedChange(prevFile.changeId);
+      setCurrentFileIndex(prevFile.fileIndex);
       setCurrentLineIndex(0);
     }
   };
@@ -852,6 +887,9 @@ function DetailedMode({
   // Keyboard navigation
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Get the scroll container for manual scrolling
+      const scrollContainer = document.querySelector('.absolute.inset-0.overflow-auto') as HTMLElement;
+      
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
           case 'ArrowLeft':
@@ -873,6 +911,28 @@ function DetailedMode({
         }
       } else {
         switch (event.key) {
+          case 'ArrowUp':
+            event.preventDefault();
+            // Scroll up manually
+            if (scrollContainer) {
+              scrollContainer.scrollBy({ top: -100, behavior: 'smooth' });
+            }
+            break;
+          case 'ArrowDown':
+            event.preventDefault();
+            // Scroll down manually
+            if (scrollContainer) {
+              scrollContainer.scrollBy({ top: 100, behavior: 'smooth' });
+            }
+            break;
+          case 'ArrowLeft':
+            event.preventDefault();
+            onPreviousFile();
+            break;
+          case 'ArrowRight':
+            event.preventDefault();
+            onNextFile();
+            break;
           case 'n':
             event.preventDefault();
             onNextChange();
@@ -925,16 +985,39 @@ function DetailedMode({
           <div>
             <h3 className="font-semibold text-[var(--base-700)]">{change.title}</h3>
             <p className="text-sm text-[var(--base-600)]">
-              File {currentFileIndex + 1} of {change.files.length}: {currentFile.filePath}
+              {(() => {
+                // Calculate current file position across all changes
+                const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+                const allFiles: { changeId: string, fileIndex: number, file: GitDiffFile }[] = [];
+                
+                allChanges.forEach(change => {
+                  change.files.forEach((file, fileIndex) => {
+                    allFiles.push({ changeId: change.id, fileIndex, file });
+                  });
+                });
+                
+                const currentGlobalIndex = allFiles.findIndex(item => 
+                  item.changeId === selectedChange && item.fileIndex === currentFileIndex
+                );
+                
+                return `File ${currentGlobalIndex + 1} of ${allFiles.length}: ${currentFile.filePath}`;
+              })()}
             </p>
             <p className="text-xs text-[var(--base-500)]">
-              Hunk {currentLineIndex + 1} of {currentFile.hunks.length}
+              Change {(() => {
+                const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+                const currentChangeIndex = allChanges.findIndex(c => c.id === selectedChange);
+                return `${currentChangeIndex + 1} of ${allChanges.length}`;
+              })()} • Hunk {currentLineIndex + 1} of {currentFile.hunks.length}
               {currentFile.hunks[currentLineIndex] && (
                 <span className="ml-2">
                   (Lines -{currentFile.hunks[currentLineIndex].oldStart},{currentFile.hunks[currentLineIndex].oldCount} 
                   +{currentFile.hunks[currentLineIndex].newStart},{currentFile.hunks[currentLineIndex].newCount})
                 </span>
               )}
+            </p>
+            <p className="text-xs text-[var(--base-400)] mt-1">
+              Navigation: ←→ Files • ↑↓ Scroll • J/K Hunks • N/P Changes • Ctrl+arrows for precise navigation
             </p>
           </div>
         </div>
