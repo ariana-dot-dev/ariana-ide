@@ -7,6 +7,7 @@ import CanvasView from "./CanvasView";
 import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Terminal } from "./canvas/Terminal";
 import type { CanvasElement } from "./canvas/types";
+import DiffManagement from "./components/DiffManagement";
 import { useUserConfig } from "./hooks/useUserConfig";
 import Onboarding from "./Onboarding";
 import Repl from "./Repl";
@@ -26,6 +27,7 @@ function App() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
+	const [showDiffManagement, setShowDiffManagement] = useState(false);
 	const { isLightTheme } = store;
 	const addElementRef = React.useRef<((element: CanvasElement) => void) | null>(
 		null,
@@ -108,6 +110,10 @@ function App() {
 		addElementRef.current?.(terminalElement);
 	};
 
+	const openDiffManagement = () => {
+		setShowDiffManagement(true);
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -134,6 +140,15 @@ function App() {
 					style={{ background: 'url("assets/noise.png")' }}
 				></div>
 				<div className="w-full h-full flex flex-col gap-1.5 p-2">
+					{/* Diff Management Modal */}
+					{showDiffManagement && (
+						<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+							<div className="bg-[var(--base-100)] rounded-lg w-[95%] h-[95%] flex flex-col">
+								<DiffManagement onClose={() => setShowDiffManagement(false)} />
+							</div>
+						</div>
+					)}
+
 					{/* Custom Titlebar */}
 					<div
 						onMouseEnter={() => {
@@ -186,10 +201,19 @@ function App() {
 										type="button"
 										onClick={openNewTerminal}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 									>
 										💻
+									</button>
+									<button
+										type="button"
+										onClick={openDiffManagement}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+										)}
+									>
+										🔀
 									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>
