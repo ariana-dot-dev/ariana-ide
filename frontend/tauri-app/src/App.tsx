@@ -15,6 +15,10 @@ import { Interpreter } from "./scripting/interpreter";
 import { useStore } from "./state";
 import { cn } from "./utils";
 import Logo from "./components/Logo";
+import { GitProjectProvider } from "./contexts/GitProjectContext";
+import GitProjectView from "./GitProjectView";
+import { osSessionGetWorkingDirectory } from "./bindings/os";
+import { CustomTerminal } from "./canvas/CustomTerminal";
 
 const appWindow = getCurrentWebviewWindow();
 
@@ -28,10 +32,8 @@ function App() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
+	const [selectedGitProjectId, setSelectedGitProjectId] = useState<string | null>(null);
 	const { isLightTheme } = store;
-	const addElementRef = React.useRef<((element: CanvasElement) => void) | null>(
-		null,
-	);
 
 	const titleBarHoveredRef = useRef(false);
 
@@ -87,33 +89,44 @@ function App() {
 	const handleClose = () => appWindow.close();
 
 	const openFileTree = async () => {
-		try {
-			const currentDir = await invoke<string>("get_current_dir", {
-				osSession: { Local: "." },
-			});
-			const fileTreeElement = FileTreeCanvas.canvasElement(
-				{
-					size: "medium",
-					aspectRatio: 0.6,
-					area: "left",
-				},
-				currentDir,
-				1,
-			);
-
-			addElementRef.current?.(fileTreeElement);
-		} catch (error) {
-			console.error("Failed to get current directory:", error);
+		if (selectedGitProjectId !== null) {
+			const selectedProject = store.getGitProject(selectedGitProjectId);
+			if (selectedProject) {
+				try {
+					const currentDir = await invoke<string>("get_current_dir", {
+						osSession: selectedProject.osSession,
+					});
+					const fileTreeElement = FileTreeCanvas.canvasElement(
+						{
+							size: "medium",
+							aspectRatio: 0.6,
+							area: "left",
+						},
+						currentDir,
+						1,
+					);
+					
+					selectedProject.addToCurrentCanvasElements(fileTreeElement);
+				} catch (error) {
+					console.error("Failed to get current directory:", error);
+				}
+			}
 		}
 	};
 
 	const openNewTerminal = () => {
-		const terminalElement = Terminal.createLocalShell();
-		addElementRef.current?.(terminalElement);
+		if (selectedGitProjectId !== null) {
+			const selectedProject = store.getGitProject(selectedGitProjectId);
+			if (selectedProject) {
+				const terminalElement = CustomTerminal.canvasElement(selectedProject.root, 1);
+				selectedProject.addToCurrentCanvasElements(terminalElement)
+			}
+		}
 	};
 
 	const handleResetSessions = () => {
-		store.clearAllOsSessions();
+		store.clearAllGitProjects();
+		setSelectedGitProjectId(null);
 	};
 
 	if (loading) {
@@ -248,8 +261,8 @@ function App() {
 						</div>
 					)}
 
-					{/* Show ProjectSelector if no current session, otherwise show CanvasView */}
-					{!store.currentOsSessionId ? (
+					{/* Show ProjectSelector if no selected project, otherwise show CanvasView */}
+					{selectedGitProjectId === null ? (
 						<div className="z-10 justify-self-center h-full w-full max-h-full flex flex-col items-center justify-center">
 							<div className="flex flex-col items-center h-fit gap-3 opacity-50 text-[var(--acc-700)]">
 								<div className="w-32">
@@ -260,14 +273,16 @@ function App() {
 								</h1>
 							</div>
 							<div className="h-fit max-h-[50%] w-full">
-								<ProjectSelector onSessionCreated={() => {}} />
+								<ProjectSelector onProjectCreated={(projectId: string) => {
+								setSelectedGitProjectId(projectId);
+							}} />
 							</div>
 						</div>
 					) : (
-						<>
-							<CanvasView onAddElementRef={addElementRef} />
+						<GitProjectProvider gitProject={store.getGitProject(selectedGitProjectId) || null}>
+							<GitProjectView/>
 							<Repl />
-						</>
+						</GitProjectProvider>
 					)}
 
 					<div className="absolute hover:opacity-100 opacity-0 bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">

@@ -23,7 +23,6 @@ interface CustomTerminalOnCanvasProps {
 
 const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 	layout,
-	osSession,
 	onDragStart: propOnDragStart,
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
@@ -36,6 +35,10 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 	const [isHovered, setIsHovered] = useState(false);
 	const [dragging, setDragging] = useState(false);
 	const [isConnected, setIsConnected] = useState(false);
+
+	if (!("customTerminal" in element.kind)) {
+		return null
+	}
 
 	const handleDragStartInternal = () => {
 		propOnDragStart(element);
@@ -128,7 +131,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 				<div className={cn("w-full h-full pointer-events-auto")}>
 					<CustomTerminalRenderer
 						elementId={element.id}
-						osSession={osSession}
+						osSession={element.kind.customTerminal.osSession}
 						onTerminalReady={handleTerminalReady}
 						onTerminalError={handleTerminalError}
 						fontSize="sm"

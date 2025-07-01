@@ -54,7 +54,6 @@ export class Terminal {
 
 	// Helper methods for creating different terminal types
 	static createLocalShell(
-		shell?: string,
 		workingDirectory?: string,
 		weight: number = 1,
 	): CanvasElement {

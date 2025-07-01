@@ -1,14 +1,17 @@
+import { OsSession } from "../bindings/os";
 import { CanvasElement, type ElementTargets } from "./types";
 
 export class TextArea {
 	public id: string;
 	public content: string;
 	public isLocked: boolean;
+	public osSession: OsSession
 
-	constructor(content: string = "") {
+	constructor(osSession: OsSession, content: string = "") {
 		this.id = Math.random().toString(36).substring(2, 9);
 		this.content = content;
 		this.isLocked = false;
+		this.osSession = osSession
 	}
 
 	public targets(): ElementTargets {
@@ -33,8 +36,8 @@ export class TextArea {
 		this.isLocked = false;
 	}
 
-	static canvasElement(content: string = ""): CanvasElement {
-		const textArea = new TextArea(content);
+	static canvasElement(osSession: OsSession, content: string = ""): CanvasElement {
+		const textArea = new TextArea(osSession, content);
 		return new CanvasElement({ textArea }, 1);
 	}
 }
