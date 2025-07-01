@@ -39,12 +39,15 @@ export function osSessionToString(session: OsSession): string {
 	return "Unknown OS Session";
 }
 
-export function osSessionEquals(sessionA: OsSession, sessionB: OsSession): boolean {
-	return osSessionToString(sessionA) == osSessionToString(sessionB)
+export function osSessionEquals(
+	sessionA: OsSession,
+	sessionB: OsSession,
+): boolean {
+	return osSessionToString(sessionA) == osSessionToString(sessionB);
 }
 
 export function osSessionGetWorkingDirectory(session: OsSession) {
-		if (isLocalSession(session)) {
+	if (isLocalSession(session)) {
 		return session.Local;
 	} else if (isWslSession(session)) {
 		return session.Wsl.working_directory;

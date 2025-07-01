@@ -14,7 +14,11 @@ interface CanvasViewProps {
 	onAddElementRef?: React.RefObject<((element: CanvasElement) => void) | null>;
 }
 
-const CanvasView: React.FC<CanvasViewProps> = ({ elements, onElementsChange, onAddElementRef }) => {
+const CanvasView: React.FC<CanvasViewProps> = ({
+	elements,
+	onElementsChange,
+	onAddElementRef,
+}) => {
 	const [stabilityWeight, _setStabilityWeight] = useState(0.3);
 	return (
 		<div className="w-full h-full">

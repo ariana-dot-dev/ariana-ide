@@ -31,7 +31,7 @@ export class GitProject {
 		this.createdAt = Date.now();
 		this.lastModified = Date.now();
 
-		console.log(this.canvases)
+		console.log(this.canvases);
 	}
 
 	// Reactive getters
@@ -41,10 +41,14 @@ export class GitProject {
 
 	// Reactive setters
 	setCurrentCanvasIndex(index: number): void {
-		if (index >= 0 && index < this.canvases.length && index !== this.currentCanvasIndex) {
+		if (
+			index >= 0 &&
+			index < this.canvases.length &&
+			index !== this.currentCanvasIndex
+		) {
 			this.currentCanvasIndex = index;
 			this.lastModified = Date.now();
-			this.notifyListeners('currentCanvasIndex');
+			this.notifyListeners("currentCanvasIndex");
 		}
 	}
 
@@ -59,16 +63,16 @@ export class GitProject {
 
 		this.canvases.push(newCanvas);
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return newCanvas.id;
 	}
 
 	removeCanvas(canvasId: string): boolean {
-		const index = this.canvases.findIndex(c => c.id === canvasId);
+		const index = this.canvases.findIndex((c) => c.id === canvasId);
 		if (index === -1 || this.canvases.length <= 1) return false;
 
 		this.canvases.splice(index, 1);
-		
+
 		// Adjust currentCanvasIndex if needed
 		if (this.currentCanvasIndex >= this.canvases.length) {
 			this.currentCanvasIndex = this.canvases.length - 1;
@@ -77,41 +81,44 @@ export class GitProject {
 		}
 
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
-		this.notifyListeners('currentCanvasIndex');
+		this.notifyListeners("canvases");
+		this.notifyListeners("currentCanvasIndex");
 		return true;
 	}
 
 	updateCanvasElements(canvasId: string, elements: CanvasElement[]): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas) return false;
 
 		canvas.elements = elements;
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
 	addToCurrentCanvasElements(element: CanvasElement): boolean {
 		const canvas = this.canvases[this.currentCanvasIndex];
 		if (!canvas) return false;
-		return this.updateCanvasElements(canvas.id, [...canvas.elements, element])
+		return this.updateCanvasElements(canvas.id, [...canvas.elements, element]);
 	}
 
 	renameCanvas(canvasId: string, name: string): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas) return false;
 
 		canvas.name = name;
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
 	// Reactive event system
-	subscribe(property: 'canvases' | 'currentCanvasIndex', callback: () => void): () => void {
+	subscribe(
+		property: "canvases" | "currentCanvasIndex",
+		callback: () => void,
+	): () => void {
 		if (!this.listeners.has(property)) {
 			this.listeners.set(property, new Set());
 		}
@@ -124,7 +131,7 @@ export class GitProject {
 	}
 
 	private notifyListeners(property: string): void {
-		this.listeners.get(property)?.forEach(callback => callback());
+		this.listeners.get(property)?.forEach((callback) => callback());
 	}
 
 	// Serialization
@@ -153,27 +160,27 @@ export class GitProject {
 	// Helper methods
 	private generateDefaultName(): string {
 		// Extract name from the root OsSession path
-		if (this.root && typeof this.root === 'object') {
-			if ('Local' in this.root) {
+		if (this.root && typeof this.root === "object") {
+			if ("Local" in this.root) {
 				const path = this.root.Local;
-				return path.split('/').pop() || path.split('\\').pop() || 'Local Project';
+				return (
+					path.split("/").pop() || path.split("\\").pop() || "Local Project"
+				);
 			}
-			if ('Wsl' in this.root) {
+			if ("Wsl" in this.root) {
 				const path = this.root.Wsl.working_directory;
-				return path.split('/').pop() || 'WSL Project';
+				return path.split("/").pop() || "WSL Project";
 			}
 		}
-		return 'Untitled Project';
+		return "Untitled Project";
 	}
 
 	private createDefaultCanvas(): GitProjectCanvas {
-		console.log("here")
+		console.log("here");
 		return {
 			id: crypto.randomUUID(),
-			name: 'Main Canvas',
-			elements: [
-				TextArea.canvasElement(this.root, "")
-			],
+			name: "Main Canvas",
+			elements: [TextArea.canvasElement(this.root, "")],
 			createdAt: Date.now(),
 			lastModified: Date.now(),
 		};

@@ -62,17 +62,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
 					// Handle migration from old osSessions to new gitProjects structure
 					if (savedState.gitProjects) {
-						const projects = savedState.gitProjects.map((projectData: any) => 
-							GitProject.fromJSON(projectData)
-						).filter((p) => {
-							p.canvases.length > 0 && p.canvases.some((c) => c.elements.length > 0)
-						});
+						const projects = savedState.gitProjects
+							.map((projectData: any) => GitProject.fromJSON(projectData))
+							.filter((p) => {
+								p.canvases.length > 0 &&
+									p.canvases.some((c) => c.elements.length > 0);
+							});
 						setGitProjects(projects);
 					} else if ((savedState as any).osSessions) {
 						// Migration: convert old OsSessions to GitProjects
 						const oldSessions = (savedState as any).osSessions;
-						const migratedProjects = Object.values(oldSessions).map((session: any) => 
-							new GitProject(session as OsSession)
+						const migratedProjects = Object.values(oldSessions).map(
+							(session: any) => new GitProject(session as OsSession),
 						);
 						setGitProjects(migratedProjects);
 					}
@@ -93,7 +94,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					theme,
 					showOnboarding,
 					currentInterpreterScript,
-					gitProjects: gitProjects.map(project => project.toJSON()),
+					gitProjects: gitProjects.map((project) => project.toJSON()),
 				};
 				await tauriStore.set("appState", stateToSave);
 				await tauriStore.save();
@@ -102,12 +103,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			}
 		};
 		saveState();
-	}, [
-		theme,
-		showOnboarding,
-		currentInterpreterScript,
-		gitProjects,
-	]);
+	}, [theme, showOnboarding, currentInterpreterScript, gitProjects]);
 
 	const setTheme = (newTheme: string) => setThemeState(newTheme);
 	const setShowOnboarding = (show: boolean) => setShowOnboardingState(show);
@@ -169,13 +165,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		addGitProject: (project: GitProject) => {
 			let projectId = null;
 			setGitProjects((prev) => {
-				let identicalProject = prev.find(p => osSessionEquals(p.osSession, project.osSession));
+				let identicalProject = prev.find((p) =>
+					osSessionEquals(p.osSession, project.osSession),
+				);
 				if (!identicalProject) {
 					projectId = project.id;
-					return [...prev, project]
+					return [...prev, project];
 				}
 				projectId = identicalProject.id;
-				return prev
+				return prev;
 			});
 			if (projectId == null) {
 				throw new Error("projectId is null");
@@ -183,10 +181,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			return projectId;
 		},
 		removeGitProject: (projectId: string) => {
-			setGitProjects((prev) => prev.filter(p => p.id !== projectId));
+			setGitProjects((prev) => prev.filter((p) => p.id !== projectId));
 		},
 		getGitProject: (projectId: string) => {
-			return gitProjects.find(p => p.id === projectId) || null;
+			return gitProjects.find((p) => p.id === projectId) || null;
 		},
 		clearAllGitProjects: () => {
 			setGitProjects([]);

@@ -5,9 +5,9 @@
 )]
 
 use log::LevelFilter;
-use std::sync::Arc;
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
+use std::sync::Arc;
 use tauri::{Manager, State};
 
 mod terminal;
@@ -306,25 +306,25 @@ async fn lsp_get_diagnostics(
 #[tauri::command]
 async fn check_git_repository(directory: String) -> Result<bool, String> {
 	let path = Path::new(&directory);
-	
+
 	// Check if the directory exists
 	if !path.exists() {
 		return Ok(false);
 	}
-	
+
 	// Check if .git directory exists
 	let git_dir = path.join(".git");
 	if git_dir.exists() {
 		return Ok(true);
 	}
-	
+
 	// Alternatively, try using git command to check if it's a repository
 	let output = Command::new("git")
 		.arg("rev-parse")
 		.arg("--git-dir")
 		.current_dir(&directory)
 		.output();
-		
+
 	match output {
 		Ok(result) => Ok(result.status.success()),
 		Err(_) => Ok(false),
@@ -337,7 +337,7 @@ async fn execute_command(command: String, args: Vec<String>) -> Result<String, S
 		.args(&args)
 		.output()
 		.map_err(|e| format!("Failed to execute command: {}", e))?;
-	
+
 	if output.status.success() {
 		Ok(String::from_utf8_lossy(&output.stdout).to_string())
 	} else {
@@ -346,13 +346,17 @@ async fn execute_command(command: String, args: Vec<String>) -> Result<String, S
 }
 
 #[tauri::command]
-async fn execute_command_in_dir(command: String, args: Vec<String>, directory: String) -> Result<String, String> {
+async fn execute_command_in_dir(
+	command: String,
+	args: Vec<String>,
+	directory: String,
+) -> Result<String, String> {
 	let output = Command::new(&command)
 		.args(&args)
 		.current_dir(&directory)
 		.output()
 		.map_err(|e| format!("Failed to execute command: {}", e))?;
-	
+
 	if output.status.success() {
 		Ok(String::from_utf8_lossy(&output.stdout).to_string())
 	} else {

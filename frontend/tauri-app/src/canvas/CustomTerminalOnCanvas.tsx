@@ -37,7 +37,7 @@ const CustomTerminalOnCanvas: React.FC<CustomTerminalOnCanvasProps> = ({
 	const [isConnected, setIsConnected] = useState(false);
 
 	if (!("customTerminal" in element.kind)) {
-		return null
+		return null;
 	}
 
 	const handleDragStartInternal = () => {

@@ -55,7 +55,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 
 	const createTerminalSpec = (): TerminalSpec => {
 		// Create terminal spec based on the current OS session
-		if (osSession && typeof osSession === 'object' && 'Wsl' in osSession) {
+		if (osSession && typeof osSession === "object" && "Wsl" in osSession) {
 			return {
 				kind: { $type: "wsl" as const },
 				lines: 24,
