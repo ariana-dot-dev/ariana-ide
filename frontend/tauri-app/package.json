@@ -10,7 +10,8 @@
 		"preview": "node scripts/generateThemes.cjs && vite preview",
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
-		"tauri:build": "tauri build"
+		"tauri:build": "tauri build",
+		"typecheck": "tsc --noEmit"
 	},
 	"keywords": [
 		"tauri",
@@ -36,7 +37,10 @@
 		"motion": "^12.19.1",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
-		"tailwindcss": "^4.1.10"
+		"tailwindcss": "^4.1.10",
+		"tree-sitter-typescript": "^0.23.2",
+		"web-tree-sitter": "^0.25.6",
+		"zustand": "^5.0.6"
 	},
 	"devDependencies": {
 		"@tauri-apps/cli": "^2.5.0",
@@ -47,6 +51,7 @@
 		"autoprefixer": "^10.4.21",
 		"tailwind-scrollbar": "^4.0.2",
 		"typescript": "^5.8.3",
+		"typescript-language-server": "^4.3.4",
 		"vite": "^6.3.5"
 	}
 }

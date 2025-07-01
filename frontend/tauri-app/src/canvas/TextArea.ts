@@ -5,13 +5,13 @@ export class TextArea {
 	public id: string;
 	public content: string;
 	public isLocked: boolean;
-	public osSession: OsSession
+	public osSession: OsSession;
 
 	constructor(osSession: OsSession, content: string = "") {
 		this.id = Math.random().toString(36).substring(2, 9);
 		this.content = content;
 		this.isLocked = false;
-		this.osSession = osSession
+		this.osSession = osSession;
 	}
 
 	public targets(): ElementTargets {
@@ -36,7 +36,10 @@ export class TextArea {
 		this.isLocked = false;
 	}
 
-	static canvasElement(osSession: OsSession, content: string = ""): CanvasElement {
+	static canvasElement(
+		osSession: OsSession,
+		content: string = "",
+	): CanvasElement {
 		const textArea = new TextArea(osSession, content);
 		return new CanvasElement({ textArea }, 1);
 	}

@@ -27,9 +27,14 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"suspicious": {
+				"noArrayIndexKey": "off",
+				"noConsole": "info"
+			},
 			"a11y": {
 				"useKeyWithClickEvents": "off",
-				"noStaticElementInteractions": "off"
+				"noStaticElementInteractions": "off",
+				"useButtonType": "off"
 			}
 		}
 	},

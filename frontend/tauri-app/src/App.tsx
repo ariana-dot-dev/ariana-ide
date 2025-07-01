@@ -4,6 +4,7 @@ import { type Event, listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import React, { useEffect, useRef, useState } from "react";
 import CanvasView from "./CanvasView";
+import { CodeEditor } from "./canvas/CodeEditor";
 import { FileTreeCanvas } from "./canvas/FileTreeCanvas";
 import { Terminal } from "./canvas/Terminal";
 import type { CanvasElement } from "./canvas/types";
@@ -33,7 +34,9 @@ function App() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
-	const [selectedGitProjectId, setSelectedGitProjectId] = useState<string | null>(null);
+	const [selectedGitProjectId, setSelectedGitProjectId] = useState<
+		string | null
+	>(null);
 	const [showDiffManagement, setShowDiffManagement] = useState(false);
 	const [diffManagementState, setDiffManagementState] = useState<any>(null);
 	const { isLightTheme } = store;
@@ -108,7 +111,7 @@ function App() {
 						currentDir,
 						1,
 					);
-					
+
 					selectedProject.addToCurrentCanvasElements(fileTreeElement);
 				} catch (error) {
 					console.error("Failed to get current directory:", error);
@@ -121,8 +124,11 @@ function App() {
 		if (selectedGitProjectId !== null) {
 			const selectedProject = store.getGitProject(selectedGitProjectId);
 			if (selectedProject) {
-				const terminalElement = CustomTerminal.canvasElement(selectedProject.root, 1);
-				selectedProject.addToCurrentCanvasElements(terminalElement)
+				const terminalElement = CustomTerminal.canvasElement(
+					selectedProject.root,
+					1,
+				);
+				selectedProject.addToCurrentCanvasElements(terminalElement);
 			}
 		}
 	};
@@ -134,6 +140,23 @@ function App() {
 
 	const toggleDiffManagement = () => {
 		setShowDiffManagement(!showDiffManagement);
+	};
+
+	const openCodeEditor = () => {
+		if (selectedGitProjectId !== null) {
+			const selectedProject = store.getGitProject(selectedGitProjectId);
+			if (selectedProject) {
+				const codeEditorElement = CodeEditor.canvasElement(
+					{
+						size: "large",
+						aspectRatio: 16 / 9,
+						area: "center",
+					},
+					1,
+				);
+				selectedProject.addToCurrentCanvasElements(codeEditorElement);
+			}
+		}
 	};
 
 	if (loading) {
@@ -162,7 +185,6 @@ function App() {
 					style={{ background: 'url("assets/noise.png")' }}
 				></div>
 				<div className="w-full h-full max-h-full flex flex-col gap-1.5 p-2">
-
 					{/* Custom Titlebar */}
 					<div
 						onMouseEnter={() => {
@@ -216,16 +238,24 @@ function App() {
 										onClick={openNewTerminal}
 										className={cn(
 											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 									>
 										💻
 									</button>
 									<button
 										type="button"
+										onClick={openCodeEditor}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
+										)}
+									>
+										📝
+									</button>
+									<button
+										type="button"
 										onClick={handleResetSessions}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 										title="Reset all sessions"
 									>
@@ -291,18 +321,22 @@ function App() {
 								</h1>
 							</div>
 							<div className="h-fit max-h-[50%] w-full">
-								<ProjectSelector onProjectCreated={(projectId: string) => {
-								setSelectedGitProjectId(projectId);
-							}} />
+								<ProjectSelector
+									onProjectCreated={(projectId: string) => {
+										setSelectedGitProjectId(projectId);
+									}}
+								/>
 							</div>
 						</div>
 					) : (
-						<GitProjectProvider gitProject={store.getGitProject(selectedGitProjectId) || null}>
+						<GitProjectProvider
+							gitProject={store.getGitProject(selectedGitProjectId) || null}
+						>
 							{/* Diff Management Modal */}
 							{showDiffManagement && (
 								<div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
 									<div className="bg-[var(--base-100)] rounded-lg w-full h-full flex flex-col">
-										<DiffManagement 
+										<DiffManagement
 											onClose={() => setShowDiffManagement(false)}
 											initialState={diffManagementState}
 											onStateChange={setDiffManagementState}
@@ -311,7 +345,7 @@ function App() {
 									</div>
 								</div>
 							)}
-							<GitProjectView/>
+							<GitProjectView />
 							<Repl />
 						</GitProjectProvider>
 					)}

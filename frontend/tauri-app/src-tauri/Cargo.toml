@@ -33,8 +33,23 @@ tauri-plugin-store = "2"
 tauri-plugin-fs = "2"
 walkdir = "2.5.0"
 tauri-plugin-os = "2"
+notify = "8.0.0"
+colored = "3.0.0"
+log = "0.4.27"
+tauri-plugin-log = "2.6.0"
+env_logger = "0.11.8"
+chrono = "0.4.41"
+
+# LSP dependencies
+lsp-types = "0.95"
+async-lsp = { version = "0.2.2", features = ["default", "tokio"] }
+tower = "0.5.2"
+tokio-util = { version = "0.7.15", features = ["compat"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[dev-dependencies]
+tempfile = "3.20.0"

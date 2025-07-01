@@ -22,7 +22,8 @@ const FileTreeItem: React.FC<{
 	onFileSelect?: (path: string) => void;
 	onToggle?: (path: string) => void;
 	isExpanded?: boolean;
-}> = ({ node, depth, onFileSelect, onToggle, isExpanded }) => {
+	expandedPaths?: Set<string>;
+}> = ({ node, depth, onFileSelect, onToggle, isExpanded, expandedPaths }) => {
 	const handleClick = () => {
 		if (node.isDirectory) {
 			onToggle?.(node.path);
@@ -36,8 +37,10 @@ const FileTreeItem: React.FC<{
 			<div
 				onClick={handleClick}
 				style={{
-					paddingLeft: `${depth * 16}px`,
-					padding: "4px 8px",
+					paddingLeft: `${depth * 16 + 8}px`,
+					paddingRight: "8px",
+					paddingTop: "4px",
+					paddingBottom: "4px",
 					cursor: "pointer",
 					display: "flex",
 					alignItems: "center",
@@ -77,7 +80,8 @@ const FileTreeItem: React.FC<{
 							depth={depth + 1}
 							onFileSelect={onFileSelect}
 							onToggle={onToggle}
-							isExpanded={false}
+							isExpanded={expandedPaths?.has(child.path) || false}
+							expandedPaths={expandedPaths}
 						/>
 					))}
 				</div>
@@ -172,6 +176,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
 					onFileSelect={onFileSelect}
 					onToggle={handleToggle}
 					isExpanded={expandedPaths.has(file.path)}
+					expandedPaths={expandedPaths}
 				/>
 			))}
 		</div>

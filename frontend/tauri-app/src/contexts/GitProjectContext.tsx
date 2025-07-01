@@ -1,6 +1,12 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { GitProject, GitProjectCanvas } from '../types/GitProject';
-import { CanvasElement } from '../canvas/types';
+import React, {
+	createContext,
+	useContext,
+	useEffect,
+	useState,
+	ReactNode,
+} from "react";
+import { GitProject, GitProjectCanvas } from "../types/GitProject";
+import { CanvasElement } from "../canvas/types";
 
 interface GitProjectContextValue {
 	selectedGitProject: GitProject | null;
@@ -19,7 +25,10 @@ interface GitProjectProviderProps {
 	gitProject: GitProject | null;
 }
 
-export function GitProjectProvider({ children, gitProject }: GitProjectProviderProps) {
+export function GitProjectProvider({
+	children,
+	gitProject,
+}: GitProjectProviderProps) {
 	const [, forceUpdate] = useState(0);
 
 	// Set up reactive subscriptions to the GitProject
@@ -28,13 +37,16 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			return;
 		}
 
-		const unsubscribeCanvases = gitProject.subscribe('canvases', () => {
-			forceUpdate(prev => prev + 1);
+		const unsubscribeCanvases = gitProject.subscribe("canvases", () => {
+			forceUpdate((prev) => prev + 1);
 		});
 
-		const unsubscribeCurrentCanvas = gitProject.subscribe('currentCanvasIndex', () => {
-			forceUpdate(prev => prev + 1);
-		});
+		const unsubscribeCurrentCanvas = gitProject.subscribe(
+			"currentCanvasIndex",
+			() => {
+				forceUpdate((prev) => prev + 1);
+			},
+		);
 
 		return () => {
 			unsubscribeCanvases();
@@ -45,7 +57,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 	const contextValue: GitProjectContextValue = {
 		selectedGitProject: gitProject,
 		currentCanvas: gitProject?.getCurrentCanvas() || null,
-		
+
 		updateCanvasElements: (elements: any[]) => {
 			if (!gitProject) return;
 			const currentCanvas = gitProject.getCurrentCanvas();
@@ -60,7 +72,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 		},
 
 		addCanvas: (canvas?: any) => {
-			if (!gitProject) return '';
+			if (!gitProject) return "";
 			return gitProject.addCanvas(canvas);
 		},
 
@@ -85,7 +97,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 export function useGitProject(): GitProjectContextValue {
 	const context = useContext(GitProjectContext);
 	if (!context) {
-		throw new Error('useGitProject must be used within a GitProjectProvider');
+		throw new Error("useGitProject must be used within a GitProjectProvider");
 	}
 	return context;
 }
