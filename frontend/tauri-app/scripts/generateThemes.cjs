@@ -73,6 +73,16 @@ const THEMES = {
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
+    "ghost": {
+        "--acc-500": "#eae1e8",
+        "--base-500": "#d4c4d1",
+        "--blackest": "#ffffff",
+        "--whitest": "#151b1b",
+        "--positive-500": "#1ebc73",  // green
+        "--negative-500": "#a24b6f",  // red
+        "--border-radius": "8px",
+        "--border-thickness": "2px",
+    },
     "light": {
         "--acc-500": "#ff4f69",
         "--base-500": "#8b8396",

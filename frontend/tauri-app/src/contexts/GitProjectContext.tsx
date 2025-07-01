@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { GitProject, GitProjectCanvas } from '../types/GitProject';
+import { GitProject, GitProjectCanvas, ProcessState } from '../types/GitProject';
 import { CanvasElement } from '../canvas/types';
+import { ProcessManager } from '../services/ProcessManager';
 
 interface GitProjectContextValue {
 	selectedGitProject: GitProject | null;
@@ -10,6 +11,12 @@ interface GitProjectContextValue {
 	addCanvas: (canvas?: GitProjectCanvas) => string;
 	removeCanvas: (canvasId: string) => boolean;
 	renameCanvas: (canvasId: string, name: string) => boolean;
+	// Process management
+	addProcess: (process: ProcessState) => boolean;
+	updateProcess: (processId: string, updates: Partial<ProcessState>) => boolean;
+	removeProcess: (processId: string) => boolean;
+	getProcessByElementId: (elementId: string) => ProcessState | undefined;
+	getCurrentCanvasProcesses: () => ProcessState[];
 }
 
 const GitProjectContext = createContext<GitProjectContextValue | null>(null);
@@ -72,6 +79,42 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 		renameCanvas: (canvasId: string, name: string) => {
 			if (!gitProject) return false;
 			return gitProject.renameCanvas(canvasId, name);
+		},
+
+		// Process management methods
+		addProcess: (process: ProcessState) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			return gitProject.addProcessToCanvas(currentCanvas.id, process);
+		},
+
+		updateProcess: (processId: string, updates: Partial<ProcessState>) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			return gitProject.updateProcessInCanvas(currentCanvas.id, processId, updates);
+		},
+
+		removeProcess: (processId: string) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			return gitProject.removeProcessFromCanvas(currentCanvas.id, processId);
+		},
+
+		getProcessByElementId: (elementId: string) => {
+			if (!gitProject) return undefined;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return undefined;
+			return gitProject.getProcessByElementId(currentCanvas.id, elementId);
+		},
+
+		getCurrentCanvasProcesses: () => {
+			if (!gitProject) return [];
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return [];
+			return gitProject.getCanvasProcesses(currentCanvas.id);
 		},
 	};
 

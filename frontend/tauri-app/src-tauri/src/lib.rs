@@ -348,19 +348,23 @@ fn create_git_branch_local(directory: &str, branch_name: &str) -> Result<(), Str
 
 #[cfg(target_os = "windows")]
 fn create_git_branch_wsl(directory: &str, branch_name: &str, distribution: &str) -> Result<(), String> {
+	// Execute git command inside WSL using --cd to change directory
 	let output = Command::new("wsl")
 		.arg("-d")
 		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
 		.arg("git")
 		.arg("checkout")
 		.arg("-B")
 		.arg(branch_name)
-		.current_dir(directory)
 		.output()
 		.map_err(|e| format!("Failed to execute WSL git command: {}", e))?;
 	
 	if !output.status.success() {
-		return Err(format!("WSL git checkout failed: {}", String::from_utf8_lossy(&output.stderr)));
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		let stdout = String::from_utf8_lossy(&output.stdout);
+		return Err(format!("WSL git checkout failed: stderr: {} stdout: {}", stderr, stdout));
 	}
 	
 	Ok(())

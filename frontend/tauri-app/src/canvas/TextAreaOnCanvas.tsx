@@ -5,8 +5,10 @@ import { CanvasElement, ElementLayout, TextAreaKind } from "./types";
 import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
 import { TerminalSpec } from "../services/CustomTerminalAPI";
 import { ClaudeCodeAgent } from "../services/ClaudeCodeAgent";
-import { useOsSession } from "../contexts/GitProjectContext";
+import { useOsSession, useGitProject } from "../contexts/GitProjectContext";
 import { useStore } from "../state";
+import { ProcessManager } from "../services/ProcessManager";
+import { ProcessState } from "../types/GitProject";
 
 interface TextAreaOnCanvasProps {
 	layout: ElementLayout;
@@ -31,6 +33,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const { cell, element } = layout;
 	const osSession = useOsSession();
 	const { isLightTheme } = useStore();
+	const { getProcessByElementId, addProcess, updateProcess, removeProcess } = useGitProject();
 
 	// Text area state
 	const [text, setText] = useState((layout.element.kind as TextAreaKind).textArea.content);
@@ -41,6 +44,9 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const [showTerminal, setShowTerminal] = useState(false);
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [claudeAgent, setClaudeAgent] = useState<ClaudeCodeAgent | null>(null);
+
+	// Element ID for process tracking
+	const elementId = element.id;
 
 	const textAreaRef = useRef<HTMLTextAreaElement>(null);
 	const [dragging, setDragging] = useState(false);
@@ -91,6 +97,27 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				(terminalId: string) => {
 					console.log("[TextAreaOnCanvas]", "Terminal ready, ID:", terminalId);
 					setTerminalId(terminalId);
+					
+					// Register process with persistence system
+					const processId = crypto.randomUUID();
+					const processState: ProcessState = {
+						processId,
+						terminalId,
+						type: 'claude-code',
+						status: 'running',
+						startTime: Date.now(),
+						elementId,
+						prompt: text.trim()
+					};
+					
+					// Register with global ProcessManager
+					ProcessManager.registerProcess(processId, agent);
+					ProcessManager.setTerminalConnection(elementId, terminalId);
+					
+					// Register with canvas process state
+					addProcess(processState);
+					
+					console.log("[TextAreaOnCanvas]", "Process registered with ID:", processId);
 				},
 			);
 
@@ -110,6 +137,34 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		(layout.element.kind as TextAreaKind).textArea.content = text;
 	}, [text])
 
+	// Restore process state on mount
+	useEffect(() => {
+		const existingProcess = getProcessByElementId(elementId);
+		
+		if (existingProcess && existingProcess.status === 'running') {
+			console.log('[TextAreaOnCanvas] Restoring existing process:', existingProcess);
+			
+			// Restore UI state
+			setIsLoading(true);
+			setIsLocked(true);
+			setShowTerminal(true);
+			setTerminalId(existingProcess.terminalId);
+			
+			// Try to restore the ClaudeCodeAgent instance from ProcessManager
+			const restoredAgent = ProcessManager.getProcess(existingProcess.processId);
+			if (restoredAgent) {
+				console.log('[TextAreaOnCanvas] Restored ClaudeCodeAgent instance');
+				setClaudeAgent(restoredAgent);
+			} else {
+				console.warn('[TextAreaOnCanvas] ClaudeCodeAgent instance not found in ProcessManager');
+				// Mark process as completed since we can't restore it
+				updateProcess(existingProcess.processId, { status: 'completed' });
+				setIsLoading(false);
+				setIsLocked(false);
+			}
+		}
+	}, [elementId, getProcessByElementId, updateProcess]);
+
 	// Listen for task completion
 	useEffect(() => {
 		if (!claudeAgent) return;
@@ -123,12 +178,26 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			console.log("[TextAreaOnCanvas]", "✅ Task completed:", result);
 			setIsLoading(false);
 			setIsLocked(false);
+			
+			// Update process state
+			const existingProcess = getProcessByElementId(elementId);
+			if (existingProcess) {
+				updateProcess(existingProcess.processId, { status: 'completed' });
+				ProcessManager.unregisterProcess(existingProcess.processId);
+			}
 		};
 
 		const handleTaskError = (error: string) => {
 			console.error("[TextAreaOnCanvas]", "❌ Claude Code task error:", error);
 			setIsLoading(false);
 			setIsLocked(false);
+			
+			// Update process state
+			const existingProcess = getProcessByElementId(elementId);
+			if (existingProcess) {
+				updateProcess(existingProcess.processId, { status: 'error' });
+				ProcessManager.unregisterProcess(existingProcess.processId);
+			}
 		};
 
 		const handleTaskStarted = (data: any) => {
@@ -163,6 +232,15 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			await claudeAgent.stopTask();
 			setClaudeAgent(null);
 		}
+		
+		// Clean up process state
+		const existingProcess = getProcessByElementId(elementId);
+		if (existingProcess) {
+			removeProcess(existingProcess.processId);
+			ProcessManager.unregisterProcess(existingProcess.processId);
+			ProcessManager.removeTerminalConnection(elementId);
+		}
+		
 		setIsLoading(false);
 		setIsLocked(false);
 		setShowTerminal(false);

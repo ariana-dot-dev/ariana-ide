@@ -3,11 +3,22 @@ import { TextArea } from "../canvas/TextArea";
 import type { CanvasElement } from "../canvas/types";
 import { CanvasService } from "../services/CanvasService";
 
+export interface ProcessState {
+	processId: string;
+	terminalId: string;
+	type: 'claude-code' | 'custom-terminal';
+	status: 'running' | 'completed' | 'error';
+	startTime: number;
+	elementId: string; // Which canvas element owns this process
+	prompt?: string; // For claude-code processes
+}
+
 export interface GitProjectCanvas {
 	id: string;
 	name: string;
 	elements: CanvasElement[];
 	osSession?: OsSession; // Optional OS session for canvas-specific operations
+	runningProcesses?: ProcessState[]; // Track processes running in this canvas
 	createdAt: number;
 	lastModified: number;
 }
@@ -226,10 +237,11 @@ export class GitProject {
 		const project = new GitProject(data.root, data.name);
 		project.id = data.id;
 		project.canvases = data.canvases || [project.createDefaultCanvas()];
-		// Handle migration for canvases that don't have osSession yet
+		// Handle migration for canvases that don't have osSession or runningProcesses yet
 		project.canvases = project.canvases.map(canvas => ({
 			...canvas,
-			osSession: canvas.osSession || undefined
+			osSession: canvas.osSession || undefined,
+			runningProcesses: canvas.runningProcesses || []
 		}));
 		project.currentCanvasIndex = data.currentCanvasIndex || 0;
 		project.createdAt = data.createdAt || Date.now();
@@ -256,7 +268,7 @@ export class GitProject {
 	createDefaultCanvas(): GitProjectCanvas {
 		return {
 			id: crypto.randomUUID(),
-			name: 'Main Canvas',
+			name: 'Initial version',
 			elements: [
 				TextArea.canvasElement(this.root, "")
 			],
@@ -268,5 +280,59 @@ export class GitProject {
 	// Utility methods
 	get osSession(): OsSession {
 		return this.root;
+	}
+
+	// Process management methods
+	addProcessToCanvas(canvasId: string, process: ProcessState): boolean {
+		const canvas = this.canvases.find(c => c.id === canvasId);
+		if (!canvas) return false;
+
+		if (!canvas.runningProcesses) {
+			canvas.runningProcesses = [];
+		}
+
+		canvas.runningProcesses.push(process);
+		canvas.lastModified = Date.now();
+		this.lastModified = Date.now();
+		this.notifyListeners('canvases');
+		return true;
+	}
+
+	updateProcessInCanvas(canvasId: string, processId: string, updates: Partial<ProcessState>): boolean {
+		const canvas = this.canvases.find(c => c.id === canvasId);
+		if (!canvas?.runningProcesses) return false;
+
+		const process = canvas.runningProcesses.find(p => p.processId === processId);
+		if (!process) return false;
+
+		Object.assign(process, updates);
+		canvas.lastModified = Date.now();
+		this.lastModified = Date.now();
+		this.notifyListeners('canvases');
+		return true;
+	}
+
+	removeProcessFromCanvas(canvasId: string, processId: string): boolean {
+		const canvas = this.canvases.find(c => c.id === canvasId);
+		if (!canvas?.runningProcesses) return false;
+
+		const index = canvas.runningProcesses.findIndex(p => p.processId === processId);
+		if (index === -1) return false;
+
+		canvas.runningProcesses.splice(index, 1);
+		canvas.lastModified = Date.now();
+		this.lastModified = Date.now();
+		this.notifyListeners('canvases');
+		return true;
+	}
+
+	getCanvasProcesses(canvasId: string): ProcessState[] {
+		const canvas = this.canvases.find(c => c.id === canvasId);
+		return canvas?.runningProcesses || [];
+	}
+
+	getProcessByElementId(canvasId: string, elementId: string): ProcessState | undefined {
+		const canvas = this.canvases.find(c => c.id === canvasId);
+		return canvas?.runningProcesses?.find(p => p.elementId === elementId);
 	}
 }

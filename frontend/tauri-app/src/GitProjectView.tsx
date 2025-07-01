@@ -72,7 +72,7 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 								}
 							}}
 						>
-							{isCreatingCanvas ? "Creating..." : "New Canvas"}
+							{isCreatingCanvas ? "Creating..." : "New Version"}
 						</button>
 						{selectedGitProject.canvases.map((canvas, index) => (
 							<button 
