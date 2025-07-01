@@ -38,6 +38,7 @@ pub fn run() {
 	let terminals_manager = Arc::new(TerminalManager::new());
 	let custom_terminals_manager = Arc::new(CustomTerminalManager::new());
 	let git_search_manager = Arc::new(GitSearchManager::new());
+	let lsp_manager = Arc::new(LspManager::new());
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_os::init())
@@ -53,6 +54,7 @@ pub fn run() {
 		.manage(terminals_manager)
 		.manage(custom_terminals_manager)
 		.manage(git_search_manager)
+		.manage(lsp_manager)
 		.invoke_handler(tauri::generate_handler![
 			// Original terminal commands
 			create_terminal_connection,
@@ -85,11 +87,19 @@ pub fn run() {
 			// Git repository commands
 			check_git_repository,
 			execute_command,
-			execute_command_in_dir
+			execute_command_in_dir,
+			// LSP commands
+			start_lsp,
+			lsp_open_document,
+			lsp_update_document,
+			lsp_get_diagnostics
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
 }
+
+mod lsp;
+use lsp::{LspDiagnostic, LspManager};
 
 #[tauri::command]
 async fn create_terminal_connection(
@@ -215,6 +225,82 @@ async fn start_git_directories_search(
 ) -> Result<String, String> {
 	let search_id = git_search_manager.start_search(os_session_kind);
 	Ok(search_id)
+}
+
+// todo: generalize this for all lsp's
+#[tauri::command]
+async fn start_lsp(
+	lsp_manager: State<'_, Arc<LspManager>>,
+	ts_ls_path: Option<String>,
+) -> Result<(), String> {
+	log::info!("[Command] start_lsp called");
+
+	// Use provided path or try default locations
+	let path = ts_ls_path.unwrap_or_else(|| {
+		// Try to find typescript-language-server in PATH first
+		if let Ok(output) = std::process::Command::new("which")
+			.arg("typescript-language-server")
+			.output()
+		{
+			if output.status.success() {
+				if let Ok(path) = String::from_utf8(output.stdout) {
+					return path.trim().to_string();
+				}
+			}
+		}
+
+		// Fallback to common locations
+		"typescript-language-server".to_string()
+	});
+
+	let result = lsp_manager.start_typescript_lsp(&path).await.map_err(|e| {
+		let err_string = e.to_string();
+		log::error!("[Command] start_lsp failed: {}", err_string);
+		err_string
+	});
+
+	if result.is_ok() {
+		log::info!(
+			"[Command] start_lsp completed successfully with path: {}",
+			path
+		);
+	}
+
+	result
+}
+
+#[tauri::command]
+async fn lsp_open_document(
+	uri: String,
+	text: String,
+	language_id: String,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<(), String> {
+	lsp_manager
+		.open_document(uri, text, language_id)
+		.await
+		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn lsp_update_document(
+	uri: String,
+	text: String,
+	version: i32,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<(), String> {
+	lsp_manager
+		.update_document(uri, text, version)
+		.await
+		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn lsp_get_diagnostics(
+	uri: String,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<Vec<LspDiagnostic>, String> {
+	Ok(lsp_manager.get_diagnostics(&uri).await)
 }
 
 #[tauri::command]

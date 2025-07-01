@@ -14,6 +14,12 @@ import {
 	yToLine,
 } from "./utils/measurements";
 
+declare global {
+	interface Window {
+		__TAURI_EVENT_PLUGIN_INTERNALS__?: any;
+	}
+}
+
 interface EditorViewProps {
 	className?: string;
 	showLineNumbers?: boolean;
@@ -27,7 +33,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const contentRef = useRef<HTMLDivElement>(null);
 
 	const activeFileId = useEditorStore((state) => state.activeFileId);
-	const activeFile = useEditorStore((state) => state.files[activeFileId]);
+	const files = useEditorStore((state) => state.files);
+	const activeFile = activeFileId ? files[activeFileId] : undefined;
 	const document = activeFile?.document || null;
 	const cursor = activeFile?.cursor || { line: 0, column: 0 };
 	const highlightedLines = activeFile?.highlightedLines;
@@ -39,15 +46,56 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const initializeSyntaxHighlighting = useEditorStore(
 		(state) => state.initializeSyntaxHighlighting,
 	);
+	const initializeLsp = useEditorStore((state) => state.initializeLsp);
+	const lspInitialized = useEditorStore((state) => state.lspInitialized);
+	const lspDiagnosticsMap = useEditorStore((state) => state.lspDiagnostics);
+	console.log(`lspDiagnosticsMap: ${JSON.stringify(lspDiagnosticsMap)}`);
+	const lspDiagnostics =
+		activeFileId && lspDiagnosticsMap[activeFileId]
+			? lspDiagnosticsMap[activeFileId]
+			: [];
 
 	// set up file watching and syntax highlighting on mount
 	useEffect(() => {
-		console.log("[EditorView] useEffect for file watching triggered");
-		setupFileWatching();
-		initializeSyntaxHighlighting();
+		let mounted = true;
+
+		const initialize = async () => {
+			if (!mounted) return;
+
+			console.log("[EditorView] useEffect for file watching triggered");
+			try {
+				await setupFileWatching();
+				await initializeSyntaxHighlighting();
+			} catch (error) {
+				console.error(
+					"[EditorView] Failed to initialize file watching/syntax:",
+					error,
+				);
+			}
+
+			// Initialize LSP separately with better error handling
+			try {
+				console.log("[EditorView] Initializing LSP...");
+				await initializeLsp();
+				console.log("[EditorView] LSP initialization complete");
+			} catch (error) {
+				console.error("[EditorView] Failed to initialize LSP:", error);
+				// LSP failure should not break the editor - it's an optional feature
+				if (error instanceof Error) {
+					console.warn("[EditorView] LSP unavailable:", error.message);
+				}
+			}
+		};
+
+		initialize();
+
 		return () => {
+			mounted = false;
 			console.log("[EditorView] useEffect cleanup for file watching triggered");
-			cleanupFileWatching();
+			// Only cleanup if we're still in a valid state
+			if (window.__TAURI_EVENT_PLUGIN_INTERNALS__) {
+				cleanupFileWatching().catch(console.error);
+			}
 		};
 	}, []); // remove dependencies to prevent re-running
 
@@ -188,6 +236,46 @@ export const EditorView: React.FC<EditorViewProps> = ({
 				{/* input handler */}
 				<InputHandler containerRef={containerRef} />
 			</div>
+
+			{/* LSP notifications */}
+			{!lspInitialized && activeFile?.name.match(/\.(ts|tsx|js|jsx)$/) && (
+				<div className="absolute bottom-4 right-4 max-w-sm bg-blue-900/90 text-white p-3 rounded-lg shadow-lg">
+					<div className="font-semibold">TypeScript LSP Initializing...</div>
+				</div>
+			)}
+
+			{lspInitialized &&
+				lspDiagnostics.length === 0 &&
+				activeFile?.name.match(/\.(ts|tsx|js|jsx)$/) && (
+					<div className="absolute bottom-4 right-4 max-w-sm bg-green-900/90 text-white p-3 rounded-lg shadow-lg">
+						<div className="font-semibold">TypeScript LSP Active!</div>
+						<div className="text-sm">
+							No issues found in {activeFile.name.split("/").pop()}
+						</div>
+					</div>
+				)}
+
+			{lspDiagnostics.length > 0 && (
+				<div className="absolute bottom-4 right-4 max-w-sm bg-red-900/90 text-white p-3 rounded-lg shadow-lg">
+					<div className="font-semibold mb-1">TypeScript LSP Active!</div>
+					<div className="text-sm">
+						{lspDiagnostics.length} diagnostic
+						{lspDiagnostics.length !== 1 ? "s" : ""} found:
+					</div>
+					<div className="text-xs mt-1 max-h-32 overflow-y-auto">
+						{lspDiagnostics.slice(0, 3).map((diag, i) => (
+							<div key={i} className="mt-1">
+								• Line {diag.line + 1}: {diag.message}
+							</div>
+						))}
+						{lspDiagnostics.length > 3 && (
+							<div className="mt-1 text-gray-300">
+								...and {lspDiagnostics.length - 3} more
+							</div>
+						)}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };
