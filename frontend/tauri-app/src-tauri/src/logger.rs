@@ -1,0 +1,34 @@
+use colored::Colorize as _;
+use log::LevelFilter;
+use tauri::{plugin::TauriPlugin, Runtime};
+use tauri_plugin_log::Builder;
+
+pub fn init<R: Runtime>(level: LevelFilter) -> TauriPlugin<R> {
+	Builder::new()
+		.level(LevelFilter::Warn)
+		.level_for("app_lib", level)
+		.format(|cb, _, record| {
+			use env_logger::fmt::style;
+			let style = match record.level() {
+				log::Level::Trace => style::AnsiColor::Cyan.on_default(),
+				log::Level::Debug => style::AnsiColor::Blue.on_default(),
+				log::Level::Info => style::AnsiColor::Green.on_default(),
+				log::Level::Warn => style::AnsiColor::Yellow.on_default(),
+				log::Level::Error => style::AnsiColor::Red
+					.on_default()
+					.effects(style::Effects::BOLD),
+			};
+			cb.finish(format_args!(
+				"[{}] [{style}{}{style:#}] [{}]: {}",
+				chrono::Local::now()
+					.format("%I:%M:%S%p")
+					.to_string()
+					.yellow()
+					.dimmed(),
+				record.level(),
+				record.target(),
+				record.args()
+			));
+		})
+		.build()
+}

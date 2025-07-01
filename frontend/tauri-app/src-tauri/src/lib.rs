@@ -4,6 +4,7 @@
 	windows_subsystem = "windows"
 )]
 
+use log::LevelFilter;
 use std::sync::Arc;
 use std::process::Command;
 use std::path::Path;
@@ -17,6 +18,7 @@ use file_watcher::FileWatcher;
 
 mod custom_terminal;
 mod custom_terminal_commands;
+mod logger;
 
 mod os;
 
@@ -40,8 +42,10 @@ pub fn run() {
 	tauri::Builder::default()
 		.plugin(tauri_plugin_os::init())
 		.plugin(tauri_plugin_store::Builder::new().build())
+		.plugin(logger::init(LevelFilter::Info))
 		.plugin(tauri_plugin_fs::init())
 		.setup(|app| {
+			log::debug!("starting ariana-ide tauri");
 			let file_watcher = Arc::new(FileWatcher::new(app.handle().clone()));
 			app.manage(file_watcher);
 			Ok(())
