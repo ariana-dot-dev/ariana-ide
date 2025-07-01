@@ -340,15 +340,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					}
 				}
 
-				// Detect Mac platform for proper delete key handling
-				const isMac = navigator.platform.toLowerCase().includes('mac');
-
 				if (event.key === "Enter") {
 					await sendRawInput("\r");
 					event.preventDefault();
 					return;
 				} else if (event.key === "Backspace") {
-					await sendRawInput("\b");
+					// Handle backspace key - backward delete
+					await sendRawInput("\x7f"); // Use DEL character (127) instead of \b for better compatibility
 					event.preventDefault();
 					return;
 				} else if (event.key === "Tab") {
@@ -396,13 +394,11 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					event.preventDefault();
 					return;
 				} else if (event.key === "Delete") {
-					if (isMac) {
-						// On Mac, the delete key (⌫) acts as backspace
-						await sendRawInput("\b");
-					} else {
-						// On other platforms, delete is forward delete
-						await sendRawInput("\x1b[3~");
-					}
+					// Handle delete key properly
+					// On Mac: Delete key = forward delete (\x1b[3~)
+					// On Mac: Backspace key = backward delete (\b) - handled above
+					// On other platforms: Delete = forward delete (\x1b[3~)
+					await sendRawInput("\x1b[3~");
 					event.preventDefault();
 					return;
 				} else if (
