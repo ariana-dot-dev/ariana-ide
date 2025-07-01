@@ -335,45 +335,82 @@ export class DiffService {
       
       console.log(`[FRONTEND] Comparing ${baseRef} with ${targetRef}`);
       
-      // Special case: if comparing with unstaged changes (no target commit specified and target is current branch)
+      // Special handling for unstaged/staged changes
       const currentBranch = await this.executeGitCommand(["branch", "--show-current"]);
-      const isComparingWithUnstaged = !targetCommit && targetBranch.trim() === currentBranch.trim();
       
-      if (isComparingWithUnstaged && baseRef !== targetRef) {
-        console.log(`[FRONTEND] Comparing ${baseRef} with unstaged changes on ${targetBranch}`);
+      // Case 1: Comparing with unstaged changes
+      if (targetCommit === 'UNSTAGED') {
+        console.log(`[FRONTEND] Comparing ${baseRef} with unstaged changes`);
         
-        // Get differences from base to current HEAD plus unstaged changes
-        // This gives us the cumulative diff from base branch to all current changes
-        let diff = "";
-        
-        try {
-          // First get diff from base to current HEAD
-          const committedDiff = await this.executeGitCommand(["diff", `${baseRef}...HEAD`]);
+        // If base is different from current branch, we need to show ALL changes from base to current state
+        if (baseRef !== currentBranch.trim() && baseRef !== 'HEAD') {
+          console.log(`[FRONTEND] Cross-branch comparison: ${baseRef} to current unstaged`);
           
-          // Then get unstaged changes
-          const unstagedDiff = await this.executeGitCommand(["diff", "HEAD"]);
-          
-          // Combine both diffs - this shows all changes from base branch to current state
-          if (committedDiff.trim() && unstagedDiff.trim()) {
-            // If we have both committed and unstaged changes, combine them
-            diff = committedDiff + "\n" + unstagedDiff;
-          } else if (committedDiff.trim()) {
-            diff = committedDiff;
-          } else if (unstagedDiff.trim()) {
-            diff = unstagedDiff;
+          try {
+            // Get diff from base branch to current HEAD (committed changes)
+            const committedDiff = await this.executeGitCommand(["diff", `${baseRef}...HEAD`]);
+            
+            // Get unstaged changes from current HEAD
+            const unstagedDiff = await this.executeGitCommand(["diff", "HEAD"]);
+            
+            console.log(`[FRONTEND] Committed diff length: ${committedDiff.length}`);
+            console.log(`[FRONTEND] Unstaged diff length: ${unstagedDiff.length}`);
+            
+            // Combine both to show complete diff from base to current state
+            if (committedDiff.trim() && unstagedDiff.trim()) {
+              // Parse and merge the diffs properly
+              const combinedDiff = this.combineDiffs(committedDiff, unstagedDiff);
+              return combinedDiff;
+            } else if (committedDiff.trim()) {
+              return committedDiff;
+            } else if (unstagedDiff.trim()) {
+              return unstagedDiff;
+            } else {
+              return "";
+            }
+            
+          } catch (error) {
+            console.warn(`[FRONTEND] Failed combined diff, trying direct comparison:`, error);
+            // Fallback: get diff from base directly to working directory
+            return await this.executeGitCommand(["diff", baseRef]);
           }
-          
-          console.log(`[FRONTEND] Combined diff length: ${diff.length}`);
-          
-        } catch (diffError) {
-          console.warn(`[FRONTEND] Failed to get combined diff, falling back to simple comparison:`, diffError);
-          // Fallback to simple diff if the above fails
-          diff = await this.executeGitCommand(["diff", baseRef]);
+        } else {
+          // Same branch comparison - just show unstaged changes
+          return await this.executeGitCommand(["diff", "HEAD"]);
         }
+      }
+      
+      // Case 2: Comparing with staged changes  
+      else if (targetCommit === 'STAGED') {
+        console.log(`[FRONTEND] Comparing ${baseRef} with staged changes`);
         
-        return diff;
-      } else {
-        // Normal branch/commit comparison
+        if (baseRef !== currentBranch.trim() && baseRef !== 'HEAD') {
+          // Cross-branch: base to current HEAD + staged changes
+          try {
+            const committedDiff = await this.executeGitCommand(["diff", `${baseRef}...HEAD`]);
+            const stagedDiff = await this.executeGitCommand(["diff", "--cached", "HEAD"]);
+            
+            if (committedDiff.trim() && stagedDiff.trim()) {
+              return this.combineDiffs(committedDiff, stagedDiff);
+            } else if (committedDiff.trim()) {
+              return committedDiff;
+            } else if (stagedDiff.trim()) {
+              return stagedDiff;
+            } else {
+              return "";
+            }
+          } catch (error) {
+            console.warn(`[FRONTEND] Failed staged diff combination:`, error);
+            return await this.executeGitCommand(["diff", "--cached", baseRef]);
+          }
+        } else {
+          // Same branch - just show staged changes
+          return await this.executeGitCommand(["diff", "--cached", "HEAD"]);
+        }
+      }
+      
+      // Case 3: Normal branch/commit comparison
+      else {
         const diff = await this.executeGitCommand(["diff", `${baseRef}...${targetRef}`]);
         return diff;
       }
@@ -399,55 +436,112 @@ export class DiffService {
       const baseRef = baseCommit || baseBranch;
       const targetRef = targetCommit || targetBranch;
       
-      // Special case: if comparing with unstaged changes (no target commit specified and target is current branch)
+      // Special handling for unstaged/staged changes (same logic as getBranchComparison)
       const currentBranch = await this.executeGitCommand(["branch", "--show-current"]);
-      const isComparingWithUnstaged = !targetCommit && targetBranch.trim() === currentBranch.trim();
       
-      if (isComparingWithUnstaged && baseRef !== targetRef) {
-        console.log(`[FRONTEND] Getting unified diff: ${baseRef} with unstaged changes on ${targetBranch}`);
+      // Case 1: Comparing with unstaged changes
+      if (targetCommit === 'UNSTAGED') {
+        console.log(`[FRONTEND] Getting unified diff: ${baseRef} with unstaged changes`);
         
-        let diff = "";
-        
-        try {
-          // First get diff from base to current HEAD
-          const committedDiff = await this.executeGitCommand([
-            "diff", 
-            "--unified=3",
-            "--no-color",
-            `${baseRef}...HEAD`
-          ]);
+        if (baseRef !== currentBranch.trim() && baseRef !== 'HEAD') {
+          console.log(`[FRONTEND] Cross-branch unified diff: ${baseRef} to current unstaged`);
           
-          // Then get unstaged changes
-          const unstagedDiff = await this.executeGitCommand([
+          try {
+            const committedDiff = await this.executeGitCommand([
+              "diff", 
+              "--unified=3",
+              "--no-color",
+              `${baseRef}...HEAD`
+            ]);
+            
+            const unstagedDiff = await this.executeGitCommand([
+              "diff",
+              "--unified=3", 
+              "--no-color",
+              "HEAD"
+            ]);
+            
+            if (committedDiff.trim() && unstagedDiff.trim()) {
+              return this.combineDiffs(committedDiff, unstagedDiff);
+            } else if (committedDiff.trim()) {
+              return committedDiff;
+            } else if (unstagedDiff.trim()) {
+              return unstagedDiff;
+            } else {
+              return "";
+            }
+          } catch (error) {
+            console.warn(`[FRONTEND] Failed unified diff combination:`, error);
+            return await this.executeGitCommand([
+              "diff", 
+              "--unified=3",
+              "--no-color",
+              baseRef
+            ]);
+          }
+        } else {
+          return await this.executeGitCommand([
             "diff",
             "--unified=3", 
             "--no-color",
             "HEAD"
           ]);
-          
-          // Combine both diffs
-          if (committedDiff.trim() && unstagedDiff.trim()) {
-            diff = committedDiff + "\n" + unstagedDiff;
-          } else if (committedDiff.trim()) {
-            diff = committedDiff;
-          } else if (unstagedDiff.trim()) {
-            diff = unstagedDiff;
+        }
+      }
+      
+      // Case 2: Comparing with staged changes
+      else if (targetCommit === 'STAGED') {
+        console.log(`[FRONTEND] Getting unified diff: ${baseRef} with staged changes`);
+        
+        if (baseRef !== currentBranch.trim() && baseRef !== 'HEAD') {
+          try {
+            const committedDiff = await this.executeGitCommand([
+              "diff", 
+              "--unified=3",
+              "--no-color",
+              `${baseRef}...HEAD`
+            ]);
+            
+            const stagedDiff = await this.executeGitCommand([
+              "diff",
+              "--unified=3", 
+              "--no-color",
+              "--cached",
+              "HEAD"
+            ]);
+            
+            if (committedDiff.trim() && stagedDiff.trim()) {
+              return this.combineDiffs(committedDiff, stagedDiff);
+            } else if (committedDiff.trim()) {
+              return committedDiff;
+            } else if (stagedDiff.trim()) {
+              return stagedDiff;
+            } else {
+              return "";
+            }
+          } catch (error) {
+            console.warn(`[FRONTEND] Failed staged unified diff combination:`, error);
+            return await this.executeGitCommand([
+              "diff",
+              "--unified=3", 
+              "--no-color",
+              "--cached",
+              baseRef
+            ]);
           }
-          
-        } catch (diffError) {
-          console.warn(`[FRONTEND] Failed to get combined unified diff, falling back:`, diffError);
-          // Fallback to simple diff
-          diff = await this.executeGitCommand([
-            "diff", 
-            "--unified=3",
+        } else {
+          return await this.executeGitCommand([
+            "diff",
+            "--unified=3", 
             "--no-color",
-            baseRef
+            "--cached",
+            "HEAD"
           ]);
         }
-        
-        return diff;
-      } else {
-        // Normal branch/commit comparison
+      }
+      
+      // Case 3: Normal branch/commit comparison
+      else {
         const diff = await this.executeGitCommand([
           "diff", 
           "--unified=3",
@@ -863,6 +957,18 @@ export class DiffService {
     });
     
     return subPaths;
+  }
+
+  private combineDiffs(diff1: string, diff2: string): string {
+    // Simple combination for now - just concatenate the diffs
+    // This could be enhanced to merge overlapping file changes more intelligently
+    console.log("[FRONTEND] Combining two diffs");
+    
+    if (!diff1.trim()) return diff2;
+    if (!diff2.trim()) return diff1;
+    
+    // Add a separator comment between the diffs
+    return diff1 + "\n\n" + diff2;
   }
 
   private inferChangeType(addedLines: GitDiffLine[], removedLines: GitDiffLine[]) {

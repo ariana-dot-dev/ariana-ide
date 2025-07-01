@@ -8,9 +8,10 @@ interface DiffManagementProps {
   onClose: () => void;
   initialState?: any;
   onStateChange?: (state: any) => void;
+  mainTitlebarVisible?: boolean;
 }
 
-export default function DiffManagement({ onClose, initialState, onStateChange }: DiffManagementProps) {
+export default function DiffManagement({ onClose, initialState, onStateChange, mainTitlebarVisible }: DiffManagementProps) {
   // Add global error logging
   useEffect(() => {
     const handleError = (error: ErrorEvent) => {
@@ -68,6 +69,22 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
       console.log("DiffManagement initialized with saved state:", initialState);
     }
   }, []);
+
+  // Load commits when base branch changes
+  useEffect(() => {
+    if (selectedBaseBranch) {
+      console.log(`Loading commits for base branch: ${selectedBaseBranch}`);
+      loadBranchCommits(selectedBaseBranch, true);
+    }
+  }, [selectedBaseBranch]);
+
+  // Load commits when target branch changes
+  useEffect(() => {
+    if (selectedTargetBranch) {
+      console.log(`Loading commits for target branch: ${selectedTargetBranch}`);
+      loadBranchCommits(selectedTargetBranch, false);
+    }
+  }, [selectedTargetBranch]);
 
   // Save state whenever it changes
   useEffect(() => {
@@ -754,17 +771,18 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
       <div 
         className={cn(
           "flex items-center justify-between border-b border-[var(--base-300)] transition-all duration-300 relative",
-          showHeader ? "p-4 h-auto opacity-100" : "p-1 h-8 opacity-0"
+          (showHeader || mainTitlebarVisible) ? "p-4 h-auto opacity-100" : "p-1 h-8 opacity-0",
+          mainTitlebarVisible && "mt-12"
         )}
         onMouseEnter={() => setShowHeader(true)}
         onMouseLeave={() => setShowHeader(false)}
       >
-        {/* Invisible hover trigger area at bottom */}
+        {/* Invisible hover trigger area extending 20px below header */}
         <div 
-          className="absolute bottom-0 left-0 right-0 h-4 bg-transparent cursor-pointer"
+          className="absolute -bottom-5 left-0 right-0 h-9 bg-transparent cursor-pointer"
           onMouseEnter={() => setShowHeader(true)}
         />
-        {showHeader && (
+        {(showHeader || mainTitlebarVisible) && (
           <>
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>

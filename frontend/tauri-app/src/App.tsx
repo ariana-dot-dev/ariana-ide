@@ -149,6 +149,7 @@ function App() {
 									onClose={() => setShowDiffManagement(false)}
 									initialState={diffManagementState}
 									onStateChange={setDiffManagementState}
+									mainTitlebarVisible={showTitlebar}
 								/>
 							</div>
 						</div>
