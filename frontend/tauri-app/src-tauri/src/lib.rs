@@ -30,6 +30,9 @@ use custom_terminal_commands::{
 mod file_tree;
 use file_tree::{read_directory, FileNode};
 
+mod lsp;
+use lsp::{LspDiagnostic, LspManager};
+
 #[tauri::command]
 async fn create_terminal_connection(
 	config: TerminalConfig,
@@ -153,14 +156,91 @@ async fn unwatch_file(
 	result
 }
 
+// todo: generalize this for all lsp's
+#[tauri::command]
+async fn start_lsp(
+	lsp_manager: State<'_, Arc<LspManager>>,
+	ts_ls_path: Option<String>,
+) -> Result<(), String> {
+	log::info!("[Command] start_lsp called");
+
+	// Use provided path or try default locations
+	let path = ts_ls_path.unwrap_or_else(|| {
+		// Try to find typescript-language-server in PATH first
+		if let Ok(output) = std::process::Command::new("which")
+			.arg("typescript-language-server")
+			.output()
+		{
+			if output.status.success() {
+				if let Ok(path) = String::from_utf8(output.stdout) {
+					return path.trim().to_string();
+				}
+			}
+		}
+
+		// Fallback to common locations
+		"typescript-language-server".to_string()
+	});
+
+	let result = lsp_manager.start_typescript_lsp(&path).await.map_err(|e| {
+		let err_string = e.to_string();
+		log::error!("[Command] start_lsp failed: {}", err_string);
+		err_string
+	});
+
+	if result.is_ok() {
+		log::info!(
+			"[Command] start_lsp completed successfully with path: {}",
+			path
+		);
+	}
+
+	result
+}
+
+#[tauri::command]
+async fn lsp_open_document(
+	uri: String,
+	text: String,
+	language_id: String,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<(), String> {
+	lsp_manager
+		.open_document(uri, text, language_id)
+		.await
+		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn lsp_update_document(
+	uri: String,
+	text: String,
+	version: i32,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<(), String> {
+	lsp_manager
+		.update_document(uri, text, version)
+		.await
+		.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn lsp_get_diagnostics(
+	uri: String,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<Vec<LspDiagnostic>, String> {
+	Ok(lsp_manager.get_diagnostics(&uri).await)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	let terminal_manager = Arc::new(TerminalManager::new());
 	let custom_terminal_state = AppState::new();
+	let lsp_manager = Arc::new(LspManager::new());
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_store::Builder::new().build())
-		.plugin(logger::init(LevelFilter::Info))
+		.plugin(logger::init(LevelFilter::Debug))
 		.plugin(tauri_plugin_fs::init())
 		.setup(|app| {
 			log::debug!("starting ariana-ide tauri");
@@ -170,6 +250,7 @@ pub fn run() {
 		})
 		.manage(terminal_manager)
 		.manage(custom_terminal_state)
+		.manage(lsp_manager)
 		.invoke_handler(tauri::generate_handler![
 			// Original terminal commands
 			create_terminal_connection,
@@ -197,7 +278,12 @@ pub fn run() {
 			write_file,
 			// File watcher commands
 			watch_file,
-			unwatch_file
+			unwatch_file,
+			// LSP commands
+			start_lsp,
+			lsp_open_document,
+			lsp_update_document,
+			lsp_get_diagnostics
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");

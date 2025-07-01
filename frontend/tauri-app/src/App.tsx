@@ -14,6 +14,7 @@ import Repl from "./Repl";
 import { Interpreter } from "./scripting/interpreter";
 import { useStore } from "./state";
 import { cn } from "./utils";
+import "./test-lsp"; // Import test LSP command
 
 const appWindow = getCurrentWebviewWindow();
 
