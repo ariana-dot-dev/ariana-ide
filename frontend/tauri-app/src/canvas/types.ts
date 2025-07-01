@@ -77,13 +77,6 @@ export class CanvasElement {
 	}
 }
 
-export interface CanvasState {
-	elements: CanvasElement[];
-	layouts: ElementLayout[];
-	canvasWidth: number;
-	canvasHeight: number;
-}
-
 export interface OptimizationOptions {
 	stabilityWeight: number; // 0-1, how much to favor stability vs optimization
 }

@@ -3,12 +3,13 @@ import { OsSession, OsSessionKind } from "../bindings/os";
 import { useStore } from "../state";
 import { OsSessionKindSelector } from "./OsSessionKindSelector";
 import { ProjectDirectoryList } from "./ProjectDirectoryList";
+import { GitProject } from "../types/GitProject";
 
 interface ProjectSelectorProps {
-	onSessionCreated: () => void;
+	onProjectCreated: (projectId: string) => void;
 }
 
-export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
+export function ProjectSelector({ onProjectCreated }: ProjectSelectorProps) {
 	const store = useStore();
 	const [selectedKind, setSelectedKind] = useState<OsSessionKind | undefined>();
 	const [selectedPath, setSelectedPath] = useState<string | undefined>();
@@ -41,11 +42,11 @@ export function ProjectSelector({ onSessionCreated }: ProjectSelectorProps) {
 			return;
 		}
 
-		// Add session to store and set as current
-		const sessionId = store.addOsSession(osSession);
-		store.setCurrentOsSessionId(sessionId);
+		// Create GitProject with the OsSession as root
+		const gitProject = new GitProject(osSession);
+		const projectIndex = store.addGitProject(gitProject);
 
-		onSessionCreated();
+		onProjectCreated(projectIndex);
 	};
 
 	const canProceed = selectedKind && selectedPath;

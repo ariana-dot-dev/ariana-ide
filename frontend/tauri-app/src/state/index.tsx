@@ -8,15 +8,15 @@ import {
 	useState,
 } from "react";
 import { Command } from "../scripting/baseScript";
-import { OsSession } from "../bindings/os";
+import { OsSession, osSessionEquals } from "../bindings/os";
+import { GitProject } from "../types/GitProject";
 
 // Define the shape of the state
 interface AppState {
 	theme: string;
 	showOnboarding: boolean;
 	currentInterpreterScript: string;
-	osSessions: Record<string, OsSession>;
-	currentOsSessionId?: string;
+	gitProjects: GitProject[];
 }
 
 // Define the shape of the store, including state and actions
@@ -25,13 +25,11 @@ export interface IStore extends AppState {
 	setShowOnboarding: (show: boolean) => void;
 	setCurrentInterpreterScript: (script: string) => void;
 	isLightTheme: boolean;
-	addOsSession: (session: OsSession) => string;
-	removeOsSession: (sessionId: string) => void;
-	getOsSession: (sessionId: string) => OsSession | null;
-	clearAllOsSessions: () => void;
-	osSessions: Record<string, OsSession>;
-	currentOsSessionId?: string;
-	setCurrentOsSessionId: (sessionId: string) => void;
+	addGitProject: (project: GitProject) => string;
+	removeGitProject: (projectId: string) => void;
+	getGitProject: (projectId: string) => GitProject | null;
+	clearAllGitProjects: () => void;
+	gitProjects: GitProject[];
 	processCommand: (command: Command) => void;
 	revertCommand: () => void;
 }
@@ -48,10 +46,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 	const [processedCommandsStack, setProcessedCommandsStack] = useState<
 		Command[]
 	>([]);
-	const [osSessions, setOsSessions] = useState<Record<string, OsSession>>({});
-	const [currentOsSessionId, setCurrentOsSessionIdState] = useState<
-		string | undefined
-	>(undefined);
+	const [gitProjects, setGitProjects] = useState<GitProject[]>([]);
 	const [tauriStore, setTauriStore] = useState<Store | null>(null);
 
 	// Load state from disk on initial render
@@ -65,8 +60,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					setThemeState(savedState.theme);
 					setShowOnboardingState(savedState.showOnboarding);
 					setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
-					setOsSessions(savedState.osSessions || {});
-					setCurrentOsSessionIdState(savedState.currentOsSessionId);
+					// Handle migration from old osSessions to new gitProjects structure
+					if (savedState.gitProjects) {
+						const projects = savedState.gitProjects.map((projectData: any) => 
+							GitProject.fromJSON(projectData)
+						).filter((p) => {
+							p.canvases.length > 0 && p.canvases.some((c) => c.elements.length > 0)
+						});
+						setGitProjects(projects);
+					} else if ((savedState as any).osSessions) {
+						// Migration: convert old OsSessions to GitProjects
+						const oldSessions = (savedState as any).osSessions;
+						const migratedProjects = Object.values(oldSessions).map((session: any) => 
+							new GitProject(session as OsSession)
+						);
+						setGitProjects(migratedProjects);
+					}
 				}
 			} catch (error) {
 				console.error("Failed to load state:", error);
@@ -84,8 +93,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					theme,
 					showOnboarding,
 					currentInterpreterScript,
-					osSessions,
-					currentOsSessionId,
+					gitProjects: gitProjects.map(project => project.toJSON()),
 				};
 				await tauriStore.set("appState", stateToSave);
 				await tauriStore.save();
@@ -98,8 +106,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		theme,
 		showOnboarding,
 		currentInterpreterScript,
-		osSessions,
-		currentOsSessionId,
+		gitProjects,
 	]);
 
 	const setTheme = (newTheme: string) => setThemeState(newTheme);
@@ -158,30 +165,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		isLightTheme,
 		processCommand,
 		revertCommand,
-		osSessions,
-		currentOsSessionId,
-		setCurrentOsSessionId: setCurrentOsSessionIdState,
-		addOsSession: (session: OsSession) => {
-			const sessionId = crypto.randomUUID();
-			setOsSessions((prev) => ({
-				...prev,
-				[sessionId]: session,
-			}));
-			return sessionId;
-		},
-		removeOsSession: (sessionId: string) => {
-			setOsSessions((prev) => {
-				const newSessions = { ...prev };
-				delete newSessions[sessionId];
-				return newSessions;
+		gitProjects,
+		addGitProject: (project: GitProject) => {
+			let projectId = null;
+			setGitProjects((prev) => {
+				let identicalProject = prev.find(p => osSessionEquals(p.osSession, project.osSession));
+				if (!identicalProject) {
+					projectId = project.id;
+					return [...prev, project]
+				}
+				projectId = identicalProject.id;
+				return prev
 			});
+			if (projectId == null) {
+				throw new Error("projectId is null");
+			}
+			return projectId;
 		},
-		getOsSession: (sessionId: string) => {
-			return osSessions[sessionId] || null;
+		removeGitProject: (projectId: string) => {
+			setGitProjects((prev) => prev.filter(p => p.id !== projectId));
 		},
-		clearAllOsSessions: () => {
-			setOsSessions({});
-			setCurrentOsSessionIdState(undefined);
+		getGitProject: (projectId: string) => {
+			return gitProjects.find(p => p.id === projectId) || null;
+		},
+		clearAllGitProjects: () => {
+			setGitProjects([]);
 		},
 	};
 

@@ -5,6 +5,7 @@ import { CanvasElement, ElementLayout } from "./types";
 import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
 import { TerminalSpec } from "../services/CustomTerminalAPI";
 import { ClaudeCodeAgent } from "../services/ClaudeCodeAgent";
+import { useOsSession } from "../contexts/GitProjectContext";
 import { useStore } from "../state";
 
 interface TextAreaOnCanvasProps {
@@ -28,6 +29,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	isDragging,
 }) => {
 	const { cell, element } = layout;
+	const osSession = useOsSession();
 	const { isLightTheme } = useStore();
 
 	// Text area state
@@ -51,11 +53,22 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		propOnDragEnd(element);
 	};
 
-	const createTerminalSpec = (): TerminalSpec => ({
-		kind: { $type: "wsl" as const },
-		lines: 24,
-		cols: 60,
-	});
+	const createTerminalSpec = (): TerminalSpec => {
+		// Create terminal spec based on the current OS session
+		if (osSession && typeof osSession === 'object' && 'Wsl' in osSession) {
+			return {
+				kind: { $type: "wsl" as const },
+				lines: 24,
+				cols: 60,
+			};
+		} else {
+			return {
+				kind: { $type: "local" as const },
+				lines: 24,
+				cols: 60,
+			};
+		}
+	};
 
 	const handleGoClick = async () => {
 		console.log(
@@ -98,7 +111,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			);
 
 			await agent.startTask(
-				{ Wsl: { distribution: "Ubuntu", working_directory: "~" } },
+				osSession || { Local: "." }, // Use the project's OS session or fallback to local
 				text.trim(),
 				terminalSpec,
 				(terminalId: string) => {

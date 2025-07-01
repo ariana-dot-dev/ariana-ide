@@ -15,7 +15,7 @@ import RectangleOnCanvas from "./RectangleOnCanvas";
 import TerminalOnCanvas from "./TerminalOnCanvas";
 import TextAreaOnCanvas from "./TextAreaOnCanvas";
 import type { CanvasElement, ElementLayout, ElementTargets } from "./types";
-import { useStore } from "../state";
+import { useOsSession } from "../contexts/GitProjectContext";
 
 interface CanvasProps {
 	elements: CanvasElement[];
@@ -48,8 +48,7 @@ const Canvas: React.FC<CanvasProps> = ({
 	stabilityWeight = 0.1,
 	onElementsChange,
 }) => {
-	const { currentOsSessionId, osSessions } = useStore();
-	const osSession = currentOsSessionId ? osSessions[currentOsSessionId] : null;
+	const osSession = useOsSession();
 	const [layouts, setLayouts] = useState<ElementLayout[]>([]);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 	const [draggedElement, setDraggedElement] = useState<CanvasElement | null>(

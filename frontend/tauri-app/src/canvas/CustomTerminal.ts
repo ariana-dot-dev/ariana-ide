@@ -1,11 +1,16 @@
+import { OsSession } from "../bindings/os";
 import type { TerminalSpec } from "../services/CustomTerminalAPI";
 import { CanvasElement, type ElementTargets } from "./types";
 
 export class CustomTerminal {
-	public spec: TerminalSpec;
+	private _osSession: OsSession
 
-	constructor(spec: TerminalSpec) {
-		this.spec = spec;
+	constructor(osSession: OsSession) {
+		this._osSession = osSession;
+	}
+
+	get osSession() {
+		return this._osSession
 	}
 
 	targets(): ElementTargets {
@@ -16,8 +21,8 @@ export class CustomTerminal {
 		};
 	}
 
-	static canvasElement(spec: TerminalSpec, weight: number = 1): CanvasElement {
-		const terminal = new CustomTerminal(spec);
+	static canvasElement(osSession: OsSession, weight: number = 1): CanvasElement {
+		const terminal = new CustomTerminal(osSession);
 		return new CanvasElement({ customTerminal: terminal }, weight);
 	}
 }
