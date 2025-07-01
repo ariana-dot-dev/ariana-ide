@@ -36,6 +36,7 @@
 				"decorations": false,
 				"transparent": true,
 				"center": true,
+				"shadow": false,
 				"useHttpsScheme": true
 			}
 		],

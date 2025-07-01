@@ -5,6 +5,8 @@
 )]
 
 use std::sync::Arc;
+use std::process::Command;
+use std::path::Path;
 use tauri::State;
 
 mod terminal;
@@ -144,6 +146,62 @@ async fn start_git_directories_search(
 ) -> Result<String, String> {
 	let search_id = git_search_manager.start_search(os_session_kind);
 	Ok(search_id)
+}
+
+async fn check_git_repository(directory: String) -> Result<bool, String> {
+	let path = Path::new(&directory);
+	
+	// Check if the directory exists
+	if !path.exists() {
+		return Ok(false);
+	}
+	
+	// Check if .git directory exists
+	let git_dir = path.join(".git");
+	if git_dir.exists() {
+		return Ok(true);
+	}
+	
+	// Alternatively, try using git command to check if it's a repository
+	let output = Command::new("git")
+		.arg("rev-parse")
+		.arg("--git-dir")
+		.current_dir(&directory)
+		.output();
+		
+	match output {
+		Ok(result) => Ok(result.status.success()),
+		Err(_) => Ok(false),
+	}
+}
+
+#[tauri::command]
+async fn execute_command(command: String, args: Vec<String>) -> Result<String, String> {
+	let output = Command::new(&command)
+		.args(&args)
+		.output()
+		.map_err(|e| format!("Failed to execute command: {}", e))?;
+	
+	if output.status.success() {
+		Ok(String::from_utf8_lossy(&output.stdout).to_string())
+	} else {
+		Err(String::from_utf8_lossy(&output.stderr).to_string())
+	}
+}
+
+#[tauri::command]
+async fn execute_command_in_dir(command: String, args: Vec<String>, directory: String) -> Result<String, String> {
+	let output = Command::new(&command)
+		.args(&args)
+		.current_dir(&directory)
+		.output()
+		.map_err(|e| format!("Failed to execute command: {}", e))?;
+	
+	if output.status.success() {
+		Ok(String::from_utf8_lossy(&output.stdout).to_string())
+	} else {
+		Err(String::from_utf8_lossy(&output.stderr).to_string())
+	}
 }
 
 #[tauri::command]
