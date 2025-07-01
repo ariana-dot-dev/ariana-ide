@@ -4,6 +4,7 @@
 	windows_subsystem = "windows"
 )]
 
+use log::LevelFilter;
 use std::sync::Arc;
 use tauri::{Manager, State};
 
@@ -15,6 +16,7 @@ use file_watcher::FileWatcher;
 
 mod custom_terminal;
 mod custom_terminal_commands;
+mod logger;
 
 #[cfg(test)]
 mod cli_agents_test;
@@ -158,8 +160,10 @@ pub fn run() {
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_store::Builder::new().build())
+		.plugin(logger::init(LevelFilter::Info))
 		.plugin(tauri_plugin_fs::init())
 		.setup(|app| {
+			log::debug!("starting ariana-ide tauri");
 			let file_watcher = Arc::new(FileWatcher::new(app.handle().clone()));
 			app.manage(file_watcher);
 			Ok(())
