@@ -330,16 +330,54 @@ export class DiffService {
       // First check if we're in a git repository
       await this.executeGitCommand(["rev-parse", "--git-dir"]);
 
-      // Build comparison refs
       const baseRef = baseCommit || baseBranch;
       const targetRef = targetCommit || targetBranch;
       
-      console.log(`[FRONTEND] Comparing ${baseRef}...${targetRef}`);
+      console.log(`[FRONTEND] Comparing ${baseRef} with ${targetRef}`);
       
-      // Get diff between the two refs (branches or commits)
-      const diff = await this.executeGitCommand(["diff", `${baseRef}...${targetRef}`]);
+      // Special case: if comparing with unstaged changes (no target commit specified and target is current branch)
+      const currentBranch = await this.executeGitCommand(["branch", "--show-current"]);
+      const isComparingWithUnstaged = !targetCommit && targetBranch.trim() === currentBranch.trim();
       
-      return diff;
+      if (isComparingWithUnstaged && baseRef !== targetRef) {
+        console.log(`[FRONTEND] Comparing ${baseRef} with unstaged changes on ${targetBranch}`);
+        
+        // Get differences from base to current HEAD plus unstaged changes
+        // This gives us the cumulative diff from base branch to all current changes
+        let diff = "";
+        
+        try {
+          // First get diff from base to current HEAD
+          const committedDiff = await this.executeGitCommand(["diff", `${baseRef}...HEAD`]);
+          
+          // Then get unstaged changes
+          const unstagedDiff = await this.executeGitCommand(["diff", "HEAD"]);
+          
+          // Combine both diffs - this shows all changes from base branch to current state
+          if (committedDiff.trim() && unstagedDiff.trim()) {
+            // If we have both committed and unstaged changes, combine them
+            diff = committedDiff + "\n" + unstagedDiff;
+          } else if (committedDiff.trim()) {
+            diff = committedDiff;
+          } else if (unstagedDiff.trim()) {
+            diff = unstagedDiff;
+          }
+          
+          console.log(`[FRONTEND] Combined diff length: ${diff.length}`);
+          
+        } catch (diffError) {
+          console.warn(`[FRONTEND] Failed to get combined diff, falling back to simple comparison:`, diffError);
+          // Fallback to simple diff if the above fails
+          diff = await this.executeGitCommand(["diff", baseRef]);
+        }
+        
+        return diff;
+      } else {
+        // Normal branch/commit comparison
+        const diff = await this.executeGitCommand(["diff", `${baseRef}...${targetRef}`]);
+        return diff;
+      }
+      
     } catch (error) {
       console.error("Failed to get branch comparison:", error);
       const errorStr = String(error);
@@ -358,18 +396,68 @@ export class DiffService {
 
   async getUnifiedDiff(baseBranch: string, targetBranch: string, baseCommit?: string, targetCommit?: string): Promise<string> {
     try {
-      // Get the raw unified diff format
       const baseRef = baseCommit || baseBranch;
       const targetRef = targetCommit || targetBranch;
       
-      const diff = await this.executeGitCommand([
-        "diff", 
-        "--unified=3",
-        "--no-color",
-        `${baseRef}...${targetRef}`
-      ]);
+      // Special case: if comparing with unstaged changes (no target commit specified and target is current branch)
+      const currentBranch = await this.executeGitCommand(["branch", "--show-current"]);
+      const isComparingWithUnstaged = !targetCommit && targetBranch.trim() === currentBranch.trim();
       
-      return diff;
+      if (isComparingWithUnstaged && baseRef !== targetRef) {
+        console.log(`[FRONTEND] Getting unified diff: ${baseRef} with unstaged changes on ${targetBranch}`);
+        
+        let diff = "";
+        
+        try {
+          // First get diff from base to current HEAD
+          const committedDiff = await this.executeGitCommand([
+            "diff", 
+            "--unified=3",
+            "--no-color",
+            `${baseRef}...HEAD`
+          ]);
+          
+          // Then get unstaged changes
+          const unstagedDiff = await this.executeGitCommand([
+            "diff",
+            "--unified=3", 
+            "--no-color",
+            "HEAD"
+          ]);
+          
+          // Combine both diffs
+          if (committedDiff.trim() && unstagedDiff.trim()) {
+            diff = committedDiff + "\n" + unstagedDiff;
+          } else if (committedDiff.trim()) {
+            diff = committedDiff;
+          } else if (unstagedDiff.trim()) {
+            diff = unstagedDiff;
+          }
+          
+        } catch (diffError) {
+          console.warn(`[FRONTEND] Failed to get combined unified diff, falling back:`, diffError);
+          // Fallback to simple diff
+          diff = await this.executeGitCommand([
+            "diff", 
+            "--unified=3",
+            "--no-color",
+            baseRef
+          ]);
+        }
+        
+        return diff;
+      } else {
+        // Normal branch/commit comparison
+        const diff = await this.executeGitCommand([
+          "diff", 
+          "--unified=3",
+          "--no-color",
+          `${baseRef}...${targetRef}`
+        ]);
+        
+        return diff;
+      }
+      
     } catch (error) {
       console.error("Failed to get unified diff:", error);
       throw new Error(`Failed to generate unified diff: ${error}`);
@@ -408,6 +496,130 @@ export class DiffService {
     } catch (error) {
       console.error("Failed to get staged changes:", error);
       throw new Error(`Failed to get staged changes: ${error}`);
+    }
+  }
+
+  async addFilesToGit(filePaths: string[]): Promise<void> {
+    try {
+      console.log("[FRONTEND] Starting git add operation");
+      console.log("[FRONTEND] Files to add:", filePaths);
+      console.log("[FRONTEND] Current working directory:", this.workingDirectory);
+      
+      // Get comprehensive git information
+      let gitRoot = "";
+      let currentBranch = "";
+      let gitStatus = "";
+      
+      try {
+        gitRoot = (await this.executeGitCommand(["rev-parse", "--show-toplevel"])).trim();
+        currentBranch = (await this.executeGitCommand(["branch", "--show-current"])).trim();
+        gitStatus = await this.executeGitCommand(["status", "--porcelain"]);
+        
+        console.log("[FRONTEND] Git root:", gitRoot);
+        console.log("[FRONTEND] Current branch:", currentBranch);
+        console.log("[FRONTEND] Git status (modified files):");
+        console.log(gitStatus);
+      } catch (error) {
+        console.warn("[FRONTEND] Could not get git info:", error);
+      }
+      
+      // Parse git status to get list of actually modified files
+      const modifiedFiles = new Set<string>();
+      if (gitStatus) {
+        gitStatus.split('\n').forEach(line => {
+          if (line.trim()) {
+            // Git status format: "XY filename" where X and Y are status codes
+            const filename = line.substring(3).trim();
+            modifiedFiles.add(filename);
+            console.log("[FRONTEND] Found modified file in git status:", filename);
+          }
+        });
+      }
+      
+      console.log("[FRONTEND] All modified files from git status:", Array.from(modifiedFiles));
+      
+      // Try to match our file paths with actually modified files
+      const filesToAdd: string[] = [];
+      
+      for (const filePath of filePaths) {
+        console.log(`[FRONTEND] Looking for matches for: ${filePath}`);
+        
+        // Try to find this file in the list of modified files
+        let matchedFile = null;
+        
+        // Direct match
+        if (modifiedFiles.has(filePath)) {
+          matchedFile = filePath;
+        } else {
+          // Try various path transformations to find a match
+          for (const modifiedFile of modifiedFiles) {
+            // Check if the modified file ends with our file path
+            if (modifiedFile.endsWith(filePath) || filePath.endsWith(modifiedFile)) {
+              matchedFile = modifiedFile;
+              break;
+            }
+            
+            // Check if removing common prefixes helps
+            const cleanFilePath = filePath.replace(/^frontend\/tauri-app\//, '');
+            if (modifiedFile === cleanFilePath || modifiedFile.endsWith(cleanFilePath)) {
+              matchedFile = modifiedFile;
+              break;
+            }
+            
+            // Check if the base filename matches
+            const baseFileName = filePath.split('/').pop();
+            const modifiedFileName = modifiedFile.split('/').pop();
+            if (baseFileName === modifiedFileName && modifiedFile.includes('src')) {
+              matchedFile = modifiedFile;
+              break;
+            }
+          }
+        }
+        
+        if (matchedFile) {
+          console.log(`[FRONTEND] Found match: ${filePath} -> ${matchedFile}`);
+          filesToAdd.push(matchedFile);
+        } else {
+          console.warn(`[FRONTEND] No match found for ${filePath} in modified files`);
+        }
+      }
+      
+      console.log("[FRONTEND] Files that will be added to git:", filesToAdd);
+      
+      // Add the matched files
+      if (filesToAdd.length > 0) {
+        for (const file of filesToAdd) {
+          try {
+            console.log(`[FRONTEND] Adding file to git: ${file}`);
+            await this.executeGitCommand(["add", file]);
+            console.log(`[FRONTEND] Successfully added: ${file}`);
+          } catch (error) {
+            console.error(`[FRONTEND] Failed to add ${file}:`, error);
+          }
+        }
+      } else {
+        console.warn("[FRONTEND] No files to add - trying to add all modified files");
+        // If we can't match any files, try adding all modified files
+        try {
+          await this.executeGitCommand(["add", "."]);
+          console.log("[FRONTEND] Successfully added all modified files with 'git add .'");
+        } catch (error) {
+          console.error("[FRONTEND] Failed to add all files:", error);
+        }
+      }
+      
+      // Final status check
+      try {
+        const finalStatus = await this.executeGitCommand(["status", "--porcelain"]);
+        console.log("[FRONTEND] Git status after adding:");
+        console.log(finalStatus);
+      } catch (error) {
+        console.warn("[FRONTEND] Could not get final git status:", error);
+      }
+      
+    } catch (error) {
+      console.error("[FRONTEND] Git add operation failed:", error);
+      console.warn("[FRONTEND] Allowing validation to continue despite git add failure");
     }
   }
 
@@ -606,8 +818,8 @@ export class DiffService {
     return {
       id: `main-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'main_logic',
-      title: `Main Logic: ${file.filePath}`,
-      description: `Comprehensive changes to ${file.filePath} with ${file.additions} additions and ${file.deletions} deletions`,
+      title: file.filePath,
+      description: `${file.additions} additions, ${file.deletions} deletions`,
       files: [file],
       validated: false,
       subLogicPaths
@@ -615,13 +827,16 @@ export class DiffService {
   }
 
   private createSmallChange(file: GitDiffFile): DiffChange {
+    const subLogicPaths = this.generateSubLogicPaths(file);
+    
     return {
       id: `small-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'small_change',
-      title: `Small Change: ${file.filePath}`,
-      description: `Minor modifications to ${file.filePath}`,
+      title: file.filePath,
+      description: `${file.additions} additions, ${file.deletions} deletions`,
       files: [file],
-      validated: false
+      validated: false,
+      subLogicPaths
     };
   }
 
@@ -637,7 +852,7 @@ export class DiffService {
       const changeType = this.inferChangeType(addedLines, removedLines);
       
       subPaths.push({
-        id: `sublogic-${index}`,
+        id: `hunk-${index}`,
         title: changeType.title,
         description: changeType.description,
         files: [file.filePath],

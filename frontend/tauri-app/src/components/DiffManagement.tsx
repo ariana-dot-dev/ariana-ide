@@ -57,6 +57,10 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
   const [showDirectorySelector, setShowDirectorySelector] = useState(initialState?.showDirectorySelector ?? true);
   const [showUnifiedDiff, setShowUnifiedDiff] = useState(false);
   const [unifiedDiffContent, setUnifiedDiffContent] = useState<string>("");
+  const [showHeader, setShowHeader] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<{ changeId: string, fileIndex: number, hunkIndex: number, hunk: GitDiffHunk, context: string }[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState<number>(-1);
 
   // Log state restoration for debugging
   useEffect(() => {
@@ -302,46 +306,92 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
     setBranchesError(null);
   };
 
-  const validateChange = (changeId: string) => {
+  const validateChange = async (changeId: string) => {
     if (!diffSummary) return;
 
-    const updatedSummary = { ...diffSummary };
-    
-    // Find and validate the change
-    const mainChange = updatedSummary.mainLogicChanges.find(c => c.id === changeId);
-    if (mainChange) {
-      mainChange.validated = true;
-    } else {
+    try {
+      const updatedSummary = { ...diffSummary };
+      
+      // Find the change to validate
+      const mainChange = updatedSummary.mainLogicChanges.find(c => c.id === changeId);
       const smallChange = updatedSummary.smallChanges.find(c => c.id === changeId);
-      if (smallChange) {
-        smallChange.validated = true;
+      const change = mainChange || smallChange;
+      
+      if (change) {
+        // Get file paths from the change
+        const filePaths = change.files.map(file => file.filePath);
+        
+        // Add files to git
+        await diffService.addFilesToGit(filePaths);
+        console.log(`[VALIDATE] Successfully added files to git for change ${changeId}:`, filePaths);
+        
+        // Mark as validated
+        change.validated = true;
+        
+        // Mark all subLogicPaths as validated if they exist
+        if (change.subLogicPaths) {
+          change.subLogicPaths.forEach(subPath => {
+            subPath.validated = true;
+          });
+        }
       }
-    }
 
-    // Check if all changes are validated
-    const allValidated = [...updatedSummary.mainLogicChanges, ...updatedSummary.smallChanges]
-      .every(change => change.validated);
-    
-    updatedSummary.validationState.allValidated = allValidated;
-    setDiffSummary(updatedSummary);
+      // Check if all changes are validated
+      const allValidated = [...updatedSummary.mainLogicChanges, ...updatedSummary.smallChanges]
+        .every(change => change.validated);
+      
+      updatedSummary.validationState.allValidated = allValidated;
+      setDiffSummary(updatedSummary);
+    } catch (error) {
+      console.error("Failed to validate change:", error);
+      setError(`Failed to validate change: ${error}`);
+    }
   };
 
-  const validateAllChanges = () => {
+  const validateAllChanges = async () => {
     if (!diffSummary) return;
 
-    const updatedSummary = { ...diffSummary };
-    updatedSummary.mainLogicChanges.forEach(change => {
-      change.validated = true;
-      change.subLogicPaths.forEach(subPath => {
-        subPath.validated = true;
+    try {
+      const updatedSummary = { ...diffSummary };
+      
+      // Collect all file paths from all changes
+      const allFilePaths: string[] = [];
+      [...updatedSummary.mainLogicChanges, ...updatedSummary.smallChanges].forEach(change => {
+        change.files.forEach(file => {
+          if (!allFilePaths.includes(file.filePath)) {
+            allFilePaths.push(file.filePath);
+          }
+        });
       });
-    });
-    updatedSummary.smallChanges.forEach(change => {
-      change.validated = true;
-    });
-    updatedSummary.validationState.allValidated = true;
-    
-    setDiffSummary(updatedSummary);
+      
+      // Add all files to git
+      await diffService.addFilesToGit(allFilePaths);
+      console.log(`[VALIDATE_ALL] Successfully added all files to git:`, allFilePaths);
+      
+      // Mark all changes as validated
+      updatedSummary.mainLogicChanges.forEach(change => {
+        change.validated = true;
+        if (change.subLogicPaths) {
+          change.subLogicPaths.forEach(subPath => {
+            subPath.validated = true;
+          });
+        }
+      });
+      updatedSummary.smallChanges.forEach(change => {
+        change.validated = true;
+        if (change.subLogicPaths) {
+          change.subLogicPaths.forEach(subPath => {
+            subPath.validated = true;
+          });
+        }
+      });
+      updatedSummary.validationState.allValidated = true;
+      
+      setDiffSummary(updatedSummary);
+    } catch (error) {
+      console.error("Failed to validate all changes:", error);
+      setError(`Failed to validate all changes: ${error}`);
+    }
   };
 
   const enterDetailedView = (changeId: string) => {
@@ -352,7 +402,91 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
   };
 
   const selectSubLogic = (subLogicId: string) => {
-    setSelectedSubLogic(selectedSubLogic === subLogicId ? null : subLogicId);
+    console.log("selectSubLogic called with:", subLogicId, "currently selected:", selectedSubLogic);
+    
+    // Extract hunk index from block ID (format: "hunk-{index}")
+    const hunkIndexMatch = subLogicId.match(/hunk-(\d+)/);
+    if (hunkIndexMatch) {
+      const hunkIndex = parseInt(hunkIndexMatch[1]);
+      console.log("Navigating to hunk index:", hunkIndex);
+      
+      // Find the change that contains this sublogic path
+      const parentChange = [...(diffSummary?.mainLogicChanges ?? []), ...(diffSummary?.smallChanges ?? [])].find(change => 
+        change.subLogicPaths?.some(path => path.id === subLogicId)
+      );
+      
+      if (parentChange) {
+        console.log("Found parent change:", parentChange.id);
+        // Switch to detailed view with the correct change and hunk
+        setSelectedChange(parentChange.id);
+        setViewMode('detailed');
+        setCurrentFileIndex(0); // Assume first file for now
+        setCurrentLineIndex(hunkIndex);
+      }
+    }
+    
+    const newSelection = selectedSubLogic === subLogicId ? null : subLogicId;
+    console.log("Setting selectedSubLogic to:", newSelection);
+    setSelectedSubLogic(newSelection);
+  };
+
+  const searchHunks = (query: string) => {
+    if (!diffSummary || !query.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(-1);
+      return;
+    }
+
+    const results: { changeId: string, fileIndex: number, hunkIndex: number, hunk: GitDiffHunk, context: string }[] = [];
+    const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+
+    allChanges.forEach(change => {
+      change.files.forEach((file, fileIndex) => {
+        file.hunks.forEach((hunk, hunkIndex) => {
+          // Search in hunk lines
+          const matchingLines = hunk.lines.filter(line => 
+            line.content.toLowerCase().includes(query.toLowerCase())
+          );
+          
+          if (matchingLines.length > 0) {
+            const context = `${file.filePath} - ${matchingLines.length} match${matchingLines.length > 1 ? 'es' : ''}`;
+            results.push({
+              changeId: change.id,
+              fileIndex,
+              hunkIndex,
+              hunk,
+              context
+            });
+          }
+        });
+      });
+    });
+
+    setSearchResults(results);
+    setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+  };
+
+  const navigateToSearchResult = (index: number) => {
+    if (index < 0 || index >= searchResults.length) return;
+    
+    const result = searchResults[index];
+    setSelectedChange(result.changeId);
+    setViewMode('detailed');
+    setCurrentFileIndex(result.fileIndex);
+    setCurrentLineIndex(result.hunkIndex);
+    setCurrentSearchIndex(index);
+  };
+
+  const nextSearchResult = () => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    navigateToSearchResult(nextIndex);
+  };
+
+  const previousSearchResult = () => {
+    if (searchResults.length === 0) return;
+    const prevIndex = currentSearchIndex <= 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    navigateToSearchResult(prevIndex);
   };
 
   const navigateToNextChange = () => {
@@ -370,22 +504,59 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
   const navigateToNextFile = () => {
     if (!diffSummary || !selectedChange) return;
     
-    const change = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges]
-      .find(c => c.id === selectedChange);
+    // Get all files from all changes
+    const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+    const allFiles: { changeId: string, fileIndex: number, file: GitDiffFile }[] = [];
     
-    if (change && currentFileIndex < change.files.length - 1) {
-      setCurrentFileIndex(currentFileIndex + 1);
+    // Build a flat list of all files with their change and file indices
+    allChanges.forEach(change => {
+      change.files.forEach((file, fileIndex) => {
+        allFiles.push({ changeId: change.id, fileIndex, file });
+      });
+    });
+    
+    // Find current file position in the flat list
+    const currentGlobalIndex = allFiles.findIndex(item => 
+      item.changeId === selectedChange && item.fileIndex === currentFileIndex
+    );
+    
+    // Navigate to next file
+    if (currentGlobalIndex < allFiles.length - 1) {
+      const nextFile = allFiles[currentGlobalIndex + 1];
+      setSelectedChange(nextFile.changeId);
+      setCurrentFileIndex(nextFile.fileIndex);
       setCurrentLineIndex(0);
     }
   };
 
-  const navigateToPreviousFile = () => {
-    if (!diffSummary || !selectedChange) return;
+  const navigateToPreviousFile = (): boolean => {
+    if (!diffSummary || !selectedChange) return false;
     
-    if (currentFileIndex > 0) {
-      setCurrentFileIndex(currentFileIndex - 1);
+    // Get all files from all changes
+    const allChanges = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges];
+    const allFiles: { changeId: string, fileIndex: number, file: GitDiffFile }[] = [];
+    
+    // Build a flat list of all files with their change and file indices
+    allChanges.forEach(change => {
+      change.files.forEach((file, fileIndex) => {
+        allFiles.push({ changeId: change.id, fileIndex, file });
+      });
+    });
+    
+    // Find current file position in the flat list
+    const currentGlobalIndex = allFiles.findIndex(item => 
+      item.changeId === selectedChange && item.fileIndex === currentFileIndex
+    );
+    
+    // Navigate to previous file
+    if (currentGlobalIndex > 0) {
+      const prevFile = allFiles[currentGlobalIndex - 1];
+      setSelectedChange(prevFile.changeId);
+      setCurrentFileIndex(prevFile.fileIndex);
       setCurrentLineIndex(0);
+      return true;
     }
+    return false;
   };
 
   const navigateToPreviousChange = () => {
@@ -414,7 +585,9 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
         console.log(`[HUNK_NAV] Moving to next hunk: ${newIndex}`);
         setCurrentLineIndex(newIndex);
       } else {
-        console.log(`[HUNK_NAV] Already at last hunk`);
+        console.log(`[HUNK_NAV] At last hunk, attempting to navigate to next file`);
+        // At last hunk of current file, try to navigate to next file
+        navigateToNextFile();
       }
     }
   };
@@ -426,7 +599,21 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
       console.log(`[HUNK_NAV] Moving to previous hunk: ${newIndex}`);
       setCurrentLineIndex(newIndex);
     } else {
-      console.log(`[HUNK_NAV] Already at first hunk`);
+      console.log(`[HUNK_NAV] At first hunk, attempting to navigate to previous file`);
+      // At first hunk of current file, try to navigate to previous file
+      const prevFileResult = navigateToPreviousFile();
+      // If we successfully moved to previous file, go to its last hunk
+      if (prevFileResult) {
+        setTimeout(() => {
+          if (!diffSummary || !selectedChange) return;
+          const change = [...diffSummary.mainLogicChanges, ...diffSummary.smallChanges]
+            .find(c => c.id === selectedChange);
+          if (change && change.files[currentFileIndex]) {
+            const newFile = change.files[currentFileIndex];
+            setCurrentLineIndex(Math.max(0, newFile.hunks.length - 1));
+          }
+        }, 0);
+      }
     }
   };
 
@@ -564,51 +751,68 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
   return (
     <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>
-          <div className="flex items-center space-x-2 text-sm text-[var(--base-600)]">
-            <span>{diffSummary.totalFiles} files</span>
-            <span className="text-green-500">+{diffSummary.totalAdditions}</span>
-            <span className="text-red-500">-{diffSummary.totalDeletions}</span>
-          </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={backToBranchSelection}
-            className="px-3 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors"
-          >
-            ← Change Branches
-          </button>
-          
-          <button
-            onClick={() => setViewMode(viewMode === 'overview' ? 'detailed' : 'overview')}
-            className="px-3 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors"
-          >
-            {viewMode === 'overview' ? 'Detailed View' : 'Overview'}
-          </button>
-          
-          <button
-            onClick={generateUnifiedDiff}
-            className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
-          >
-            View Unified Diff
-          </button>
-          
-          <button
-            onClick={validateAllChanges}
-            disabled={diffSummary.validationState.allValidated}
-            className={cn(
-              "px-4 py-2 rounded-lg font-medium transition-colors",
-              diffSummary.validationState.allValidated
-                ? "bg-green-500 text-white"
-                : "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
-            )}
-          >
-            {diffSummary.validationState.allValidated ? "✓ All Validated" : "Validate All"}
-          </button>
-        </div>
+      <div 
+        className={cn(
+          "flex items-center justify-between border-b border-[var(--base-300)] transition-all duration-300 relative",
+          showHeader ? "p-4 h-auto opacity-100" : "p-1 h-8 opacity-0"
+        )}
+        onMouseEnter={() => setShowHeader(true)}
+        onMouseLeave={() => setShowHeader(false)}
+      >
+        {/* Invisible hover trigger area at bottom */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-4 bg-transparent cursor-pointer"
+          onMouseEnter={() => setShowHeader(true)}
+        />
+        {showHeader && (
+          <>
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>
+              <div className="flex items-center space-x-2 text-sm text-[var(--base-600)]">
+                <span>{diffSummary.totalFiles} files</span>
+                <span className="text-green-500">+{diffSummary.totalAdditions}</span>
+                <span className="text-red-500">-{diffSummary.totalDeletions}</span>
+              </div>
+            </div>
+
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={backToBranchSelection}
+                className="px-3 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors"
+              >
+                ← Change Branches
+              </button>
+              
+              <button
+                onClick={() => setViewMode(viewMode === 'overview' ? 'detailed' : 'overview')}
+                className="px-3 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors"
+              >
+                {viewMode === 'overview' ? 'Detailed View' : 'Overview'}
+              </button>
+              
+              <button
+                onClick={generateUnifiedDiff}
+                className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded-lg hover:bg-[var(--base-500)] transition-colors"
+              >
+                View Unified Diff
+              </button>
+              
+              <button
+                onClick={validateAllChanges}
+                disabled={diffSummary.validationState.allValidated}
+                className={cn(
+                  "px-4 py-2 rounded-lg font-medium transition-colors",
+                  diffSummary.validationState.allValidated
+                    ? "bg-green-500 text-white"
+                    : "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
+                )}
+              >
+                {diffSummary.validationState.allValidated ? "✓ All Validated" : "Validate All"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Unified Diff Modal */}
@@ -631,6 +835,8 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
           onEnterDetailed={enterDetailedView}
           onSelectSubLogic={selectSubLogic}
           selectedSubLogic={selectedSubLogic}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
         />
       ) : (
         <DetailedMode
@@ -647,6 +853,13 @@ export default function DiffManagement({ onClose, initialState, onStateChange }:
           onNextHunk={navigateToNextHunk}
           onPreviousHunk={navigateToPreviousHunk}
           onBackToOverview={() => setViewMode('overview')}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchResults={searchResults}
+          currentSearchIndex={currentSearchIndex}
+          searchHunks={searchHunks}
+          nextSearchResult={nextSearchResult}
+          previousSearchResult={previousSearchResult}
         />
       )}
     </div>
@@ -660,6 +873,8 @@ interface OverviewModeProps {
   onEnterDetailed: (changeId: string) => void;
   onSelectSubLogic: (subLogicId: string) => void;
   selectedSubLogic: string | null;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 }
 
 function OverviewMode({ 
@@ -667,40 +882,141 @@ function OverviewMode({
   onValidateChange, 
   onEnterDetailed, 
   onSelectSubLogic, 
-  selectedSubLogic 
+  selectedSubLogic,
+  searchQuery,
+  setSearchQuery
 }: OverviewModeProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter changes based on search query
+  const filterChanges = (changes: (MainLogicChange | DiffChange)[]) => {
+    if (!searchQuery.trim()) return changes;
+    
+    return changes.filter(change => {
+      // Search in file names
+      const fileMatches = change.files.some(file => 
+        file.filePath.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      
+      // Search in file content (hunks)
+      const contentMatches = change.files.some(file =>
+        file.hunks.some(hunk =>
+          hunk.lines.some(line =>
+            line.content.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        )
+      );
+      
+      return fileMatches || contentMatches;
+    });
+  };
+
+  const filteredMainChanges = filterChanges(diffSummary.mainLogicChanges);
+  const filteredSmallChanges = filterChanges(diffSummary.smallChanges);
+
+  // Add keyboard shortcut for Cmd/Ctrl+F
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="flex-1 overflow-auto p-6">
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Search Bar */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Overview</h1>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search files and content..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="px-3 py-2 border border-[var(--base-300)] rounded text-sm w-64 focus:outline-none focus:border-[var(--acc-500)]"
+              />
+              {searchQuery && (
+                <div className="absolute right-8 top-1/2 transform -translate-y-1/2 text-xs text-[var(--base-600)]">
+                  {filteredMainChanges.length + filteredSmallChanges.length} result{filteredMainChanges.length + filteredSmallChanges.length !== 1 ? 's' : ''}
+                </div>
+              )}
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[var(--base-500)] hover:text-[var(--base-700)]"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
         {/* Main Logic Changes */}
-        {diffSummary.mainLogicChanges.length > 0 && (
+        {filteredMainChanges.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-[var(--acc-600)]">Main Logic Changes</h2>
-            {diffSummary.mainLogicChanges.map((change) => (
+            <h2 className="text-xl font-semibold text-[var(--acc-600)]">
+              Main Logic Changes 
+              {searchQuery && (
+                <span className="text-sm font-normal text-[var(--base-600)]">
+                  ({filteredMainChanges.length} of {diffSummary.mainLogicChanges.length})
+                </span>
+              )}
+            </h2>
+            {filteredMainChanges.map((change) => (
               <MainLogicChangeCard
                 key={change.id}
-                change={change}
+                change={change as MainLogicChange}
                 onValidate={() => onValidateChange(change.id)}
                 onEnterDetailed={() => onEnterDetailed(change.id)}
                 onSelectSubLogic={onSelectSubLogic}
                 selectedSubLogic={selectedSubLogic}
+                searchQuery={searchQuery}
               />
             ))}
           </div>
         )}
 
         {/* Small Changes */}
-        {diffSummary.smallChanges.length > 0 && (
+        {filteredSmallChanges.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-[var(--acc-600)]">Small Changes</h2>
-            {diffSummary.smallChanges.map((change) => (
+            <h2 className="text-xl font-semibold text-[var(--acc-600)]">
+              Small Changes
+              {searchQuery && (
+                <span className="text-sm font-normal text-[var(--base-600)]">
+                  ({filteredSmallChanges.length} of {diffSummary.smallChanges.length})
+                </span>
+              )}
+            </h2>
+            {filteredSmallChanges.map((change) => (
               <SmallChangeCard
                 key={change.id}
                 change={change}
                 onValidate={() => onValidateChange(change.id)}
                 onEnterDetailed={() => onEnterDetailed(change.id)}
+                onSelectSubLogic={onSelectSubLogic}
+                selectedSubLogic={selectedSubLogic}
+                searchQuery={searchQuery}
               />
             ))}
+          </div>
+        )}
+        
+        {/* No Results Message */}
+        {searchQuery && filteredMainChanges.length === 0 && filteredSmallChanges.length === 0 && (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-4">🔍</div>
+            <h3 className="text-lg font-semibold text-[var(--base-700)] mb-2">No results found</h3>
+            <p className="text-[var(--base-600)]">
+              No files or content match "{searchQuery}". Try a different search term.
+            </p>
           </div>
         )}
       </div>
@@ -715,6 +1031,7 @@ interface MainLogicChangeCardProps {
   onEnterDetailed: () => void;
   onSelectSubLogic: (subLogicId: string) => void;
   selectedSubLogic: string | null;
+  searchQuery?: string;
 }
 
 function MainLogicChangeCard({ 
@@ -722,19 +1039,32 @@ function MainLogicChangeCard({
   onValidate, 
   onEnterDetailed, 
   onSelectSubLogic, 
-  selectedSubLogic 
+  selectedSubLogic,
+  searchQuery = ""
 }: MainLogicChangeCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <div className={cn(
-      "border rounded-lg p-4 space-y-4 transition-colors",
-      change.validated 
-        ? "border-green-400 bg-green-50" 
-        : "border-[var(--base-300)] bg-[var(--base-200)]"
-    )}>
+    <div 
+      className={cn(
+        "border rounded-lg p-4 space-y-4 transition-colors group",
+        change.validated 
+          ? "border-green-400 bg-green-50" 
+          : "border-[var(--base-300)] bg-[var(--base-200)]"
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-[var(--base-700)]">{change.title}</h3>
-          <p className="text-sm text-[var(--base-600)]">{change.description}</p>
+          <h3 className="font-semibold text-[var(--base-700)]">
+            {highlightSearchTerm(change.title, searchQuery)}
+          </h3>
+          {isHovered && (
+            <p className="text-sm text-[var(--base-600)]">
+              {highlightSearchTerm(change.description, searchQuery)}
+            </p>
+          )}
         </div>
         
         <div className="flex items-center space-x-2">
@@ -760,20 +1090,22 @@ function MainLogicChangeCard({
         </div>
       </div>
 
-      {/* Sub Logic Paths */}
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium text-[var(--base-600)]">Sub Logic Paths:</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {change.subLogicPaths.map((subPath) => (
-            <SubLogicPathCard
-              key={subPath.id}
-              subPath={subPath}
-              isSelected={selectedSubLogic === subPath.id}
-              onSelect={() => onSelectSubLogic(subPath.id)}
-            />
-          ))}
+      {/* Blocks (only visible on hover) */}
+      {isHovered && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-[var(--base-600)]">Blocks:</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {change.subLogicPaths.map((subPath) => (
+              <SubLogicPathCard
+                key={subPath.id}
+                subPath={subPath}
+                isSelected={selectedSubLogic === subPath.id}
+                onSelect={() => onSelectSubLogic(subPath.id)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -786,11 +1118,18 @@ interface SubLogicPathCardProps {
 }
 
 function SubLogicPathCard({ subPath, isSelected, onSelect }: SubLogicPathCardProps) {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("SubLogicPathCard clicked:", subPath.id, "currently selected:", isSelected);
+    onSelect();
+  };
+
   return (
     <div
-      onClick={onSelect}
+      onClick={handleClick}
       className={cn(
-        "p-3 border rounded cursor-pointer transition-colors",
+        "p-3 border rounded cursor-pointer transition-colors select-none",
         isSelected 
           ? "border-[var(--acc-400)] bg-[var(--acc-100)]" 
           : "border-[var(--base-300)] bg-[var(--base-100)] hover:bg-[var(--base-150)]",
@@ -814,42 +1153,76 @@ interface SmallChangeCardProps {
   change: DiffChange;
   onValidate: () => void;
   onEnterDetailed: () => void;
+  onSelectSubLogic?: (subLogicId: string) => void;
+  selectedSubLogic?: string | null;
+  searchQuery?: string;
 }
 
-function SmallChangeCard({ change, onValidate, onEnterDetailed }: SmallChangeCardProps) {
+function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic, selectedSubLogic, searchQuery = "" }: SmallChangeCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <div className={cn(
-      "border rounded-lg p-4 flex items-center justify-between transition-colors",
-      change.validated 
-        ? "border-green-400 bg-green-50" 
-        : "border-[var(--base-300)] bg-[var(--base-200)]"
-    )}>
-      <div>
-        <h3 className="font-semibold text-[var(--base-700)]">{change.title}</h3>
-        <p className="text-sm text-[var(--base-600)]">{change.description}</p>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={onEnterDetailed}
-          className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors text-sm"
-        >
-          View
-        </button>
-        
-        <button
-          onClick={onValidate}
-          disabled={change.validated}
-          className={cn(
-            "px-3 py-1 rounded text-sm font-medium transition-colors",
-            change.validated
-              ? "bg-green-500 text-white"
-              : "bg-[var(--base-400)] text-[var(--base-700)] hover:bg-[var(--base-500)]"
+    <div 
+      className={cn(
+        "border rounded-lg p-4 space-y-4 transition-colors",
+        change.validated 
+          ? "border-green-400 bg-green-50" 
+          : "border-[var(--base-300)] bg-[var(--base-200)]"
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-[var(--base-700)]">
+            {highlightSearchTerm(change.title, searchQuery)}
+          </h3>
+          {isHovered && (
+            <p className="text-sm text-[var(--base-600)]">
+              {highlightSearchTerm(change.description, searchQuery)}
+            </p>
           )}
-        >
-          {change.validated ? "✓ Validated" : "Validate"}
-        </button>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onEnterDetailed}
+            className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors text-sm"
+          >
+            View
+          </button>
+          
+          <button
+            onClick={onValidate}
+            disabled={change.validated}
+            className={cn(
+              "px-3 py-1 rounded text-sm font-medium transition-colors",
+              change.validated
+                ? "bg-green-500 text-white"
+                : "bg-[var(--base-400)] text-[var(--base-700)] hover:bg-[var(--base-500)]"
+            )}
+          >
+            {change.validated ? "✓ Validated" : "Validate"}
+          </button>
+        </div>
       </div>
+
+      {/* Blocks (only visible on hover) */}
+      {isHovered && change.subLogicPaths && change.subLogicPaths.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-[var(--base-600)]">Blocks:</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {change.subLogicPaths.map((subPath) => (
+              <SubLogicPathCard
+                key={subPath.id}
+                subPath={subPath}
+                isSelected={selectedSubLogic === subPath.id}
+                onSelect={() => onSelectSubLogic?.(subPath.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -869,6 +1242,13 @@ interface DetailedModeProps {
   onNextHunk: () => void;
   onPreviousHunk: () => void;
   onBackToOverview: () => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  searchResults: { changeId: string, fileIndex: number, hunkIndex: number, hunk: GitDiffHunk, context: string }[];
+  currentSearchIndex: number;
+  searchHunks: (query: string) => void;
+  nextSearchResult: () => void;
+  previousSearchResult: () => void;
 }
 
 function DetailedMode({
@@ -884,8 +1264,16 @@ function DetailedMode({
   onPreviousFile,
   onNextHunk,
   onPreviousHunk,
-  onBackToOverview
+  onBackToOverview,
+  searchQuery,
+  setSearchQuery,
+  searchResults,
+  currentSearchIndex,
+  searchHunks,
+  nextSearchResult,
+  previousSearchResult
 }: DetailedModeProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // Keyboard navigation
   React.useEffect(() => {
     let lastKeyPress: { key: string; timestamp: number } | null = null;
@@ -904,14 +1292,6 @@ function DetailedMode({
       
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
-          case 'ArrowLeft':
-            event.preventDefault();
-            onPreviousFile();
-            break;
-          case 'ArrowRight':
-            event.preventDefault();
-            onNextFile();
-            break;
           case 'ArrowUp':
             event.preventDefault();
             onPreviousHunk();
@@ -919,6 +1299,10 @@ function DetailedMode({
           case 'ArrowDown':
             event.preventDefault();
             onNextHunk();
+            break;
+          case 'f':
+            event.preventDefault();
+            searchInputRef.current?.focus();
             break;
         }
       } else {
@@ -953,27 +1337,13 @@ function DetailedMode({
             break;
           case 'ArrowLeft':
             event.preventDefault();
-            if (isDoubleTap) {
-              // Double-tap left arrow = previous change
-              onPreviousChange();
-              lastKeyPress = null; // Reset to prevent triple-tap
-            } else {
-              // Single tap left arrow = previous file
-              onPreviousFile();
-              lastKeyPress = { key: event.key, timestamp: currentTime };
-            }
+            // Single tap left arrow = previous file
+            onPreviousFile();
             break;
           case 'ArrowRight':
             event.preventDefault();
-            if (isDoubleTap) {
-              // Double-tap right arrow = next change
-              onNextChange();
-              lastKeyPress = null; // Reset to prevent triple-tap
-            } else {
-              // Single tap right arrow = next file
-              onNextFile();
-              lastKeyPress = { key: event.key, timestamp: currentTime };
-            }
+            // Single tap right arrow = next file
+            onNextFile();
             break;
           case 'n':
             event.preventDefault();
@@ -1022,20 +1392,13 @@ function DetailedMode({
       {/* Navigation Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)] bg-[var(--base-150)]">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={onBackToOverview}
-            className="px-3 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors"
-          >
-            ← Back to Overview
-          </button>
-          
           <div>
             <h3 className="font-semibold text-[var(--base-700)]">{change.title}</h3>
             <p className="text-sm text-[var(--base-600)]">
               File {currentFileIndex + 1} of {change.files.length}: {currentFile.filePath}
             </p>
             <p className="text-xs text-[var(--base-500)]">
-              Hunk {currentLineIndex + 1} of {currentFile.hunks.length}
+              Block {currentLineIndex + 1} of {currentFile.hunks.length}
               {currentFile.hunks[currentLineIndex] && (
                 <span className="ml-2">
                   (Lines -{currentFile.hunks[currentLineIndex].oldStart},{currentFile.hunks[currentLineIndex].oldCount} 
@@ -1043,6 +1406,44 @@ function DetailedMode({
                 </span>
               )}
             </p>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  searchHunks(e.target.value);
+                }}
+                className="px-3 py-1 border border-[var(--base-300)] rounded text-sm w-48 focus:outline-none focus:border-[var(--acc-500)]"
+              />
+              {searchResults.length > 0 && (
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-[var(--base-600)]">
+                  {currentSearchIndex + 1}/{searchResults.length}
+                </div>
+              )}
+            </div>
+            {searchResults.length > 0 && (
+              <>
+                <button
+                  onClick={previousSearchResult}
+                  className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={nextSearchResult}
+                  className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
+                >
+                  ↓
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -1066,13 +1467,13 @@ function DetailedMode({
             </button>
           </div>
 
-          {/* Hunk Navigation */}
+          {/* Block Navigation */}
           <div className="flex items-center space-x-1 mr-2">
             <button
               onClick={onPreviousHunk}
               disabled={currentLineIndex <= 0}
               className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Previous Hunk (K or Ctrl+↑)"
+              title="Previous Block (K or Ctrl+↑)"
             >
               ◀
             </button>
@@ -1080,7 +1481,7 @@ function DetailedMode({
               onClick={onNextHunk}
               disabled={currentLineIndex >= currentFile.hunks.length - 1}
               className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Next Hunk (J or Ctrl+↓)"
+              title="Next Block (J or Ctrl+↓)"
             >
               ▶
             </button>
@@ -1103,9 +1504,33 @@ function DetailedMode({
 
       {/* File Diff Content */}
       <div className="flex-1 relative">
-        <FileDiffViewer file={currentFile} currentHunkIndex={currentLineIndex} />
+        <FileDiffViewer file={currentFile} currentHunkIndex={currentLineIndex} searchQuery={searchQuery} />
       </div>
     </div>
+  );
+}
+
+// Text highlighting utility
+function highlightSearchTerm(text: string, searchTerm: string): JSX.Element {
+  if (!searchTerm.trim()) {
+    return <span>{text}</span>;
+  }
+
+  const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  
+  return (
+    <span>
+      {parts.map((part, index) =>
+        regex.test(part) ? (
+          <span key={index} className="bg-yellow-300 text-black px-1 rounded">
+            {part}
+          </span>
+        ) : (
+          <span key={index}>{part}</span>
+        )
+      )}
+    </span>
   );
 }
 
@@ -1113,9 +1538,10 @@ function DetailedMode({
 interface FileDiffViewerProps {
   file: GitDiffFile;
   currentHunkIndex?: number;
+  searchQuery?: string;
 }
 
-function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
+function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDiffViewerProps) {
   const currentHunkRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -1198,7 +1624,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
                   <span className="text-green-600">+{file.additions}</span>
                   <span className="text-red-600">-{file.deletions}</span>
                   <span className="text-[var(--base-600)]">
-                    Hunk {currentHunkIndex + 1}/{file.hunks.length}
+                    Block {currentHunkIndex + 1}/{file.hunks.length}
                   </span>
                 </div>
               </div>
@@ -1240,6 +1666,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0 }: FileDiffViewerProps) {
                       showLineNumbers={showLineNumbers}
                       onHoverLineNumber={() => setShowLineNumbers(true)}
                       onLeaveLineNumber={() => setShowLineNumbers(false)}
+                      searchQuery={searchQuery}
                     />
                   ))}
                 </div>
@@ -1258,9 +1685,10 @@ interface DiffLineProps {
   showLineNumbers: boolean;
   onHoverLineNumber: () => void;
   onLeaveLineNumber: () => void;
+  searchQuery?: string;
 }
 
-function DiffLine({ line, showLineNumbers, onHoverLineNumber, onLeaveLineNumber }: DiffLineProps) {
+function DiffLine({ line, showLineNumbers, onHoverLineNumber, onLeaveLineNumber, searchQuery = "" }: DiffLineProps) {
   const getLineStyle = () => {
     switch (line.type) {
       case 'added':
@@ -1289,7 +1717,9 @@ function DiffLine({ line, showLineNumbers, onHoverLineNumber, onLeaveLineNumber 
         {line.newLineNumber || line.oldLineNumber || ''}
       </span>
       <span className="w-4 text-center select-none">{getPrefix()}</span>
-      <span className="flex-1 whitespace-pre-wrap break-all">{line.content}</span>
+      <span className="flex-1 whitespace-pre-wrap break-all">
+        {highlightSearchTerm(line.content, searchQuery)}
+      </span>
     </div>
   );
 }

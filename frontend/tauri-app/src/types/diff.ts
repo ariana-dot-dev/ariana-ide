@@ -31,6 +31,7 @@ export interface DiffChange {
   files: GitDiffFile[];
   validated: boolean;
   promptLink?: string;
+  subLogicPaths?: SubLogicPath[];
 }
 
 export interface MainLogicChange extends DiffChange {
