@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use std::process::Command;
 use std::path::Path;
+use std::fs;
 use tauri::State;
 
 mod terminal;
@@ -64,7 +65,12 @@ pub fn run() {
 			// Git search commands
 			start_git_directories_search,
 			get_found_git_directories_so_far,
-			list_available_os_session_kinds
+			list_available_os_session_kinds,
+			// Canvas management commands
+			copy_directory,
+			create_git_branch,
+			execute_command,
+			execute_command_in_dir
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -217,4 +223,150 @@ async fn get_found_git_directories_so_far(
 #[tauri::command]
 async fn list_available_os_session_kinds() -> Result<Vec<OsSessionKind>, String> {
 	OsSessionKind::list_available().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn copy_directory(source: String, destination: String, os_session: OsSession) -> Result<(), String> {
+	match os_session {
+		OsSession::Local(_) => {
+			copy_directory_local(&source, &destination)
+		}
+		OsSession::Wsl(wsl_session) => {
+			copy_directory_wsl(&source, &destination, &wsl_session.distribution)
+		}
+	}
+}
+
+fn copy_directory_local(source: &str, destination: &str) -> Result<(), String> {
+	use std::fs;
+	use std::path::Path;
+	
+	let src_path = Path::new(source);
+	let dst_path = Path::new(destination);
+	
+	if !src_path.exists() {
+		return Err("Source directory does not exist".to_string());
+	}
+	
+	// Create destination directory if it doesn't exist
+	if let Some(parent) = dst_path.parent() {
+		fs::create_dir_all(parent)
+			.map_err(|e| format!("Failed to create destination parent directory: {}", e))?;
+	}
+	
+	// Use system copy command for better performance
+	#[cfg(target_os = "windows")]
+	{
+		// Use PowerShell Copy-Item for reliable directory copying on Windows
+		let ps_command = format!(
+			"Copy-Item -Path '{}' -Destination '{}' -Recurse -Force",
+			source.replace("'", "''"),
+			destination.replace("'", "''")
+		);
+		
+		let output = Command::new("powershell")
+			.arg("-Command")
+			.arg(&ps_command)
+			.output()
+			.map_err(|e| format!("Failed to execute PowerShell copy: {}", e))?;
+		
+		if !output.status.success() {
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			let stdout = String::from_utf8_lossy(&output.stdout);
+			return Err(format!("PowerShell copy failed: {} {}", stderr, stdout));
+		}
+	}
+	
+	#[cfg(any(target_os = "linux", target_os = "macos"))]
+	{
+		let output = Command::new("cp")
+			.arg("-r")
+			.arg(source)
+			.arg(destination)
+			.output()
+			.map_err(|e| format!("Failed to execute cp: {}", e))?;
+		
+		if !output.status.success() {
+			return Err(format!("cp failed: {}", String::from_utf8_lossy(&output.stderr)));
+		}
+	}
+	
+	Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn copy_directory_wsl(source: &str, destination: &str, distribution: &str) -> Result<(), String> {
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("cp")
+		.arg("-r")
+		.arg(source)
+		.arg(destination)
+		.output()
+		.map_err(|e| format!("Failed to execute WSL cp: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("WSL cp failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn copy_directory_wsl(_source: &str, _destination: &str, _distribution: &str) -> Result<(), String> {
+	Err("WSL is only available on Windows".to_string())
+}
+
+#[tauri::command]
+async fn create_git_branch(directory: String, branch_name: String, os_session: OsSession) -> Result<(), String> {
+	match os_session {
+		OsSession::Local(_) => {
+			create_git_branch_local(&directory, &branch_name)
+		}
+		OsSession::Wsl(wsl_session) => {
+			create_git_branch_wsl(&directory, &branch_name, &wsl_session.distribution)
+		}
+	}
+}
+
+fn create_git_branch_local(directory: &str, branch_name: &str) -> Result<(), String> {
+	let output = Command::new("git")
+		.arg("checkout")
+		.arg("-B")
+		.arg(branch_name)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git command: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("Git checkout failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn create_git_branch_wsl(directory: &str, branch_name: &str, distribution: &str) -> Result<(), String> {
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("git")
+		.arg("checkout")
+		.arg("-B")
+		.arg(branch_name)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git command: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("WSL git checkout failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn create_git_branch_wsl(_directory: &str, _branch_name: &str, _distribution: &str) -> Result<(), String> {
+	Err("WSL is only available on Windows".to_string())
 }

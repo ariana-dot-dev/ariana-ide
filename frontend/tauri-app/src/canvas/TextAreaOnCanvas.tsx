@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, PanInfo } from "framer-motion";
 import { cn } from "../utils";
-import { CanvasElement, ElementLayout } from "./types";
+import { CanvasElement, ElementLayout, TextAreaKind } from "./types";
 import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
 import { TerminalSpec } from "../services/CustomTerminalAPI";
 import { ClaudeCodeAgent } from "../services/ClaudeCodeAgent";
@@ -33,7 +33,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const { isLightTheme } = useStore();
 
 	// Text area state
-	const [text, setText] = useState("");
+	const [text, setText] = useState((layout.element.kind as TextAreaKind).textArea.content);
 	const [isLocked, setIsLocked] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 
@@ -51,23 +51,6 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 
 	const handleDragEndInternal = () => {
 		propOnDragEnd(element);
-	};
-
-	const createTerminalSpec = (): TerminalSpec => {
-		// Create terminal spec based on the current OS session
-		if (osSession && typeof osSession === 'object' && 'Wsl' in osSession) {
-			return {
-				kind: { $type: "wsl" as const },
-				lines: 24,
-				cols: 60,
-			};
-		} else {
-			return {
-				kind: { $type: "local" as const },
-				lines: 24,
-				cols: 60,
-			};
-		}
 	};
 
 	const handleGoClick = async () => {
@@ -102,18 +85,9 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			console.log("[TextAreaOnCanvas]", "Showing terminal...");
 			setShowTerminal(true);
 
-			// Start Claude Code task
-			const terminalSpec = createTerminalSpec();
-			console.log(
-				"[TextAreaOnCanvas]",
-				"Starting Claude Code task with spec:",
-				terminalSpec,
-			);
-
 			await agent.startTask(
 				osSession || { Local: "." }, // Use the project's OS session or fallback to local
 				text.trim(),
-				terminalSpec,
 				(terminalId: string) => {
 					console.log("[TextAreaOnCanvas]", "Terminal ready, ID:", terminalId);
 					setTerminalId(terminalId);
@@ -131,6 +105,10 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			setIsLocked(false);
 		}
 	};
+
+	useEffect(() => {
+		(layout.element.kind as TextAreaKind).textArea.content = text;
+	}, [text])
 
 	// Listen for task completion
 	useEffect(() => {

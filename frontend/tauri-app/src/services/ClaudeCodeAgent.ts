@@ -93,18 +93,12 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	async startTask(
 		osSession: OsSession,
 		prompt: string,
-		terminalSpec: TerminalSpec,
 		onTerminalReady?: (terminalId: string) => void,
 	): Promise<void> {
 		console.log(
 			this.logPrefix,
 			"Starting Claude Code task with prompt:",
 			prompt,
-		);
-		console.log(
-			this.logPrefix,
-			"Terminal spec:",
-			JSON.stringify(terminalSpec, null, 2),
 		);
 
 		if (this.isRunning) {

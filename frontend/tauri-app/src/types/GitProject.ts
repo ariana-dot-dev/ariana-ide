@@ -1,11 +1,13 @@
-import { OsSession } from "../bindings/os";
+import { OsSession, osSessionGetWorkingDirectory } from "../bindings/os";
 import { TextArea } from "../canvas/TextArea";
 import type { CanvasElement } from "../canvas/types";
+import { CanvasService } from "../services/CanvasService";
 
 export interface GitProjectCanvas {
 	id: string;
 	name: string;
 	elements: CanvasElement[];
+	osSession?: OsSession; // Optional OS session for canvas-specific operations
 	createdAt: number;
 	lastModified: number;
 }
@@ -53,6 +55,7 @@ export class GitProject {
 			id: crypto.randomUUID(),
 			name: canvas?.name || `Canvas ${this.canvases.length + 1}`,
 			elements: canvas?.elements || [],
+			osSession: canvas?.osSession,
 			createdAt: Date.now(),
 			lastModified: Date.now(),
 		};
@@ -61,6 +64,85 @@ export class GitProject {
 		this.lastModified = Date.now();
 		this.notifyListeners('canvases');
 		return newCanvas.id;
+	}
+
+	/**
+	 * Creates a new canvas that is a copy of the repository on another branch and location
+	 */
+	async addCanvasCopy(): Promise<{ success: boolean; canvasId?: string; error?: string }> {
+		try {
+			// Generate random ID for the new version
+			const randomId = CanvasService.generateRandomId();
+			const branchName = `canvas-${randomId}`;
+			
+			// Get the root working directory
+			const rootDirectory = osSessionGetWorkingDirectory(this.root);
+			if (!rootDirectory) {
+				return { success: false, error: "Could not determine root directory" };
+			}
+
+			// Create new location path (add suffix to avoid conflicts)
+			const newLocation = `${rootDirectory}-${randomId}`;
+			
+			// Step 1: Copy the folder to new location
+			const copyResult = await CanvasService.copyDirectory(
+				rootDirectory,
+				newLocation,
+				this.root
+			);
+			
+			if (!copyResult.success) {
+				return { 
+					success: false, 
+					error: `Failed to copy directory: ${copyResult.error}` 
+				};
+			}
+
+			// Step 2: Create new OsSession with the new working directory
+			let newOsSession: OsSession;
+			if ('Local' in this.root) {
+				newOsSession = { Local: newLocation };
+			} else if ('Wsl' in this.root) {
+				newOsSession = {
+					Wsl: {
+						distribution: this.root.Wsl.distribution,
+						working_directory: newLocation
+					}
+				};
+			} else {
+				return { success: false, error: "Unknown OS session type" };
+			}
+
+			// Step 3: Create git branch in the new location
+			const gitResult = await CanvasService.createGitBranch(
+				newLocation,
+				branchName,
+				newOsSession
+			);
+			
+			if (!gitResult.success) {
+				return { 
+					success: false, 
+					error: `Failed to create git branch: ${gitResult.error}` 
+				};
+			}
+
+			// Step 4: Create the new canvas with the new OsSession and TextArea
+			const canvasId = this.addCanvas({
+				name: `Canvas ${this.canvases.length + 1} (${branchName})`,
+				osSession: newOsSession,
+				elements: [
+					TextArea.canvasElement(newOsSession, "")
+				]
+			});
+
+			return { success: true, canvasId };
+		} catch (error) {
+			return { 
+				success: false, 
+				error: `Unexpected error: ${error}` 
+			};
+		}
 	}
 
 	removeCanvas(canvasId: string): boolean {
@@ -144,6 +226,11 @@ export class GitProject {
 		const project = new GitProject(data.root, data.name);
 		project.id = data.id;
 		project.canvases = data.canvases || [project.createDefaultCanvas()];
+		// Handle migration for canvases that don't have osSession yet
+		project.canvases = project.canvases.map(canvas => ({
+			...canvas,
+			osSession: canvas.osSession || undefined
+		}));
 		project.currentCanvasIndex = data.currentCanvasIndex || 0;
 		project.createdAt = data.createdAt || Date.now();
 		project.lastModified = data.lastModified || Date.now();
@@ -166,8 +253,7 @@ export class GitProject {
 		return 'Untitled Project';
 	}
 
-	private createDefaultCanvas(): GitProjectCanvas {
-		console.log("here")
+	createDefaultCanvas(): GitProjectCanvas {
 		return {
 			id: crypto.randomUUID(),
 			name: 'Main Canvas',
