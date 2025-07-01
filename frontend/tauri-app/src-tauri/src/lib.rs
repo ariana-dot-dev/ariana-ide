@@ -64,7 +64,11 @@ pub fn run() {
 			// Git search commands
 			start_git_directories_search,
 			get_found_git_directories_so_far,
-			list_available_os_session_kinds
+			list_available_os_session_kinds,
+			// Git repository commands
+			check_git_repository,
+			execute_command,
+			execute_command_in_dir
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -148,6 +152,7 @@ async fn start_git_directories_search(
 	Ok(search_id)
 }
 
+#[tauri::command]
 async fn check_git_repository(directory: String) -> Result<bool, String> {
 	let path = Path::new(&directory);
 	

@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { DiffSummary, MainLogicChange, DiffChange, SubLogicPath, GitDiffFile, GitDiffLine, GitBranch, GitCommit, BranchComparison, GitDiffHunk } from "../types/diff";
 import { diffService } from "../services/DiffService";
 import { cn } from "../utils";
+import { useGitProject } from "../contexts/GitProjectContext";
+import { osSessionGetWorkingDirectory } from "../bindings/os";
 
 interface DiffManagementProps {
   onClose: () => void;
@@ -12,6 +14,23 @@ interface DiffManagementProps {
 }
 
 export default function DiffManagement({ onClose, initialState, onStateChange, mainTitlebarVisible }: DiffManagementProps) {
+  console.log("[DIFFMANAGEMENT] Component rendering...");
+  
+  let { selectedGitProject } = useGitProject();
+  console.log("[DIFFMANAGEMENT] Selected git project:", selectedGitProject);
+  
+  // Add safety check for git project
+  if (!selectedGitProject) {
+    console.warn("[DIFFMANAGEMENT] No git project available");
+    return (
+      <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] p-8">
+        <h1 className="text-2xl text-[var(--acc-600)] mb-4">No Git Project</h1>
+        <p className="text-[var(--base-600)] mb-4">Please select a git repository first.</p>
+        <button onClick={onClose} className="px-4 py-2 bg-[var(--acc-500)] text-white rounded">Close</button>
+      </div>
+    );
+  }
+  
   // Add global error logging
   useEffect(() => {
     const handleError = (error: ErrorEvent) => {
@@ -54,14 +73,32 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
   const [baseBranchCommits, setBaseBranchCommits] = useState<GitCommit[]>(initialState?.baseBranchCommits ?? []);
   const [targetBranchCommits, setTargetBranchCommits] = useState<GitCommit[]>(initialState?.targetBranchCommits ?? []);
   const [loadingCommits, setLoadingCommits] = useState(false);
-  const [selectedDirectory, setSelectedDirectory] = useState<string>(initialState?.selectedDirectory ?? "");
-  const [showDirectorySelector, setShowDirectorySelector] = useState(initialState?.showDirectorySelector ?? true);
   const [showUnifiedDiff, setShowUnifiedDiff] = useState(false);
   const [unifiedDiffContent, setUnifiedDiffContent] = useState<string>("");
   const [showHeader, setShowHeader] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<{ changeId: string, fileIndex: number, hunkIndex: number, hunk: GitDiffHunk, context: string }[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState<number>(-1);
+
+  // Initialize diff service with current git project directory
+  useEffect(() => {
+    console.log("[COMPONENT] Git project:", selectedGitProject);
+    if (selectedGitProject?.root) {
+      const workingDirectory = osSessionGetWorkingDirectory(selectedGitProject.root);
+      if (workingDirectory) {
+        console.log("[COMPONENT] Setting diff service working directory to:", workingDirectory);
+        diffService.setWorkingDirectory(workingDirectory);
+        // Auto-load branches when git project is available
+        loadBranches();
+      } else {
+        console.warn("[COMPONENT] Could not extract working directory from git project");
+        setBranchesError("Could not extract working directory from git project.");
+      }
+    } else {
+      console.warn("[COMPONENT] No git project available");
+      setBranchesError("No git project selected. Please select a git repository first.");
+    }
+  }, [selectedGitProject]);
 
   // Log state restoration for debugging
   useEffect(() => {
@@ -101,9 +138,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
         selectedBaseBranch,
         selectedTargetBranch,
         selectedBaseCommit,
-        selectedTargetCommit,
-        selectedDirectory,
-        showDirectorySelector
+        selectedTargetCommit
       };
       onStateChange(currentState);
     }
@@ -120,22 +155,15 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     selectedTargetBranch,
     selectedBaseCommit,
     selectedTargetCommit,
-    selectedDirectory,
-    showDirectorySelector,
     onStateChange
   ]);
 
-  const loadBranches = async (directory?: string) => {
+  const loadBranches = async () => {
     console.log("[COMPONENT] loadBranches method entry");
     try {
-      console.log("[COMPONENT] loadBranches called with directory:", directory);
+      console.log("[COMPONENT] loadBranches called for git project:", selectedGitProject?.root);
       setBranchesLoading(true);
       setBranchesError(null);
-      
-      if (directory) {
-        console.log("[COMPONENT] Setting working directory:", directory);
-        diffService.setWorkingDirectory(directory);
-      }
       
       console.log("[COMPONENT] About to call getGitBranches...");
       const gitBranches = await diffService.getGitBranches();
@@ -277,51 +305,9 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     setViewMode('overview');
   };
 
-  const handleDirectorySelect = async (directory: string) => {
-    console.log("[COMPONENT] handleDirectorySelect called with:", directory);
-    setBranchesLoading(true);
-    setBranchesError(null);
-    
-    try {
-      // Test basic Tauri invoke first
-      console.log("[COMPONENT] Testing basic Tauri invoke...");
-      await diffService.testInvoke();
-      console.log("[COMPONENT] Basic Tauri invoke successful");
-      
-      console.log("[COMPONENT] Starting directory validation...");
-      // First validate the directory is a git repository
-      const isGitRepo = await diffService.checkGitRepository(directory);
-      console.log("[COMPONENT] Directory validation result:", isGitRepo);
-      
-      if (!isGitRepo) {
-        console.log("[COMPONENT] Directory is not a git repository");
-        setBranchesError("Directory is not a valid git repository. Please select the root directory of a git repository (containing .git folder).");
-        setBranchesLoading(false);
-        return;
-      }
-      
-      console.log("[COMPONENT] Directory validated, setting state...");
-      setSelectedDirectory(directory);
-      setShowDirectorySelector(false);
-      
-      console.log("[COMPONENT] Loading branches...");
-      await loadBranches(directory);
-      console.log("[COMPONENT] Branches loaded successfully");
-    } catch (error) {
-      console.error("[COMPONENT] Error in handleDirectorySelect:", error);
-      console.error("[COMPONENT] Error stack:", error instanceof Error ? error.stack : "No stack");
-      setBranchesError(error instanceof Error ? error.message : "Failed to validate directory");
-      setBranchesLoading(false);
-    }
-  };
+  // Directory selection removed - using git project from context
 
-  const backToDirectorySelection = () => {
-    setShowDirectorySelector(true);
-    setBranches([]);
-    setSelectedBaseBranch("");
-    setSelectedTargetBranch("");
-    setBranchesError(null);
-  };
+  // Back to directory selection removed - using git project from context
 
   const validateChange = async (changeId: string) => {
     if (!diffSummary) return;
@@ -492,6 +478,26 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     setCurrentFileIndex(result.fileIndex);
     setCurrentLineIndex(result.hunkIndex);
     setCurrentSearchIndex(index);
+    
+    // Trigger scroll to make search result visible as second line
+    setTimeout(() => {
+      const searchResultElements = document.querySelectorAll('.search-highlight');
+      if (searchResultElements.length > 0) {
+        const targetElement = searchResultElements[0] as HTMLElement;
+        const scrollContainer = document.querySelector('.absolute.inset-0.overflow-auto') as HTMLElement;
+        
+        if (targetElement && scrollContainer) {
+          // Calculate position to show search result as second visible line
+          const lineHeight = 24; // Approximate line height
+          const targetTop = targetElement.offsetTop - (lineHeight * 1); // Show as second line
+          
+          scrollContainer.scrollTo({
+            top: Math.max(0, targetTop),
+            behavior: 'smooth'
+          });
+        }
+      }
+    }, 100); // Small delay to ensure DOM is updated
   };
 
   const nextSearchResult = () => {
@@ -643,21 +649,21 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     return change?.files[currentFileIndex] || null;
   };
 
-  // Show directory selection first
-  if (showBranchSelection && showDirectorySelector) {
-    return (
-      <DirectorySelectionPage
-        selectedDirectory={selectedDirectory}
-        onDirectorySelect={handleDirectorySelect}
-        onClose={onClose}
-        loading={branchesLoading}
-        error={branchesError}
-      />
-    );
-  }
+  // Directory selection removed - using git project from context
+
+  console.log("[DIFFMANAGEMENT] Current state:", {
+    showBranchSelection,
+    loading,
+    error,
+    diffSummary: !!diffSummary,
+    branches: branches.length,
+    branchesLoading,
+    branchesError
+  });
 
   // Show branch selection landing page
   if (showBranchSelection) {
+    console.log("[DIFFMANAGEMENT] Rendering BranchSelectionPage");
     return (
       <BranchSelectionPage
         branches={branches}
@@ -670,7 +676,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
         baseBranchCommits={baseBranchCommits}
         targetBranchCommits={targetBranchCommits}
         loadingCommits={loadingCommits}
-        selectedDirectory={selectedDirectory}
+        selectedDirectory={selectedGitProject?.root ? (osSessionGetWorkingDirectory(selectedGitProject.root) || "") : ""}
         onBaseBranchChange={(branch) => {
           setSelectedBaseBranch(branch);
           if (branch) loadBranchCommits(branch, true);
@@ -683,8 +689,8 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
         onTargetCommitChange={setSelectedTargetCommit}
         onCompare={handleCompareBranches}
         onClose={onClose}
-        onRetry={() => loadBranches(selectedDirectory)}
-        onBackToDirectory={backToDirectorySelection}
+        onRetry={() => loadBranches()}
+        onBackToDirectory={() => {/* Directory selection removed */}}
         isComparing={loading}
       />
     );
@@ -1363,10 +1369,6 @@ function DetailedMode({
             // Single tap right arrow = next file
             onNextFile();
             break;
-          case 'n':
-            event.preventDefault();
-            onNextChange();
-            break;
           case 'p':
             event.preventDefault();
             onPreviousChange();
@@ -1479,7 +1481,7 @@ function DetailedMode({
             <button
               onClick={onNextChange}
               className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
-              title="Next Change (N)"
+              title="Next Change"
             >
               →
             </button>
@@ -1541,7 +1543,7 @@ function highlightSearchTerm(text: string, searchTerm: string): JSX.Element {
     <span>
       {parts.map((part, index) =>
         regex.test(part) ? (
-          <span key={index} className="bg-yellow-300 text-black px-1 rounded">
+          <span key={index} className="bg-yellow-300 text-black px-1 rounded search-highlight">
             {part}
           </span>
         ) : (
@@ -1743,171 +1745,11 @@ function DiffLine({ line, showLineNumbers, onHoverLineNumber, onLeaveLineNumber,
 }
 
 // Directory Selection Page Component
-interface DirectorySelectionPageProps {
-  selectedDirectory: string;
-  onDirectorySelect: (directory: string) => void;
-  onClose: () => void;
-  loading?: boolean;
-  error?: string | null;
-}
+// DirectorySelectionPage removed - using git project from context
 
-function DirectorySelectionPage({
-  selectedDirectory,
-  onDirectorySelect,
-  onClose,
-  loading = false,
-  error = null
-}: DirectorySelectionPageProps) {
-  const [directoryInput, setDirectoryInput] = useState(selectedDirectory);
-  const [suggestedDirectories, setSuggestedDirectories] = useState<string[]>([]);
+// DirectorySelectionPage function removed - using git project from context
 
-  useEffect(() => {
-    // Get current directory and suggest some common paths
-    const loadSuggestions = async () => {
-      try {
-        const currentDir = await invoke<string>("get_current_dir");
-        const suggestions = [
-          currentDir,
-          currentDir.replace('/tauri-app', ''), // Parent directory
-          currentDir.replace('/frontend/tauri-app', ''), // Project root
-          '/Users/isago/ariana-ide', // Direct project path
-        ].filter((path, index, arr) => arr.indexOf(path) === index); // Remove duplicates
-        
-        setSuggestedDirectories(suggestions);
-        if (!directoryInput) {
-          setDirectoryInput(suggestions[1] || currentDir); // Default to parent directory
-        }
-      } catch (error) {
-        console.error("Failed to get current directory:", error);
-      }
-    };
-    
-    loadSuggestions();
-  }, []);
-
-  const handleDirectorySubmit = () => {
-    console.log("[DIRECTORY_PAGE] handleDirectorySubmit called with:", directoryInput);
-    if (directoryInput.trim()) {
-      console.log("[DIRECTORY_PAGE] Calling onDirectorySelect with:", directoryInput.trim());
-      onDirectorySelect(directoryInput.trim());
-    } else {
-      console.log("[DIRECTORY_PAGE] Directory input is empty");
-    }
-  };
-
-  return (
-    <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Select Git Repository</h1>
-          <p className="text-sm text-[var(--base-600)] mt-1">
-            Choose the directory containing your git repository
-          </p>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Directory Input */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--base-700)] mb-2">
-                Repository Directory Path
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={directoryInput}
-                  onChange={(e) => setDirectoryInput(e.target.value)}
-                  placeholder="/path/to/your/git/repository"
-                  className="flex-1 px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)] focus:border-transparent"
-                  onKeyPress={(e) => e.key === 'Enter' && handleDirectorySubmit()}
-                />
-                <button
-                  onClick={handleDirectorySubmit}
-                  disabled={!directoryInput.trim() || loading}
-                  className={cn(
-                    "px-4 py-2 rounded-lg font-medium transition-colors",
-                    directoryInput.trim() && !loading
-                      ? "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
-                      : "bg-[var(--base-300)] text-[var(--base-500)] cursor-not-allowed"
-                  )}
-                >
-                  {loading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Validating...</span>
-                    </div>
-                  ) : (
-                    "Select"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center space-x-2">
-                <div className="text-red-500">⚠️</div>
-                <div className="text-sm text-red-700">{error}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Suggested Directories */}
-          {suggestedDirectories.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-[var(--base-700)]">Suggested Directories:</h3>
-              <div className="space-y-2">
-                {suggestedDirectories.map((dir, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      console.log("[DIRECTORY_PAGE] Suggested directory clicked:", dir);
-                      onDirectorySelect(dir);
-                    }}
-                    disabled={loading}
-                    className={cn(
-                      "w-full text-left px-4 py-3 rounded-lg transition-colors",
-                      loading 
-                        ? "bg-[var(--base-200)] opacity-50 cursor-not-allowed"
-                        : "bg-[var(--base-200)] hover:bg-[var(--base-250)]"
-                    )}
-                  >
-                    <div className="font-mono text-sm text-[var(--base-700)]">{dir}</div>
-                    <div className="text-xs text-[var(--base-600)] mt-1">
-                      {index === 0 && "Current directory"}
-                      {index === 1 && "Parent directory"}
-                      {index === 2 && "Project root"}
-                      {index === 3 && "Ariana IDE project"}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Help Text */}
-          <div className="bg-[var(--base-200)] rounded-lg p-4">
-            <h4 className="font-medium text-[var(--base-700)] mb-2">💡 Tips</h4>
-            <ul className="text-sm text-[var(--base-600)] space-y-1">
-              <li>• Select the root directory of your git repository</li>
-              <li>• The directory should contain a .git folder</li>
-              <li>• Use absolute paths for best results</li>
-              <li>• Try the suggested directories above for quick access</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Branch Selection Landing Page Component
+// Branch Selection Page Component
 interface BranchSelectionPageProps {
   branches: GitBranch[];
   loading: boolean;
@@ -1953,276 +1795,194 @@ function BranchSelectionPage({
   onBackToDirectory,
   isComparing
 }: BranchSelectionPageProps) {
-  const canCompare = (selectedBaseBranch && selectedTargetBranch && (
-                       selectedBaseBranch !== selectedTargetBranch || // Different branches
-                       (selectedBaseBranch === selectedTargetBranch && (selectedBaseCommit || selectedTargetCommit)) // Same branch with different commits
-                     )) || 
-                     selectedBaseCommit === 'UNSTAGED' || selectedTargetCommit === 'UNSTAGED' ||
-                     selectedBaseCommit === 'STAGED' || selectedTargetCommit === 'STAGED';
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Select Branches to Compare</h1>
-        </div>
-        
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--acc-500)] mx-auto mb-4"></div>
-            <p className="text-[var(--base-600)]">Loading branches...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Select Branches to Compare</h1>
-        </div>
-        
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <div className="text-red-500 text-xl mb-4">⚠️</div>
-            <h2 className="text-xl font-semibold text-[var(--base-700)] mb-2">Error Loading Branches</h2>
-            <p className="text-[var(--base-600)] mb-4">{error}</p>
-            <button
-              onClick={onRetry}
-              className="px-4 py-2 bg-[var(--acc-500)] text-white rounded-lg hover:bg-[var(--acc-600)] transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>
+          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Branch Comparison</h1>
           <p className="text-sm text-[var(--base-600)] mt-1">
             Repository: <span className="font-mono">{selectedDirectory}</span>
           </p>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={onBackToDirectory}
-            className="px-3 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
-          >
-            ← Change Directory
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors"
+        >
+          Close
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Branch Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Base Branch Selection */}
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--acc-600)] mb-2">Base Branch</h3>
-                <p className="text-sm text-[var(--base-600)]">The branch to compare against (what you're merging into)</p>
-              </div>
-              
-              <BranchSelector
-                branches={branches}
-                selectedBranch={selectedBaseBranch}
-                selectedCommit={selectedBaseCommit}
-                commits={baseBranchCommits}
-                loadingCommits={loadingCommits}
-                onBranchChange={onBaseBranchChange}
-                onCommitChange={onBaseCommitChange}
-                placeholder="Select base branch"
-              />
-            </div>
-
-            {/* Target Branch Selection */}
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--acc-600)] mb-2">Target Branch</h3>
-                <p className="text-sm text-[var(--base-600)]">The branch with changes to validate (what you're merging from)</p>
-              </div>
-              
-              <BranchSelector
-                branches={branches}
-                selectedBranch={selectedTargetBranch}
-                selectedCommit={selectedTargetCommit}
-                commits={targetBranchCommits}
-                loadingCommits={loadingCommits}
-                onBranchChange={onTargetBranchChange}
-                onCommitChange={onTargetCommitChange}
-                placeholder="Select target branch"
-              />
+        {loading && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--acc-500)] mx-auto mb-4"></div>
+              <p className="text-[var(--base-600)]">Loading branches...</p>
             </div>
           </div>
+        )}
 
-          {/* Comparison Preview */}
-          {canCompare && (
-            <div className="bg-[var(--base-200)] rounded-lg p-4">
-              <h4 className="font-medium text-[var(--base-700)] mb-2">Comparison Preview</h4>
-              <div className="flex items-center space-x-4 text-sm">
-                <span className="text-[var(--base-600)]">
-                  {selectedTargetCommit === 'UNSTAGED' && "Comparing unstaged changes against HEAD"}
-                  {selectedTargetCommit === 'STAGED' && "Comparing staged changes against HEAD"}
-                  {selectedBaseCommit === 'UNSTAGED' && "Comparing unstaged changes against HEAD"}
-                  {selectedBaseCommit === 'STAGED' && "Comparing staged changes against HEAD"}
-                  {(selectedTargetCommit !== 'UNSTAGED' && selectedTargetCommit !== 'STAGED' && selectedBaseCommit !== 'UNSTAGED' && selectedBaseCommit !== 'STAGED') && 
-                    `Comparing changes from ${selectedTargetBranch} against ${selectedBaseBranch}`}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Compare Button */}
-          <div className="flex justify-center pt-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <h3 className="text-red-800 font-medium mb-2">Error</h3>
+            <p className="text-red-700 mb-4">{error}</p>
             <button
-              onClick={onCompare}
-              disabled={!canCompare || isComparing}
-              className={cn(
-                "px-8 py-3 rounded-lg font-medium transition-colors",
-                canCompare && !isComparing
-                  ? "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
-                  : "bg-[var(--base-300)] text-[var(--base-500)] cursor-not-allowed"
-              )}
+              onClick={onRetry}
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
             >
-              {isComparing ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Loading...</span>
-                </div>
-              ) : (
-                selectedTargetCommit === 'UNSTAGED' || selectedBaseCommit === 'UNSTAGED' ? "View Unstaged Changes" :
-                selectedTargetCommit === 'STAGED' || selectedBaseCommit === 'STAGED' ? "View Staged Changes" :
-                "Compare Branches"
-              )}
+              Retry
             </button>
           </div>
+        )}
 
-          {!canCompare && selectedBaseBranch && selectedTargetBranch && (
-            <p className="text-center text-sm text-[var(--base-500)]">
-              {selectedBaseBranch === selectedTargetBranch 
-                ? "Please select different commits to compare within the same branch"
-                : "Please select two different branches to compare"}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+        {!loading && !error && branches.length > 0 && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Branch Selection */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Base Branch */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-[var(--base-700)]">Base Branch</h3>
+                <select
+                  value={selectedBaseBranch}
+                  onChange={(e) => onBaseBranchChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]"
+                >
+                  <option value="">Select base branch...</option>
+                  {branches.filter(branch => branch && branch.name).map(branch => (
+                    <option key={String(branch.name)} value={String(branch.name)}>
+                      {String(branch.name)} {branch.isCurrentBranch ? '(current)' : ''}
+                    </option>
+                  ))}
+                </select>
 
-// Branch Selector Component
-interface BranchSelectorProps {
-  branches: GitBranch[];
-  selectedBranch: string;
-  selectedCommit: string;
-  commits: GitCommit[];
-  loadingCommits: boolean;
-  onBranchChange: (branch: string) => void;
-  onCommitChange: (commit: string) => void;
-  excludeBranch?: string;
-  placeholder: string;
-}
+                {/* Base Commit Selection */}
+                {selectedBaseBranch && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                      Specific commit (optional)
+                    </label>
+                    <select
+                      value={selectedBaseCommit}
+                      onChange={(e) => onBaseCommitChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]"
+                    >
+                      <option value="">Latest commit</option>
+                      <option value="UNSTAGED">🔶 Unstaged Changes (Working Directory)</option>
+                      <option value="STAGED">🟡 Staged Changes (Index)</option>
+                      {baseBranchCommits.map(commit => (
+                        <option key={commit.hash} value={commit.hash}>
+                          {String(commit.hash).substring(0, 7)} - {String(commit.message).substring(0, 50)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-function BranchSelector({
-  branches,
-  selectedBranch,
-  selectedCommit,
-  commits,
-  loadingCommits,
-  onBranchChange,
-  onCommitChange,
-  excludeBranch,
-  placeholder
-}: BranchSelectorProps) {
-  const availableBranches = excludeBranch ? branches.filter(b => b.name !== excludeBranch) : branches;
-
-  return (
-    <div className="space-y-3">
-      <select
-        value={selectedBranch}
-        onChange={(e) => onBranchChange(e.target.value)}
-        className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)] focus:border-transparent"
-      >
-        <option value="">{placeholder}</option>
-        {availableBranches.map((branch) => (
-          <option key={branch.name} value={branch.name}>
-            {branch.name} {branch.isCurrentBranch ? "(current)" : ""} {branch.isRemote ? "(remote)" : ""}
-          </option>
-        ))}
-      </select>
-
-      {/* Commit Selection */}
-      {selectedBranch && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-[var(--base-700)]">
-            Select Commit (optional, defaults to latest)
-          </label>
-          {loadingCommits ? (
-            <div className="flex items-center space-x-2 text-sm text-[var(--base-600)]">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--acc-500)]"></div>
-              <span>Loading commits...</span>
-            </div>
-          ) : (
-            <select
-              value={selectedCommit}
-              onChange={(e) => onCommitChange(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)] focus:border-transparent"
-            >
-              <option value="">Latest commit</option>
-              <option value="UNSTAGED">🔶 Unstaged Changes (Working Directory)</option>
-              <option value="STAGED">🟡 Staged Changes (Index)</option>
-              {commits.map((commit) => (
-                <option key={commit.hash} value={commit.hash}>
-                  {commit.shortHash} - {commit.message} ({commit.author}, {commit.date})
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
-      {/* Selected Branch Details */}
-      {selectedBranch && (
-        <div className="bg-[var(--base-150)] rounded-lg p-3">
-          {(() => {
-            const branch = branches.find(b => b.name === selectedBranch);
-            if (!branch) return null;
-            
-            return (
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium text-[var(--base-700)]">{branch.name}</span>
-                  {branch.isCurrentBranch && (
-                    <span className="text-xs bg-[var(--acc-500)] text-white px-2 py-0.5 rounded">CURRENT</span>
-                  )}
-                  {branch.isRemote && (
-                    <span className="text-xs bg-[var(--base-400)] text-[var(--base-700)] px-2 py-0.5 rounded">REMOTE</span>
-                  )}
-                </div>
-                {branch.lastCommit && (
-                  <div className="text-xs text-[var(--base-600)]">
-                    <span className="font-mono">{branch.lastCommit}</span>
-                    {branch.lastCommitMessage && (
-                      <span className="ml-2">{branch.lastCommitMessage}</span>
-                    )}
+                {/* Show staged/unstaged options even without branch selection */}
+                {!selectedBaseBranch && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                      Or compare changes directly
+                    </label>
+                    <select
+                      value={selectedBaseCommit}
+                      onChange={(e) => onBaseCommitChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]"
+                    >
+                      <option value="">Select option...</option>
+                      <option value="UNSTAGED">🔶 Unstaged Changes (Working Directory)</option>
+                      <option value="STAGED">🟡 Staged Changes (Index)</option>
+                    </select>
                   </div>
                 )}
               </div>
-            );
-          })()}
-        </div>
-      )}
+
+              {/* Target Branch */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-[var(--base-700)]">Target Branch</h3>
+                <select
+                  value={selectedTargetBranch}
+                  onChange={(e) => onTargetBranchChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]"
+                >
+                  <option value="">Select target branch...</option>
+                  {branches.filter(branch => branch && branch.name).map(branch => (
+                    <option key={String(branch.name)} value={String(branch.name)}>
+                      {String(branch.name)} {branch.isCurrentBranch ? '(current)' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Target Commit Selection */}
+                {selectedTargetBranch && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                      Specific commit (optional)
+                    </label>
+                    <select
+                      value={selectedTargetCommit}
+                      onChange={(e) => onTargetCommitChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]"
+                    >
+                      <option value="">Latest commit</option>
+                      <option value="UNSTAGED">🔶 Unstaged Changes (Working Directory)</option>
+                      <option value="STAGED">🟡 Staged Changes (Index)</option>
+                      {targetBranchCommits.map(commit => (
+                        <option key={commit.hash} value={commit.hash}>
+                          {String(commit.hash).substring(0, 7)} - {String(commit.message).substring(0, 50)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Show staged/unstaged options even without branch selection */}
+                {!selectedTargetBranch && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                      Or compare changes directly
+                    </label>
+                    <select
+                      value={selectedTargetCommit}
+                      onChange={(e) => onTargetCommitChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-[var(--base-300)] rounded-lg bg-[var(--base-100)] text-[var(--base-700)] focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]"
+                    >
+                      <option value="">Select option...</option>
+                      <option value="UNSTAGED">🔶 Unstaged Changes (Working Directory)</option>
+                      <option value="STAGED">🟡 Staged Changes (Index)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Compare Button */}
+            <div className="border-t pt-6">
+              <button
+                onClick={onCompare}
+                disabled={!selectedBaseBranch && !selectedTargetCommit}
+                className={cn(
+                  "w-full px-6 py-3 rounded-lg font-medium transition-colors",
+                  (selectedBaseBranch || selectedTargetCommit) && !isComparing
+                    ? "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
+                    : "bg-[var(--base-300)] text-[var(--base-500)] cursor-not-allowed"
+                )}
+              >
+                {isComparing ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Comparing...</span>
+                  </div>
+                ) : (
+                  "Compare"
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

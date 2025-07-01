@@ -162,19 +162,6 @@ function App() {
 					style={{ background: 'url("assets/noise.png")' }}
 				></div>
 				<div className="w-full h-full max-h-full flex flex-col gap-1.5 p-2">
-					{/* Diff Management Modal */}
-					{showDiffManagement && (
-						<div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
-							<div className="bg-[var(--base-100)] rounded-lg w-full h-full flex flex-col">
-								<DiffManagement 
-									onClose={() => setShowDiffManagement(false)}
-									initialState={diffManagementState}
-									onStateChange={setDiffManagementState}
-									mainTitlebarVisible={showTitlebar}
-								/>
-							</div>
-						</div>
-					)}
 
 					{/* Custom Titlebar */}
 					<div
@@ -311,6 +298,19 @@ function App() {
 						</div>
 					) : (
 						<GitProjectProvider gitProject={store.getGitProject(selectedGitProjectId) || null}>
+							{/* Diff Management Modal */}
+							{showDiffManagement && (
+								<div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+									<div className="bg-[var(--base-100)] rounded-lg w-full h-full flex flex-col">
+										<DiffManagement 
+											onClose={() => setShowDiffManagement(false)}
+											initialState={diffManagementState}
+											onStateChange={setDiffManagementState}
+											mainTitlebarVisible={showTitlebar}
+										/>
+									</div>
+								</div>
+							)}
 							<GitProjectView/>
 							<Repl />
 						</GitProjectProvider>

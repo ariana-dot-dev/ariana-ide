@@ -340,6 +340,9 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					}
 				}
 
+				// Detect Mac platform for proper delete key handling
+				const isMac = navigator.platform.toLowerCase().includes('mac');
+
 				if (event.key === "Enter") {
 					await sendRawInput("\r");
 					event.preventDefault();
@@ -393,7 +396,13 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					event.preventDefault();
 					return;
 				} else if (event.key === "Delete") {
-					await sendRawInput("\x1b[3~");
+					if (isMac) {
+						// On Mac, the delete key (⌫) acts as backspace
+						await sendRawInput("\b");
+					} else {
+						// On other platforms, delete is forward delete
+						await sendRawInput("\x1b[3~");
+					}
 					event.preventDefault();
 					return;
 				} else if (
@@ -597,8 +606,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 						{/* <div className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs">
 							{" "}
 						</div> */}
-						<div className="absolute flex items-center justify-center top-0 left-0 h-full w-[200%] opacity-80">
-							<div>{"😎"}</div>
+						<div className="h-[90%] w-full bg-[var(--blackest)] opacity-70 rounded-sm animate-pulse">
+							{" "}
 						</div>
 					</motion.div>
 					<span ref={phantomCharRef} className="absolute -left-full -top-full">
