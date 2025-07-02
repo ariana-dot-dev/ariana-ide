@@ -9,6 +9,7 @@ import { useOsSession, useGitProject } from "../contexts/GitProjectContext";
 import { useStore } from "../state";
 import { ProcessManager } from "../services/ProcessManager";
 import { ProcessState } from "../types/GitProject";
+import { OsSession } from "../bindings/os";
 
 interface TextAreaOnCanvasProps {
 	layout: ElementLayout;
@@ -28,29 +29,30 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	onDragEnd: propOnDragEnd,
 	onDrag: propOnDrag,
 	isDragTarget,
-	isDragging,
+	isDragging
 }) => {
 	const { cell, element } = layout;
-	const osSession = useOsSession();
 	const { isLightTheme } = useStore();
 	const { getProcessByElementId, addProcess, updateProcess, removeProcess } = useGitProject();
-
+	
 	// Text area state
 	const [text, setText] = useState((layout.element.kind as TextAreaKind).textArea.content);
 	const [isLocked, setIsLocked] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
-
+	
 	// Terminal state
 	const [showTerminal, setShowTerminal] = useState(false);
 	const [terminalId, setTerminalId] = useState<string | null>(null);
 	const [claudeAgent, setClaudeAgent] = useState<ClaudeCodeAgent | null>(null);
-
+	
 	// Element ID for process tracking
 	const elementId = element.id;
-
+	
 	const textAreaRef = useRef<HTMLTextAreaElement>(null);
 	const [dragging, setDragging] = useState(false);
-
+	
+	const osSession = (element.kind as TextAreaKind).textArea.osSession; 
+	
 	const handleDragStartInternal = () => {
 		propOnDragStart(element);
 	};
