@@ -71,7 +71,7 @@ pub fn run() {
 			execute_command,
 			execute_command_in_dir,
 			// System integration commands
-			open_path_in_explorer
+			open_path_in_explorer,
 			// Git repository commands
 			check_git_repository,
 		])
