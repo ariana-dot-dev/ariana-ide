@@ -128,7 +128,7 @@ function App() {
 	};
 
 	const handleResetSessions = () => {
-		store.clearAllGitProjects();
+		// Just clear the selection, don't delete the projects from storage
 		setSelectedGitProjectId(null);
 	};
 

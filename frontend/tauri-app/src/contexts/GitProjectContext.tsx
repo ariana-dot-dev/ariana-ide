@@ -49,9 +49,19 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 		};
 	}, [gitProject]);
 
+	const currentCanvas = gitProject?.getCurrentCanvas() || null;
+	
+	console.log("GitProjectContext:", {
+		gitProject: gitProject?.name,
+		canvasCount: gitProject?.canvases.length,
+		currentCanvasIndex: gitProject?.currentCanvasIndex,
+		currentCanvas: currentCanvas?.name,
+		canvasElements: currentCanvas?.elements.length
+	});
+
 	const contextValue: GitProjectContextValue = {
 		selectedGitProject: gitProject,
-		currentCanvas: gitProject?.getCurrentCanvas() || null,
+		currentCanvas: currentCanvas,
 		
 		updateCanvasElements: (elements: any[]) => {
 			if (!gitProject) return;

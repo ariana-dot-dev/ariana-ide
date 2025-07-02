@@ -65,7 +65,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 						const projects = savedState.gitProjects.map((projectData: any) => 
 							GitProject.fromJSON(projectData)
 						).filter((p) => {
-							p.canvases.length > 0 && p.canvases.some((c) => c.elements.length > 0)
+							// Only filter out truly invalid projects (keep projects with empty canvases)
+							return p.canvases.length > 0;
 						});
 						setGitProjects(projects);
 					} else if ((savedState as any).osSessions) {

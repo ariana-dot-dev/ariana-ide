@@ -23,8 +23,37 @@ export function ProjectSelector({ onProjectCreated }: ProjectSelectorProps) {
 		setSelectedPath(path);
 	};
 
+	const findExistingProjectForPath = (path: string): GitProject | null => {
+		// Check if any existing project has this path as root or in any canvas
+		return store.gitProjects.find(project => {
+			// Check if this path is the project root
+			const rootPath = 'Local' in project.root ? project.root.Local : 
+							'Wsl' in project.root ? project.root.Wsl.working_directory : null;
+			
+			if (rootPath === path) {
+				return true;
+			}
+
+			// Check if this path is in any canvas osSession
+			return project.canvases.some(canvas => {
+				if (!canvas.osSession) return false;
+				const canvasPath = 'Local' in canvas.osSession ? canvas.osSession.Local :
+								  'Wsl' in canvas.osSession ? canvas.osSession.Wsl.working_directory : null;
+				return canvasPath === path;
+			});
+		}) || null;
+	};
+
 	const handleCreateSession = () => {
 		if (!selectedKind || !selectedPath) return;
+
+		// First, check if there's an existing project that covers this path
+		const existingProject = findExistingProjectForPath(selectedPath);
+		if (existingProject) {
+			console.log("Found existing project for path:", selectedPath, existingProject);
+			onProjectCreated(existingProject.id);
+			return;
+		}
 
 		// Create OsSession based on selected kind and path
 		let osSession: OsSession;
@@ -72,6 +101,7 @@ export function ProjectSelector({ onProjectCreated }: ProjectSelectorProps) {
 							osSessionKind={selectedKind}
 							onSelect={handlePathSelect}
 							selectedPath={selectedPath}
+							existingProjects={store.gitProjects}
 						/>
 					</div>
 				)}

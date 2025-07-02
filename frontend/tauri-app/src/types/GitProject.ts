@@ -272,6 +272,7 @@ export class GitProject {
 			elements: [
 				TextArea.canvasElement(this.root, "")
 			],
+			osSession: this.root, // Set the osSession to the root
 			createdAt: Date.now(),
 			lastModified: Date.now(),
 		};

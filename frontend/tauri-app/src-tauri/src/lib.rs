@@ -7,7 +7,6 @@
 use std::sync::Arc;
 use std::process::Command;
 use std::path::Path;
-use std::fs;
 use tauri::State;
 
 mod terminal;
@@ -70,7 +69,9 @@ pub fn run() {
 			copy_directory,
 			create_git_branch,
 			execute_command,
-			execute_command_in_dir
+			execute_command_in_dir,
+			// System integration commands
+			open_path_in_explorer
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -373,4 +374,81 @@ fn create_git_branch_wsl(directory: &str, branch_name: &str, distribution: &str)
 #[cfg(not(target_os = "windows"))]
 fn create_git_branch_wsl(_directory: &str, _branch_name: &str, _distribution: &str) -> Result<(), String> {
 	Err("WSL is only available on Windows".to_string())
+}
+
+#[tauri::command]
+async fn open_path_in_explorer(path: String) -> Result<(), String> {
+	#[cfg(target_os = "windows")]
+	{
+		// On Windows, normalize the path and use explorer.exe to open it
+		let windows_path = path.replace('/', "\\");
+		println!("Opening path in explorer - Original: '{}', Windows path: '{}'", path, windows_path);
+		
+		// Use /select to open the parent directory and highlight the folder
+		// But if it's a directory, just open it directly
+		let path_obj = std::path::Path::new(&windows_path);
+		println!("Path exists: {}, Is directory: {}", path_obj.exists(), path_obj.is_dir());
+		
+		let output = if path_obj.is_dir() {
+			// Open the directory directly
+			println!("Opening directory directly: '{}'", windows_path);
+			Command::new("explorer")
+				.arg(&windows_path)
+				.output()
+		} else {
+			// If it's a file, open the parent and select it
+			println!("Using /select for file: '{}'", windows_path);
+			Command::new("explorer")
+				.arg("/select,")
+				.arg(&windows_path)
+				.output()
+		};
+		
+		let result = output.map_err(|e| format!("Failed to open explorer: {}", e))?;
+		
+		if !result.status.success() {
+			return Err(format!("Explorer failed: {}", String::from_utf8_lossy(&result.stderr)));
+		}
+		
+		println!("Explorer command succeeded");
+	}
+	
+	#[cfg(target_os = "macos")]
+	{
+		// On macOS, use open command
+		let output = Command::new("open")
+			.arg(&path)
+			.output()
+			.map_err(|e| format!("Failed to open finder: {}", e))?;
+		
+		if !output.status.success() {
+			return Err(format!("Open failed: {}", String::from_utf8_lossy(&output.stderr)));
+		}
+	}
+	
+	#[cfg(target_os = "linux")]
+	{
+		// On Linux, try various file managers
+		let file_managers = ["xdg-open", "nautilus", "dolphin", "thunar", "pcmanfm"];
+		let mut success = false;
+		
+		for manager in &file_managers {
+			let result = Command::new(manager)
+				.arg(&path)
+				.output();
+			
+			if let Ok(output) = result {
+				if output.status.success() {
+					success = true;
+					break;
+				}
+			}
+		}
+		
+		if !success {
+			return Err("Failed to open file manager on Linux".to_string());
+		}
+	}
+	
+	Ok(())
 }

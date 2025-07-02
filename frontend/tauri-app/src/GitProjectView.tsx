@@ -11,6 +11,13 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 
 	const canvasesHoveredRef = useRef(false);
 
+	console.log("GitProjectView render:", {
+		selectedGitProject: selectedGitProject?.name,
+		currentCanvas: currentCanvas?.name,
+		canvasCount: selectedGitProject?.canvases.length,
+		currentCanvasElements: currentCanvas?.elements.length
+	});
+
 	return currentCanvas && selectedGitProject ? (
 		<div className="w-full h-full flex gap-1.5">
 			<div

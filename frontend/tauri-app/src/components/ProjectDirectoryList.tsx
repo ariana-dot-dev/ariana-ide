@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { OsSessionKind } from "../bindings/os";
 import { cn } from "../utils";
+import { GitProject } from "../types/GitProject";
 
 interface GitSearchResult {
 	directories: string[];
@@ -12,17 +13,25 @@ interface ProjectDirectoryListProps {
 	osSessionKind: OsSessionKind;
 	onSelect: (path: string) => void;
 	selectedPath?: string;
+	existingProjects?: GitProject[];
 }
 
 export function ProjectDirectoryList({
 	osSessionKind,
 	onSelect,
 	selectedPath,
+	existingProjects = [],
 }: ProjectDirectoryListProps) {
 	const [directories, setDirectories] = useState<string[]>([]);
 	const [searchId, setSearchId] = useState<string | null>(null);
 	const [isComplete, setIsComplete] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const [contextMenu, setContextMenu] = useState<{
+		x: number;
+		y: number;
+		path: string;
+	} | null>(null);
+	const contextMenuRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		const startSearch = async () => {
@@ -78,6 +87,96 @@ export function ProjectDirectoryList({
 		return path.split("/").pop() || path.split("\\").pop() || path;
 	};
 
+	const isPathAlreadyInProject = (path: string): boolean => {
+		for (const project of existingProjects) {
+			const rootPath = 'Local' in project.root ? project.root.Local : 
+							'Wsl' in project.root ? project.root.Wsl.working_directory : null;
+			
+			// Don't filter out the project root - we want users to be able to select it to reopen the project
+			if (rootPath === path) {
+				return false; // Keep the root directory visible
+			}
+			
+			// Filter out any path that's a canvas osSession (derived directory)
+			for (const canvas of project.canvases) {
+				if (!canvas.osSession) continue;
+				const canvasPath = 'Local' in canvas.osSession ? canvas.osSession.Local :
+								  'Wsl' in canvas.osSession ? canvas.osSession.Wsl.working_directory : null;
+				if (canvasPath === path) {
+					return true; // Filter out derived directories
+				}
+			}
+		}
+		return false; // Keep paths that aren't in any project
+	};
+
+	// Filter out directories that are already in existing projects
+	const filteredDirectories = directories.filter(path => {
+		const isFiltered = isPathAlreadyInProject(path);
+		console.log(`Directory filter: ${path} - filtered: ${isFiltered}`);
+		return !isFiltered;
+	});
+	
+	console.log("All found directories:", directories);
+	console.log("Existing projects count:", existingProjects.length);
+	console.log("Existing projects:", existingProjects.map(p => ({
+		name: p.name,
+		root: 'Local' in p.root ? p.root.Local : p.root.Wsl.working_directory,
+		canvases: p.canvases.map(c => c.osSession ? 
+			('Local' in c.osSession ? c.osSession.Local : c.osSession.Wsl.working_directory) : 'no osSession'
+		)
+	})));
+	console.log("Filtered directories:", filteredDirectories);
+
+	// Handle right-click context menu
+	const handleContextMenu = (e: React.MouseEvent, path: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setContextMenu({
+			x: e.clientX,
+			y: e.clientY,
+			path
+		});
+	};
+
+	// Close context menu when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+				setContextMenu(null);
+			}
+		};
+
+		if (contextMenu) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [contextMenu]);
+
+	// Show in explorer functionality
+	const showInExplorer = async (path: string) => {
+		try {
+			let explorerPath = path;
+			
+			// Handle WSL paths
+			if (typeof osSessionKind === "object" && "Wsl" in osSessionKind) {
+				// Convert WSL path to Windows explorer path
+				// Format: \\wsl$\<distribution>\path
+				const distribution = osSessionKind.Wsl;
+				explorerPath = `\\\\wsl$\\${distribution}${path.replace(/\//g, '\\')}`;
+			}
+
+			// Open in system file explorer
+			await invoke("open_path_in_explorer", { path: explorerPath });
+		} catch (error) {
+			console.error("Failed to open in explorer:", error);
+		}
+		setContextMenu(null);
+	};
+
 	return (
 		<div className="flex flex-col gap-2 p-4 h-fit max-h-full">
 			<div className="flex items-center gap-2">
@@ -89,24 +188,27 @@ export function ProjectDirectoryList({
 				)}
 			</div>
 
-			{loading && directories.length === 0 ? (
+			{loading && filteredDirectories.length === 0 ? (
 				<div className="flex justify-center p-4">
 					<span className="text-[var(--base-500)]">
 						Searching for repositories...
 					</span>
 				</div>
-			) : directories.length === 0 ? (
+			) : filteredDirectories.length === 0 ? (
 				<div className="flex justify-center p-4">
-					<span className="text-[var(--base-500)]">No repositories found</span>
+					<span className="text-[var(--base-500)]">
+						{directories.length === 0 ? "No repositories found" : "All repositories are already open"}
+					</span>
 				</div>
 			) : (
 				<div className="flex flex-col gap-1 h-fit max-h-full overflow-y-auto overflow-x-hidden p-1">
-					{directories.map((path, index) => (
+					{filteredDirectories.map((path, index) => (
 						<button
 							key={index}
 							onClick={() => onSelect(path)}
+							onContextMenu={(e) => handleContextMenu(e, path)}
 							className={cn(
-								"p-3 rounded-md text-left transition-colors",
+								"p-3 rounded-md text-left transition-colors relative",
 								"border-2 border-[var(--base-400-50)]",
 								selectedPath === path
 									? "bg-[var(--acc-400-50)] text-[var(--acc-900)] border-[var(--acc-500-50)]"
@@ -123,7 +225,28 @@ export function ProjectDirectoryList({
 			{isComplete && (
 				<div className="text-sm text-[var(--base-500)] mt-2">
 					Search complete • Found {directories.length} project
-					{directories.length !== 1 ? "s" : ""}
+					{directories.length !== 1 ? "s" : ""} 
+					{filteredDirectories.length !== directories.length && 
+						`• ${directories.length - filteredDirectories.length} already open`}
+				</div>
+			)}
+
+			{/* Context Menu */}
+			{contextMenu && (
+				<div
+					ref={contextMenuRef}
+					className="fixed z-50 bg-[var(--base-100)] border border-[var(--acc-600)]/20 rounded-md shadow-lg py-1 min-w-[150px]"
+					style={{
+						left: contextMenu.x,
+						top: contextMenu.y,
+					}}
+				>
+					<button
+						onClick={() => showInExplorer(contextMenu.path)}
+						className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--base-200)] text-[var(--blackest)] transition-colors"
+					>
+						📁 Show in Explorer
+					</button>
 				</div>
 			)}
 		</div>
