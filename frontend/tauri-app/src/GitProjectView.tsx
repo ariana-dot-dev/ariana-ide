@@ -3,9 +3,11 @@ import CanvasView from "./CanvasView";
 import { useGitProject } from "./contexts/GitProjectContext";
 import { cn } from "./utils";
 import { GitProject } from "./types/GitProject";
+import { useStore } from "./state";
 
 const GitProjectView: React.FC<{}> = ({ }) => {
 	const { selectedGitProject, currentCanvas, updateCanvasElements } = useGitProject();
+	const { updateGitProject } = useStore();
 	const [showCanvases, setShowCanvases] = useState(false);
 	const [isCreatingCanvas, setIsCreatingCanvas] = useState(false);
 
@@ -67,6 +69,8 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 									if (result.success && result.canvasId) {
 										selectedGitProject.setCurrentCanvasIndex(selectedGitProject.canvases.length - 1);
 										console.log("New canvas copy created with ID:", result.canvasId);
+										// Trigger state update to save to disk
+										updateGitProject(selectedGitProject.id);
 									} else {
 										console.error("Failed to create canvas copy:", result.error);
 										alert(`Failed to create canvas copy: ${result.error}`);
@@ -90,7 +94,11 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 										? "bg-[var(--base-400-20)]"
 										: "bg-transparent",
 								)}
-								onClick={() => selectedGitProject.setCurrentCanvasIndex(index)}
+								onClick={() => {
+									selectedGitProject.setCurrentCanvasIndex(index);
+									// Trigger state update to save to disk
+									updateGitProject(selectedGitProject.id);
+								}}
 							>
 								{canvas.name}
 							</button>

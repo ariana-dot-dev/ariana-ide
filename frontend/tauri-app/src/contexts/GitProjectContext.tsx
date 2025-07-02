@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { GitProject, GitProjectCanvas, ProcessState } from '../types/GitProject';
 import { CanvasElement } from '../canvas/types';
 import { ProcessManager } from '../services/ProcessManager';
+import { useStore } from '../state';
 
 interface GitProjectContextValue {
 	selectedGitProject: GitProject | null;
@@ -28,6 +29,7 @@ interface GitProjectProviderProps {
 
 export function GitProjectProvider({ children, gitProject }: GitProjectProviderProps) {
 	const [, forceUpdate] = useState(0);
+	const { updateGitProject } = useStore();
 
 	// Set up reactive subscriptions to the GitProject
 	useEffect(() => {
@@ -68,27 +70,36 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (currentCanvas) {
 				gitProject.updateCanvasElements(currentCanvas.id, elements);
+				// Trigger state update to save to disk
+				updateGitProject(gitProject.id);
 			}
 		},
 
 		switchCanvas: (canvasIndex: number) => {
 			if (!gitProject) return;
 			gitProject.setCurrentCanvasIndex(canvasIndex);
+			updateGitProject(gitProject.id);
 		},
 
 		addCanvas: (canvas?: any) => {
 			if (!gitProject) return '';
-			return gitProject.addCanvas(canvas);
+			const canvasId = gitProject.addCanvas(canvas);
+			updateGitProject(gitProject.id);
+			return canvasId;
 		},
 
 		removeCanvas: (canvasId: string) => {
 			if (!gitProject) return false;
-			return gitProject.removeCanvas(canvasId);
+			const result = gitProject.removeCanvas(canvasId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
 		},
 
 		renameCanvas: (canvasId: string, name: string) => {
 			if (!gitProject) return false;
-			return gitProject.renameCanvas(canvasId, name);
+			const result = gitProject.renameCanvas(canvasId, name);
+			if (result) updateGitProject(gitProject.id);
+			return result;
 		},
 
 		// Process management methods
@@ -96,21 +107,27 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			return gitProject.addProcessToCanvas(currentCanvas.id, process);
+			const result = gitProject.addProcessToCanvas(currentCanvas.id, process);
+			if (result) updateGitProject(gitProject.id);
+			return result;
 		},
 
 		updateProcess: (processId: string, updates: Partial<ProcessState>) => {
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			return gitProject.updateProcessInCanvas(currentCanvas.id, processId, updates);
+			const result = gitProject.updateProcessInCanvas(currentCanvas.id, processId, updates);
+			if (result) updateGitProject(gitProject.id);
+			return result;
 		},
 
 		removeProcess: (processId: string) => {
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			return gitProject.removeProcessFromCanvas(currentCanvas.id, processId);
+			const result = gitProject.removeProcessFromCanvas(currentCanvas.id, processId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
 		},
 
 		getProcessByElementId: (elementId: string) => {
