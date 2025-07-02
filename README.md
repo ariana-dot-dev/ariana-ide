@@ -28,6 +28,12 @@ Ariana IDE is not ready for usage yet. Come back in a few days/weeks!
 - Node.js (>= 24.2.0)
 - Rust (latest)
 
+**Note for nvm users:** If you use nvm to manage Node.js versions, you must set Node.js 24 as your default to ensure Ariana uses the correct version:
+
+```bash
+nvm alias default 24
+```
+
 ### Install Just
 
 ```bash
