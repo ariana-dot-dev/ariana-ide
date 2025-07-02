@@ -19,7 +19,6 @@ import Logo from "./components/Logo";
 import { GitProjectProvider } from "./contexts/GitProjectContext";
 import GitProjectView from "./GitProjectView";
 import { osSessionGetWorkingDirectory } from "./bindings/os";
-import { CustomTerminal } from "./canvas/CustomTerminal";
 
 const appWindow = getCurrentWebviewWindow();
 
@@ -121,7 +120,7 @@ function App() {
 		if (selectedGitProjectId !== null) {
 			const selectedProject = store.getGitProject(selectedGitProjectId);
 			if (selectedProject) {
-				const terminalElement = CustomTerminal.canvasElement(selectedProject.root, 1);
+				const terminalElement = Terminal.canvasElement(selectedProject.root, 1);
 				selectedProject.addToCurrentCanvasElements(terminalElement)
 			}
 		}

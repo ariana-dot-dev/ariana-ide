@@ -1,4 +1,3 @@
-import type { CustomTerminal } from "./CustomTerminal";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import type { Rectangle } from "./Rectangle";
 import type { Terminal } from "./Terminal";
@@ -40,13 +39,11 @@ export interface ElementLayout {
 export type CanvasElementKind =
 	| RectangleKind
 	| TerminalKind
-	| CustomTerminalKind
 	| FileTreeKind
 	| TextAreaKind;
 
 export type RectangleKind = { rectangle: Rectangle };
 export type TerminalKind = { terminal: Terminal };
-export type CustomTerminalKind = { customTerminal: CustomTerminal };
 export type FileTreeKind = { fileTree: FileTreeCanvas };
 export type TextAreaKind = { textArea: TextArea };
 
@@ -66,8 +63,6 @@ export class CanvasElement {
 			return this.kind.rectangle.targets();
 		} else if ("terminal" in this.kind) {
 			return this.kind.terminal.targets();
-		} else if ("customTerminal" in this.kind) {
-			return this.kind.customTerminal.targets();
 		} else if ("fileTree" in this.kind) {
 			return this.kind.fileTree.targets();
 		} else if ("textArea" in this.kind) {

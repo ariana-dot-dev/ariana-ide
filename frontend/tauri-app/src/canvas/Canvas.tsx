@@ -2,7 +2,7 @@ import type { PanInfo } from "framer-motion";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../utils";
-import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas";
+// import CustomTerminalOnCanvas from "./CustomTerminalOnCanvas"; // Removed - using regular terminal instead
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import FileTreeOnCanvas from "./FileTreeOnCanvas";
 import {
@@ -306,15 +306,15 @@ const Canvas: React.FC<CanvasProps> = ({
 							isDragging={layout.element === draggedElement}
 						/>
 					);
-				} else if ("customTerminal" in layout.element.kind && osSession) {
+				} else if ("terminal" in layout.element.kind) {
 					return (
-						<CustomTerminalOnCanvas
+						<TerminalOnCanvas
 							key={`${layout.element.id}`}
 							layout={layout}
-							osSession={osSession}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
 							onDrag={layout.element === draggedElement ? handleDrag : () => {}}
+							onRemoveElement={handleRemoveElement}
 							isDragTarget={layout.element === dragTarget}
 							isDragging={layout.element === draggedElement}
 						/>

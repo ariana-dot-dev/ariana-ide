@@ -67,13 +67,13 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 		// Resolve CSS variables -> solid colors for xterm (it cannot understand CSS vars)
 		const cssVars = getComputedStyle(document.documentElement);
 		const theme = {
-			background: resolveColor("--base-500", cssVars),
-			foreground: resolveColor("--acc-500", cssVars),
+			background: "#e6f3ff", // Light blue background
+			foreground: "#000000", // Black text for main foreground
 			cursor: resolveColor("--acc-900", cssVars),
 			selectionBackground: resolveColor("--acc-900", cssVars),
 			selectionForeground: resolveColor("--acc-200", cssVars),
-			black: resolveColor("--blackest", cssVars),
-			red: resolveColor("--negative-500", cssVars),
+			black: "#000000", // Black
+			red: "#000000", // Change red text to black
 			green: resolveColor("--positive-500", cssVars),
 			yellow: resolveColor("--acc-600", cssVars),
 			blue: resolveColor("--acc-600", cssVars),
@@ -81,7 +81,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 			cyan: resolveColor("--acc-600", cssVars),
 			white: resolveColor("--whitest", cssVars),
 			brightBlack: resolveColor("--acc-800", cssVars),
-			brightRed: resolveColor("--negative-500", cssVars),
+			brightRed: "#000000", // Change bright red text to black
 			brightGreen: resolveColor("--positive-500", cssVars),
 			brightYellow: resolveColor("--acc-200", cssVars),
 			brightBlue: resolveColor("--acc-200", cssVars),
