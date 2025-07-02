@@ -771,19 +771,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 			return;
 		}
 
-		// only highlight typescript/javascript files for now
-		const isTypeScript =
+		// check if file type is supported for syntax highlighting
+		const isSupportedFile =
 			file.name.endsWith(".ts") ||
 			file.name.endsWith(".tsx") ||
 			file.name.endsWith(".js") ||
-			file.name.endsWith(".jsx");
+			file.name.endsWith(".jsx") ||
+			file.name.endsWith(".rs");
 
-		if (!isTypeScript) {
-			console.log("[EditorStore] Not a TypeScript file:", file.name);
+		if (!isSupportedFile) {
+			console.log(
+				"[EditorStore] Unsupported file type for syntax highlighting:",
+				file.name,
+			);
 			return;
 		}
 
-		console.log("[EditorStore] Highlighting TypeScript file:", file.name);
+		console.log("[EditorStore] Highlighting file:", file.name);
 		const highlightedLines = highlighter.getHighlightedLines(
 			file.content,
 			file.name,

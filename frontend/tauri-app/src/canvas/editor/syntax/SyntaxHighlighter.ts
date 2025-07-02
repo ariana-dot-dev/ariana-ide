@@ -14,9 +14,11 @@ export class SyntaxHighlighter {
 	private parser: any = null;
 	private tsLanguage: any = null;
 	private tsxLanguage: any = null;
+	private rustLanguage: any = null;
 	private tree: any = null;
 	private isInitialized = false;
 	private Parser: any = null;
+	private currentLanguageType: "typescript" | "tsx" | "rust" = "typescript";
 
 	async initialize() {
 		if (this.isInitialized) return;
@@ -82,6 +84,17 @@ export class SyntaxHighlighter {
 
 			this.tsxLanguage = await Language.load(new Uint8Array(tsxLangBytes));
 
+			// load rust language
+			console.log("[SyntaxHighlighter] Loading Rust grammar...");
+			const rustLangFile = await fetch("/tree-sitter-rust.wasm");
+			const rustLangBytes = await rustLangFile.arrayBuffer();
+			console.log(
+				"[SyntaxHighlighter] Rust grammar loaded, size:",
+				rustLangBytes.byteLength,
+			);
+
+			this.rustLanguage = await Language.load(new Uint8Array(rustLangBytes));
+
 			// default to typescript
 			this.parser.setLanguage(this.tsLanguage);
 			this.isInitialized = true;
@@ -115,11 +128,25 @@ export class SyntaxHighlighter {
 
 		// set appropriate language based on file extension
 		if (this.parser && this.isInitialized) {
-			const isTSX = fileName.endsWith(".tsx") || fileName.endsWith(".jsx");
-			const language = isTSX ? this.tsxLanguage : this.tsLanguage;
+			let language = this.tsLanguage;
+			let languageName = "TypeScript";
+
+			if (fileName.endsWith(".rs")) {
+				language = this.rustLanguage;
+				languageName = "Rust";
+				this.currentLanguageType = "rust";
+			} else if (fileName.endsWith(".tsx") || fileName.endsWith(".jsx")) {
+				language = this.tsxLanguage;
+				languageName = "TSX";
+				this.currentLanguageType = "tsx";
+			} else {
+				// Default to TypeScript for .ts, .js files
+				this.currentLanguageType = "typescript";
+			}
+
 			if (language) {
 				console.log(
-					`[SyntaxHighlighter] Using ${isTSX ? "TSX" : "TypeScript"} parser for ${fileName}`,
+					`[SyntaxHighlighter] Using ${languageName} parser for ${fileName}`,
 				);
 				this.parser.setLanguage(language);
 			}
@@ -195,6 +222,11 @@ export class SyntaxHighlighter {
 
 	private getScopes(nodeType: string, cursor: any): string[] {
 		const scopes: string[] = [];
+
+		// rust-specific token mapping
+		if (this.currentLanguageType === "rust") {
+			return this.getRustScopes(nodeType, cursor);
+		}
 
 		// typescript/javascript token mapping
 		switch (nodeType) {
@@ -312,6 +344,126 @@ export class SyntaxHighlighter {
 		return scopes;
 	}
 
+	private getRustScopes(nodeType: string, cursor: any): string[] {
+		const scopes: string[] = [];
+
+		// rust token mapping
+		switch (nodeType) {
+			// keywords
+			case "let":
+			case "mut":
+			case "fn":
+			case "struct":
+			case "enum":
+			case "trait":
+			case "impl":
+			case "mod":
+			case "use":
+			case "pub":
+			case "crate":
+			case "super":
+			case "self":
+			case "Self":
+			case "const":
+			case "static":
+			case "type":
+			case "where":
+			case "async":
+			case "await":
+			case "move":
+			case "ref":
+			case "if":
+			case "else":
+			case "match":
+			case "for":
+			case "while":
+			case "loop":
+			case "break":
+			case "continue":
+			case "return":
+			case "yield":
+			case "in":
+			case "as":
+			case "unsafe":
+			case "extern":
+			case "dyn":
+				scopes.push("keyword");
+				break;
+
+			// literals
+			case "string_literal":
+			case "raw_string_literal":
+			case "char_literal":
+				scopes.push("string");
+				break;
+
+			case "integer_literal":
+			case "float_literal":
+				scopes.push("number");
+				break;
+
+			case "true":
+			case "false":
+				scopes.push("constant");
+				break;
+
+			// comments
+			case "line_comment":
+			case "block_comment":
+				scopes.push("comment");
+				break;
+
+			// types
+			case "type_identifier":
+			case "primitive_type":
+				scopes.push("type");
+				break;
+
+			// identifiers
+			case "function_item":
+			case "function_signature_item":
+				scopes.push("function");
+				break;
+
+			case "macro_invocation":
+			case "macro_definition":
+				scopes.push("macro");
+				break;
+
+			case "attribute":
+			case "attribute_item":
+			case "inner_attribute_item":
+				scopes.push("attribute");
+				break;
+
+			case "lifetime":
+			case "lifetime_identifier":
+				scopes.push("lifetime");
+				break;
+
+			// check parent for more context
+			default:
+				if (nodeType === "identifier") {
+					const parent = cursor.currentNode.parent;
+					if (parent) {
+						if (parent.type === "function_item") {
+							scopes.push("function");
+						} else if (
+							parent.type === "struct_item" ||
+							parent.type === "enum_item" ||
+							parent.type === "trait_item"
+						) {
+							scopes.push("type");
+						} else if (parent.type === "call_expression") {
+							scopes.push("function-call");
+						}
+					}
+				}
+		}
+
+		return scopes;
+	}
+
 	private getLineStartIndex(content: string, lineNumber: number): number {
 		let index = 0;
 		for (let i = 0; i < lineNumber; i++) {
@@ -339,6 +491,7 @@ export class SyntaxHighlighter {
 		}
 		this.tsLanguage = null;
 		this.tsxLanguage = null;
+		this.rustLanguage = null;
 		this.isInitialized = false;
 	}
 }

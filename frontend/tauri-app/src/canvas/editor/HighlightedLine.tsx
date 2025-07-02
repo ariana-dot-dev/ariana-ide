@@ -47,6 +47,15 @@ const getTokenClassName = (scopes: string[]): string => {
 			case "property":
 				classes.push("text-[var(--syntax-property)]");
 				break;
+			case "macro":
+				classes.push("text-[var(--syntax-function)]"); // Use function color for macros
+				break;
+			case "attribute":
+				classes.push("text-[var(--syntax-comment)]"); // Use comment color for attributes
+				break;
+			case "lifetime":
+				classes.push("text-[var(--syntax-type)]"); // Use type color for lifetimes
+				break;
 		}
 	}
 

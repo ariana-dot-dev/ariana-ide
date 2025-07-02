@@ -37,6 +37,7 @@
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
 		"tailwindcss": "^4.1.10",
+		"tree-sitter-rust": "^0.24.0",
 		"tree-sitter-typescript": "^0.23.2",
 		"typescript": "^5.8.3",
 		"typescript-language-server": "^4.3.4",
