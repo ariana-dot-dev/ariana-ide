@@ -39,8 +39,8 @@ export class GitProject {
 		this.id = crypto.randomUUID();
 		this.root = root;
 		this.name = name || this.generateDefaultName();
-		this.canvases = [this.createDefaultCanvas()];
-		this.currentCanvasIndex = 0;
+		this.canvases = []; // Start with no canvases - user must create versions explicitly
+		this.currentCanvasIndex = -1; // No canvas selected initially
 		this.createdAt = Date.now();
 		this.lastModified = Date.now();
 
@@ -54,7 +54,7 @@ export class GitProject {
 
 	// Reactive setters
 	setCurrentCanvasIndex(index: number): void {
-		if (index >= 0 && index < this.canvases.length && index !== this.currentCanvasIndex) {
+		if (index >= -1 && index < this.canvases.length && index !== this.currentCanvasIndex) {
 			this.currentCanvasIndex = index;
 			this.lastModified = Date.now();
 			this.notifyListeners('currentCanvasIndex');
@@ -64,7 +64,7 @@ export class GitProject {
 	addCanvas(canvas?: Partial<GitProjectCanvas>): string {
 		const newCanvas: GitProjectCanvas = {
 			id: crypto.randomUUID(),
-			name: canvas?.name || `Canvas ${this.canvases.length + 1}`,
+			name: canvas?.name || "", // No automatic naming
 			elements: canvas?.elements || [],
 			osSession: canvas?.osSession,
 			createdAt: Date.now(),
@@ -72,8 +72,17 @@ export class GitProject {
 		};
 
 		this.canvases.push(newCanvas);
+		
+		// If this is the first canvas, automatically select it
+		if (this.canvases.length === 1) {
+			this.currentCanvasIndex = 0;
+		}
+		
 		this.lastModified = Date.now();
 		this.notifyListeners('canvases');
+		if (this.canvases.length === 1) {
+			this.notifyListeners('currentCanvasIndex');
+		}
 		return newCanvas.id;
 	}
 
@@ -236,14 +245,14 @@ export class GitProject {
 	static fromJSON(data: any): GitProject {
 		const project = new GitProject(data.root, data.name);
 		project.id = data.id;
-		project.canvases = data.canvases || [project.createDefaultCanvas()];
+		project.canvases = data.canvases || [];
 		// Handle migration for canvases that don't have osSession or runningProcesses yet
 		project.canvases = project.canvases.map(canvas => ({
 			...canvas,
 			osSession: canvas.osSession || undefined,
 			runningProcesses: canvas.runningProcesses || []
 		}));
-		project.currentCanvasIndex = data.currentCanvasIndex || 0;
+		project.currentCanvasIndex = data.currentCanvasIndex >= 0 ? data.currentCanvasIndex : (project.canvases.length > 0 ? 0 : -1);
 		project.createdAt = data.createdAt || Date.now();
 		project.lastModified = data.lastModified || Date.now();
 		return project;
