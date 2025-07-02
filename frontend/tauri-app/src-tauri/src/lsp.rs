@@ -38,6 +38,25 @@ struct DiagnosticsClient {
 	diagnostics: Arc<RwLock<HashMap<String, Vec<LspDiagnostic>>>>,
 }
 
+#[derive(Debug, Clone)]
+pub enum LspServerType {
+	TypeScript,
+	Rust,
+	Python,
+	Go,
+}
+
+impl LspServerType {
+	fn as_key(&self) -> String {
+		match self {
+			LspServerType::TypeScript => "typescript".to_string(),
+			LspServerType::Rust => "rust".to_string(),
+			LspServerType::Python => "python".to_string(),
+			LspServerType::Go => "go".to_string(),
+		}
+	}
+}
+
 pub struct LspManager {
 	processes: Arc<Mutex<HashMap<String, LspProcessHandle>>>,
 	diagnostics: Arc<RwLock<HashMap<String, Vec<LspDiagnostic>>>>,
@@ -51,60 +70,69 @@ impl LspManager {
 		}
 	}
 
-	pub async fn start_typescript_lsp(&self, ts_ls_path: &str) -> Result<()> {
-		info!("Starting TypeScript LSP from: {ts_ls_path}");
+	pub async fn start_lsp_for_file(&self, file_path: &str) -> Result<()> {
+		let server_type = self.determine_lsp_type(file_path)?;
+		match server_type {
+			LspServerType::TypeScript => self.start_typescript_lsp().await,
+			LspServerType::Rust => self.start_rust_analyzer().await,
+			_ => Err(anyhow!(
+				"LSP server type not yet implemented: {:?}",
+				server_type
+			)),
+		}
+	}
+
+	fn determine_lsp_type(&self, file_path: &str) -> Result<LspServerType> {
+		let path = Path::new(file_path);
+		let extension = path
+			.extension()
+			.and_then(|ext| ext.to_str())
+			.ok_or_else(|| anyhow!("File has no extension: {}", file_path))?;
+
+		match extension {
+			"ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" => Ok(LspServerType::TypeScript),
+			"rs" => Ok(LspServerType::Rust),
+			"py" => Ok(LspServerType::Python),
+			_ => Err(anyhow!(
+				"No LSP server configured for extension: {}",
+				extension
+			)),
+		}
+	}
+
+	pub fn get_lsp_type_for_file(&self, file_path: &str) -> Option<LspServerType> {
+		self.determine_lsp_type(file_path).ok()
+	}
+
+	pub async fn is_lsp_running(&self, server_type: &LspServerType) -> bool {
+		let processes = self.processes.lock().await;
+		processes.contains_key(&server_type.as_key())
+	}
+
+	async fn start_typescript_lsp(&self) -> Result<()> {
+		let server_key = LspServerType::TypeScript.as_key();
+		info!("Starting TypeScript LSP");
 
 		// Check if already running
 		{
 			let processes = self.processes.lock().await;
-			if processes.contains_key("typescript") {
+			if processes.contains_key(&server_key) {
 				warn!("TypeScript LSP already running");
 				return Ok(());
 			}
 		}
 
-		// Validate the LSP path
-		let lsp_path = Path::new(ts_ls_path);
-		let final_path = if !lsp_path.exists() {
-			// Try common locations if the provided path doesn't exist
-			let common_paths = [
-				"typescript-language-server",
-				"/usr/local/bin/typescript-language-server",
-				"/opt/homebrew/bin/typescript-language-server",
-			];
-
-			let available_path = common_paths
-				.iter()
-				.find(|p| Path::new(p).exists())
-				.map(|p| p.to_string());
-
-			match available_path {
-				Some(found_path) => {
-					info!("Found TypeScript LSP at: {found_path}");
-					found_path
-				}
-				None => {
-					return Err(anyhow!(
-						"TypeScript language server not found at: {} or in common locations",
-						ts_ls_path
-					));
-				}
-			}
-		} else {
-			ts_ls_path.to_string()
-		};
-
-		info!("Spawning TypeScript LSP process...");
-		let mut process = Command::new(&final_path)
+		// Use npx to run the bundled typescript-language-server
+		info!("Spawning TypeScript LSP process via npx...");
+		let mut process = Command::new("npx")
+			.arg("typescript-language-server")
 			.arg("--stdio")
 			.stdin(std::process::Stdio::piped())
 			.stdout(std::process::Stdio::piped())
 			.stderr(std::process::Stdio::piped())
 			.kill_on_drop(true)
 			.spawn()
-			.with_context(|| {
-				format!("Failed to spawn TypeScript LSP from {}", final_path)
-			})?;
+			.context("Failed to spawn TypeScript LSP via npx")?;
 
 		info!("Process spawned with PID: {:?}", process.id());
 
@@ -174,7 +202,7 @@ impl LspManager {
 
 		let mut processes = self.processes.lock().await;
 		processes.insert(
-			"typescript".to_string(),
+			server_key,
 			LspProcessHandle {
 				server: server_clone,
 				_process_handle: process_handle,
@@ -183,6 +211,213 @@ impl LspManager {
 		);
 		info!("TypeScript LSP registered and ready");
 
+		Ok(())
+	}
+
+	async fn start_rust_analyzer(&self) -> Result<()> {
+		let server_key = LspServerType::Rust.as_key();
+		info!("Starting rust-analyzer LSP");
+
+		// Check if already running
+		{
+			let processes = self.processes.lock().await;
+			if processes.contains_key(&server_key) {
+				warn!("rust-analyzer LSP already running");
+				return Ok(());
+			}
+		}
+
+		// Try to find rust-analyzer in PATH
+		let rust_analyzer_path = if let Ok(output) = std::process::Command::new("which")
+			.arg("rust-analyzer")
+			.output()
+		{
+			if output.status.success() {
+				if let Ok(path) = String::from_utf8(output.stdout) {
+					path.trim().to_string()
+				} else {
+					"rust-analyzer".to_string()
+				}
+			} else {
+				"rust-analyzer".to_string()
+			}
+		} else {
+			"rust-analyzer".to_string()
+		};
+
+		info!("Spawning rust-analyzer process...");
+		let mut process = Command::new(&rust_analyzer_path)
+			.stdin(std::process::Stdio::piped())
+			.stdout(std::process::Stdio::piped())
+			.stderr(std::process::Stdio::piped())
+			.kill_on_drop(true)
+			.spawn()
+			.with_context(|| {
+				format!("Failed to spawn rust-analyzer from {}", rust_analyzer_path)
+			})?;
+
+		info!("Process spawned with PID: {:?}", process.id());
+
+		let stdin = process.stdin.take().context("Failed to open LSP stdin")?;
+		let stdout = process.stdout.take().context("Failed to open LSP stdout")?;
+		let stderr = process.stderr.take().context("Failed to open LSP stderr")?;
+
+		// spawn task to read LSP stderr
+		tokio::spawn(async move {
+			let reader = BufReader::new(stderr);
+			let mut lines = reader.lines();
+			while let Ok(Some(line)) = lines.next_line().await {
+				debug!("[rust-analyzer STDERR] {}", line);
+			}
+		});
+
+		let diagnostics = self.diagnostics.clone();
+
+		// Create the client and main loop
+		let (main_loop, server) = MainLoop::new_client(|server| {
+			let mut router = Router::new(DiagnosticsClient {
+				server: server.clone(),
+				diagnostics: diagnostics.clone(),
+			});
+			router
+				.notification::<lsp_types::notification::PublishDiagnostics>(
+					|client, params| {
+						debug!("Publishing diagnostics!");
+						handle_diagnostics(params, &client.diagnostics);
+						ControlFlow::Continue(())
+					},
+				)
+				.notification::<lsp_types::notification::LogMessage>(|_client, params| {
+					debug!("[rust-analyzer window/logMessage] {}", params.message);
+					ControlFlow::Continue(())
+				})
+				.notification::<lsp_types::notification::ShowMessage>(
+					|_client, params| {
+						debug!("[rust-analyzer window/showMessage] {}", params.message);
+						ControlFlow::Continue(())
+					},
+				);
+			router
+		});
+
+		let server_clone = server.clone();
+
+		// Spawn the main loop task
+		let process_handle = tokio::spawn(async move {
+			main_loop
+				.run_buffered(stdout.compat(), stdin.compat_write())
+				.await
+		});
+
+		// Initialize the LSP
+		info!("Starting rust-analyzer initialization sequence...");
+
+		match self.send_initialize_rust_analyzer(&server_clone).await {
+			Ok(_) => info!("rust-analyzer send_initialize completed successfully"),
+			Err(e) => {
+				error!("rust-analyzer send_initialize failed: {:?}", e);
+				return Err(e);
+			}
+		}
+
+		info!("rust-analyzer initialization sequence completed");
+
+		let mut processes = self.processes.lock().await;
+		processes.insert(
+			server_key,
+			LspProcessHandle {
+				server: server_clone,
+				_process_handle: process_handle,
+				_child_process: Some(process),
+			},
+		);
+		info!("rust-analyzer LSP registered and ready");
+
+		Ok(())
+	}
+
+	async fn send_initialize_rust_analyzer(&self, server: &ServerSocket) -> Result<()> {
+		debug!("send_initialize_rust_analyzer: starting");
+
+		// Use the parent directory or find Cargo.toml
+		let cwd = std::env::current_dir().context("Failed to get current directory")?;
+		debug!("Current working directory: {cwd:?}");
+
+		// Look for Cargo.toml in current dir and parent dirs
+		let project_root = find_rust_project_root(&cwd).unwrap_or_else(|| {
+			warn!("Could not find Cargo.toml, using current directory as fallback");
+			cwd.clone()
+		});
+		debug!("Project root: {project_root:?}");
+
+		let root_uri = Url::from_file_path(&project_root).map_err(|_| {
+			anyhow!("Failed to create root URI from path: {project_root:?}")
+		})?;
+
+		debug!("Initializing with root URI: {root_uri}");
+
+		// Create capabilities with text document sync
+		let capabilities = lsp_types::ClientCapabilities {
+			text_document: Some(lsp_types::TextDocumentClientCapabilities {
+				synchronization: Some(lsp_types::TextDocumentSyncClientCapabilities {
+					dynamic_registration: Some(false),
+					will_save: Some(false),
+					will_save_wait_until: Some(false),
+					did_save: Some(true),
+				}),
+				publish_diagnostics: Some(
+					lsp_types::PublishDiagnosticsClientCapabilities {
+						related_information: Some(true),
+						tag_support: None,
+						version_support: Some(true),
+						code_description_support: Some(true),
+						data_support: Some(true),
+					},
+				),
+				..Default::default()
+			}),
+			..Default::default()
+		};
+
+		#[allow(deprecated)]
+		let initialize_params = InitializeParams {
+			process_id: Some(std::process::id()),
+			root_uri: Some(root_uri.clone()),
+			capabilities,
+			initialization_options: None,
+			client_info: Some(lsp_types::ClientInfo {
+				name: "ariana-ide".to_string(),
+				version: Some("0.1.0".to_string()),
+			}),
+			locale: None,
+			root_path: Some(project_root.to_string_lossy().to_string()),
+			trace: None,
+			workspace_folders: None,
+			work_done_progress_params: lsp_types::WorkDoneProgressParams {
+				work_done_token: None,
+			},
+		};
+
+		debug!("About to send initialize request...");
+		let response = server
+			.request::<request::Initialize>(initialize_params)
+			.await
+			.map_err(|e| {
+				error!("Initialize request failed: {:?}", e);
+				anyhow!("Initialize request failed: {:?}", e)
+			})?;
+
+		debug!("Initialize response: {response:?}");
+
+		debug!("Sending initialized notification...");
+		server
+			.notify::<lsp_types::notification::Initialized>(InitializedParams {})
+			.map_err(|e| {
+				error!("Failed to send initialized notification: {:?}", e);
+				anyhow!("Failed to send initialized notification: {:?}", e)
+			})?;
+
+		info!("send_initialize_rust_analyzer completed successfully");
 		Ok(())
 	}
 
@@ -277,10 +512,15 @@ impl LspManager {
 		text: String,
 		language_id: String,
 	) -> Result<()> {
+		// Extract file path from URI
+		let file_path = uri.strip_prefix("file://").unwrap_or(&uri);
+		let server_type = self.determine_lsp_type(file_path)?;
+		let server_key = server_type.as_key();
+
 		let processes = self.processes.lock().await;
 		let lsp = processes
-			.get("typescript")
-			.ok_or_else(|| anyhow!("TypeScript LSP not running"))?;
+			.get(&server_key)
+			.ok_or_else(|| anyhow!("{} LSP not running", server_key))?;
 
 		debug!("Opening document: {uri} (language: {language_id})");
 		debug!("Document text length: {} chars", text.len());
@@ -312,10 +552,15 @@ impl LspManager {
 		text: String,
 		version: i32,
 	) -> Result<()> {
+		// Extract file path from URI
+		let file_path = uri.strip_prefix("file://").unwrap_or(&uri);
+		let server_type = self.determine_lsp_type(file_path)?;
+		let server_key = server_type.as_key();
+
 		let processes = self.processes.lock().await;
 		let lsp = processes
-			.get("typescript")
-			.ok_or_else(|| anyhow!("TypeScript LSP not running"))?;
+			.get(&server_key)
+			.ok_or_else(|| anyhow!("{} LSP not running", server_key))?;
 
 		debug!("Updating document: {uri} (version: {version})");
 
@@ -386,6 +631,17 @@ fn find_project_root(start_dir: &Path) -> Option<PathBuf> {
 	let mut current = start_dir;
 	loop {
 		if current.join("tsconfig.json").exists() {
+			return Some(current.to_path_buf());
+		}
+		current = current.parent()?;
+	}
+}
+
+// Helper function to find Rust project root by looking for Cargo.toml
+fn find_rust_project_root(start_dir: &Path) -> Option<PathBuf> {
+	let mut current = start_dir;
+	loop {
+		if current.join("Cargo.toml").exists() {
 			return Some(current.to_path_buf());
 		}
 		current = current.parent()?;

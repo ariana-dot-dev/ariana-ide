@@ -156,46 +156,42 @@ async fn unwatch_file(
 	result
 }
 
-// todo: generalize this for all lsp's
 #[tauri::command]
-async fn start_lsp(
+async fn start_lsp_for_file(
+	file_path: String,
 	lsp_manager: State<'_, Arc<LspManager>>,
-	ts_ls_path: Option<String>,
 ) -> Result<(), String> {
-	log::info!("[Command] start_lsp called");
+	log::info!("[Command] start_lsp_for_file called for: {}", file_path);
 
-	// Use provided path or try default locations
-	let path = ts_ls_path.unwrap_or_else(|| {
-		// Try to find typescript-language-server in PATH first
-		if let Ok(output) = std::process::Command::new("which")
-			.arg("typescript-language-server")
-			.output()
-		{
-			if output.status.success() {
-				if let Ok(path) = String::from_utf8(output.stdout) {
-					return path.trim().to_string();
-				}
-			}
-		}
-
-		// Fallback to common locations
-		"typescript-language-server".to_string()
-	});
-
-	let result = lsp_manager.start_typescript_lsp(&path).await.map_err(|e| {
-		let err_string = e.to_string();
-		log::error!("[Command] start_lsp failed: {}", err_string);
-		err_string
-	});
+	let result = lsp_manager
+		.start_lsp_for_file(&file_path)
+		.await
+		.map_err(|e| {
+			let err_string = e.to_string();
+			log::error!("[Command] start_lsp_for_file failed: {}", err_string);
+			err_string
+		});
 
 	if result.is_ok() {
 		log::info!(
-			"[Command] start_lsp completed successfully with path: {}",
-			path
+			"[Command] start_lsp_for_file completed successfully for: {}",
+			file_path
 		);
 	}
 
 	result
+}
+
+#[tauri::command]
+async fn check_lsp_running(
+	file_path: String,
+	lsp_manager: State<'_, Arc<LspManager>>,
+) -> Result<bool, String> {
+	if let Some(server_type) = lsp_manager.get_lsp_type_for_file(&file_path) {
+		Ok(lsp_manager.is_lsp_running(&server_type).await)
+	} else {
+		Ok(false)
+	}
 }
 
 #[tauri::command]
@@ -280,7 +276,8 @@ pub fn run() {
 			watch_file,
 			unwatch_file,
 			// LSP commands
-			start_lsp,
+			start_lsp_for_file,
+			check_lsp_running,
 			lsp_open_document,
 			lsp_update_document,
 			lsp_get_diagnostics

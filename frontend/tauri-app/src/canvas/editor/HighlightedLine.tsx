@@ -14,6 +14,7 @@ interface HighlightedLineProps {
 	content: string;
 	tokens: Token[];
 	showLineNumbers?: boolean;
+	hasError?: boolean;
 }
 
 const getTokenClassName = (scopes: string[]): string => {
@@ -53,7 +54,13 @@ const getTokenClassName = (scopes: string[]): string => {
 };
 
 export const HighlightedLine = memo<HighlightedLineProps>(
-	({ lineNumber, content, tokens, showLineNumbers = true }) => {
+	({
+		lineNumber,
+		content,
+		tokens,
+		showLineNumbers = true,
+		hasError = false,
+	}) => {
 		const y = lineToY(lineNumber);
 
 		// sort tokens by start index
@@ -142,7 +149,7 @@ export const HighlightedLine = memo<HighlightedLineProps>(
 							paddingRight: "16px", // pr-4
 						}}
 					>
-						{lineNumber + 1}
+						{hasError ? "❌" : lineNumber + 1}
 					</div>
 				)}
 				<div
@@ -164,6 +171,7 @@ export const HighlightedLine = memo<HighlightedLineProps>(
 			prevProps.content === nextProps.content &&
 			prevProps.lineNumber === nextProps.lineNumber &&
 			prevProps.showLineNumbers === nextProps.showLineNumbers &&
+			prevProps.hasError === nextProps.hasError &&
 			prevProps.tokens.length === nextProps.tokens.length &&
 			prevProps.tokens.every((token, index) => {
 				const nextToken = nextProps.tokens[index];

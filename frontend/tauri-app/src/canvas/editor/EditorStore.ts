@@ -32,13 +32,17 @@ interface LspDiagnostic {
 	end_column: number;
 }
 
+interface LspStatus {
+	initialized: boolean;
+	initializing: boolean;
+}
+
 interface EditorState {
 	files: Record<string, FileData>;
 	activeFileId: string;
 	fileWatchers: Record<string, UnlistenFn>;
 	syntaxHighlighter: SyntaxHighlighter | null;
-	lspInitialized: boolean;
-	lspInitializing: boolean;
+	lspStatuses: Record<string, LspStatus>; // key is file extension
 	lspDiagnostics: Record<string, LspDiagnostic[]>;
 	lspDocumentVersions: Record<string, number>;
 
@@ -68,7 +72,7 @@ interface EditorState {
 	updateSyntaxHighlighting: (fileId: string) => void;
 
 	// LSP actions
-	initializeLsp: () => Promise<void>;
+	initializeLspForFile: (fileId: string) => Promise<void>;
 	updateLspDocument: (fileId: string) => Promise<void>;
 	fetchLspDiagnostics: (fileId: string) => Promise<void>;
 }
@@ -83,8 +87,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 	activeFileId: "",
 	fileWatchers: {},
 	syntaxHighlighter: null,
-	lspInitialized: false,
-	lspInitializing: false,
+	lspStatuses: {},
 	lspDiagnostics: {},
 	lspDocumentVersions: {},
 
@@ -520,25 +523,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 				get().updateSyntaxHighlighting(fileId);
 			}, 100);
 
-			// update LSP document for new file
+			// Initialize LSP and update document for new file
 			setTimeout(async () => {
 				console.log(
 					"[EditorStore] Checking if LSP is ready for newly opened file:",
 					fileId,
 				);
-				const currentState = get();
-				if (!currentState.lspInitialized) {
-					console.log("[EditorStore] LSP not initialized yet, waiting...");
-					// Try to initialize if not already done
-					try {
-						await get().initializeLsp();
-					} catch (error) {
-						console.error(
-							"[EditorStore] Failed to initialize LSP for new file:",
-							error,
-						);
-					}
+
+				// Try to initialize LSP for this file type if not already done
+				try {
+					await get().initializeLspForFile(fileId);
+				} catch (error) {
+					console.error(
+						"[EditorStore] Failed to initialize LSP for new file:",
+						error,
+					);
 				}
+
 				console.log(
 					"[EditorStore] Calling updateLspDocument for newly opened file:",
 					fileId,
@@ -801,18 +802,34 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 	},
 
 	// LSP actions
-	initializeLsp: async () => {
+	initializeLspForFile: async (fileId: string) => {
 		const state = get();
-		if (state.lspInitialized || state.lspInitializing) {
-			console.log("[EditorStore] LSP already initialized or initializing");
+		const file = state.files[fileId];
+		if (!file) return;
+
+		const fileExt = file.name.split(".").pop()?.toLowerCase();
+		if (!fileExt) return;
+
+		// Check if LSP is already initialized for this file type
+		const lspStatus = state.lspStatuses[fileExt];
+		if (lspStatus?.initialized || lspStatus?.initializing) {
+			console.log(
+				`[EditorStore] LSP already initialized or initializing for .${fileExt} files`,
+			);
 			return;
 		}
 
-		set({ lspInitializing: true });
+		// Update status to initializing
+		set((state) => ({
+			lspStatuses: {
+				...state.lspStatuses,
+				[fileExt]: { initialized: false, initializing: true },
+			},
+		}));
 
 		try {
-			console.log("[EditorStore] Initializing LSP...");
-			console.log("[EditorStore] Calling start_lsp command...");
+			console.log(`[EditorStore] Initializing LSP for .${fileExt} files...`);
+			console.log("[EditorStore] Calling start_lsp_for_file command...");
 			const startTime = Date.now();
 
 			// Add a timeout wrapper with longer timeout
@@ -824,28 +841,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 				);
 			});
 
-			// Try to start LSP without a specific path first (will use PATH or defaults)
+			// Start LSP for this file type
 			await Promise.race([
-				invoke("start_lsp", { tsLsPath: null }),
+				invoke("start_lsp_for_file", { filePath: file.name }),
 				timeoutPromise,
 			]);
 
 			const elapsed = Date.now() - startTime;
-			console.log(`[EditorStore] start_lsp command completed in ${elapsed}ms`);
-			set({ lspInitialized: true, lspInitializing: false });
-			console.log("[EditorStore] LSP initialized successfully");
+			console.log(
+				`[EditorStore] start_lsp_for_file command completed in ${elapsed}ms`,
+			);
 
-			// open all currently open files in LSP
+			// Update status to initialized
+			set((state) => ({
+				lspStatuses: {
+					...state.lspStatuses,
+					[fileExt]: { initialized: true, initializing: false },
+				},
+			}));
+			console.log(
+				`[EditorStore] LSP initialized successfully for .${fileExt} files`,
+			);
+
+			// Open all currently open files of this type in LSP
 			const currentState = get();
-			const fileEntries = Object.entries(currentState.files);
-			console.log(`[EditorStore] Opening ${fileEntries.length} files in LSP`);
+			const fileEntries = Object.entries(currentState.files).filter(([_, f]) =>
+				f.name.endsWith(`.${fileExt}`),
+			);
+			console.log(
+				`[EditorStore] Opening ${fileEntries.length} .${fileExt} files in LSP`,
+			);
 			for (const [fileId, file] of fileEntries) {
 				console.log(`[EditorStore] Opening file in LSP: ${file.name}`);
 				await get().updateLspDocument(fileId);
 			}
 		} catch (error) {
-			set({ lspInitializing: false });
-			console.error("[EditorStore] Failed to initialize LSP:", error);
+			// Update status back to not initialized
+			set((state) => ({
+				lspStatuses: {
+					...state.lspStatuses,
+					[fileExt]: { initialized: false, initializing: false },
+				},
+			}));
+			console.error(
+				`[EditorStore] Failed to initialize LSP for .${fileExt} files:`,
+				error,
+			);
 			// Log more details about the error
 			if (error instanceof Error) {
 				console.error(
@@ -866,10 +907,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 			fileId,
 			file?.name,
 		);
-		console.log("[EditorStore] LSP initialized:", state.lspInitialized);
 
-		if (!file || !state.lspInitialized) {
-			console.log("[EditorStore] Skipping LSP update - file or LSP not ready");
+		if (!file) {
+			console.log("[EditorStore] Skipping LSP update - file not found");
+			return;
+		}
+
+		const fileExt = file.name.split(".").pop()?.toLowerCase();
+		if (!fileExt) return;
+
+		const lspStatus = state.lspStatuses[fileExt];
+		console.log(`[EditorStore] LSP status for .${fileExt}:`, lspStatus);
+
+		if (!lspStatus?.initialized) {
+			console.log(
+				`[EditorStore] Skipping LSP update - LSP not ready for .${fileExt} files`,
+			);
 			return;
 		}
 
@@ -936,7 +989,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 	fetchLspDiagnostics: async (fileId: string) => {
 		const state = get();
 		const file = state.files[fileId];
-		if (!file || !state.lspInitialized) return;
+		if (!file) return;
+
+		const fileExt = file.name.split(".").pop()?.toLowerCase();
+		if (!fileExt) return;
+
+		const lspStatus = state.lspStatuses[fileExt];
+		if (!lspStatus?.initialized) return;
 
 		try {
 			const uri = `file://${file.name}`;

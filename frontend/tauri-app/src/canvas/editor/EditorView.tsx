@@ -14,12 +14,6 @@ import {
 	yToLine,
 } from "./utils/measurements";
 
-declare global {
-	interface Window {
-		__TAURI_EVENT_PLUGIN_INTERNALS__?: any;
-	}
-}
-
 interface EditorViewProps {
 	className?: string;
 	showLineNumbers?: boolean;
@@ -46,8 +40,10 @@ export const EditorView: React.FC<EditorViewProps> = ({
 	const initializeSyntaxHighlighting = useEditorStore(
 		(state) => state.initializeSyntaxHighlighting,
 	);
-	const initializeLsp = useEditorStore((state) => state.initializeLsp);
-	const lspInitialized = useEditorStore((state) => state.lspInitialized);
+	const initializeLspForFile = useEditorStore(
+		(state) => state.initializeLspForFile,
+	);
+	const lspStatuses = useEditorStore((state) => state.lspStatuses);
 	const lspDiagnosticsMap = useEditorStore((state) => state.lspDiagnostics);
 	console.log(`lspDiagnosticsMap: ${JSON.stringify(lspDiagnosticsMap)}`);
 	const lspDiagnostics =
@@ -73,16 +69,18 @@ export const EditorView: React.FC<EditorViewProps> = ({
 				);
 			}
 
-			// Initialize LSP separately with better error handling
-			try {
-				console.log("[EditorView] Initializing LSP...");
-				await initializeLsp();
-				console.log("[EditorView] LSP initialization complete");
-			} catch (error) {
-				console.error("[EditorView] Failed to initialize LSP:", error);
-				// LSP failure should not break the editor - it's an optional feature
-				if (error instanceof Error) {
-					console.warn("[EditorView] LSP unavailable:", error.message);
+			// Initialize LSP for open files
+			if (activeFileId) {
+				try {
+					console.log("[EditorView] Initializing LSP for active file...");
+					await initializeLspForFile(activeFileId);
+					console.log("[EditorView] LSP initialization complete");
+				} catch (error) {
+					console.error("[EditorView] Failed to initialize LSP:", error);
+					// LSP failure should not break the editor - it's an optional feature
+					if (error instanceof Error) {
+						console.warn("[EditorView] LSP unavailable:", error.message);
+					}
 				}
 			}
 		};
@@ -97,7 +95,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 				cleanupFileWatching().catch(console.error);
 			}
 		};
-	}, []); // remove dependencies to prevent re-running
+	}, [activeFileId]); // Re-run when active file changes
 
 	// auto-scroll to keep cursor in view
 	useEffect(() => {
@@ -224,6 +222,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 							content={lineContent}
 							tokens={hasHighlighting ? lineHighlighting.tokens : []}
 							showLineNumbers={showLineNumbers}
+							hasError={lspDiagnostics.some((diag) => diag.line === i)}
 						/>
 					);
 				})}
@@ -238,44 +237,67 @@ export const EditorView: React.FC<EditorViewProps> = ({
 			</div>
 
 			{/* LSP notifications */}
-			{!lspInitialized && activeFile?.name.match(/\.(ts|tsx|js|jsx)$/) && (
-				<div className="absolute bottom-4 right-4 max-w-sm bg-blue-900/90 text-white p-3 rounded-lg shadow-lg">
-					<div className="font-semibold">TypeScript LSP Initializing...</div>
-				</div>
-			)}
+			{(() => {
+				if (!activeFile) return null;
 
-			{lspInitialized &&
-				lspDiagnostics.length === 0 &&
-				activeFile?.name.match(/\.(ts|tsx|js|jsx)$/) && (
-					<div className="absolute bottom-4 right-4 max-w-sm bg-green-900/90 text-white p-3 rounded-lg shadow-lg">
-						<div className="font-semibold">TypeScript LSP Active!</div>
-						<div className="text-sm">
-							No issues found in {activeFile.name.split("/").pop()}
+				const fileExt = activeFile.name.split(".").pop()?.toLowerCase();
+				const lspStatus = fileExt ? lspStatuses[fileExt] : undefined;
+				const lspType =
+					fileExt === "rs"
+						? "Rust"
+						: fileExt && ["ts", "tsx", "js", "jsx"].includes(fileExt)
+							? "TypeScript"
+							: null;
+
+				if (!lspType) return null;
+
+				// LSP initializing
+				if (lspStatus?.initializing) {
+					return (
+						<div className="absolute bottom-4 right-4 max-w-sm bg-blue-900/90 text-white p-3 rounded-lg shadow-lg">
+							<div className="font-semibold">{lspType} LSP Initializing...</div>
 						</div>
-					</div>
-				)}
+					);
+				}
 
-			{lspDiagnostics.length > 0 && (
-				<div className="absolute bottom-4 right-4 max-w-sm bg-red-900/90 text-white p-3 rounded-lg shadow-lg">
-					<div className="font-semibold mb-1">TypeScript LSP Active!</div>
-					<div className="text-sm">
-						{lspDiagnostics.length} diagnostic
-						{lspDiagnostics.length !== 1 ? "s" : ""} found:
-					</div>
-					<div className="text-xs mt-1 max-h-32 overflow-y-auto">
-						{lspDiagnostics.slice(0, 3).map((diag, i) => (
-							<div key={i} className="mt-1">
-								• Line {diag.line + 1}: {diag.message}
+				// LSP initialized
+				if (lspStatus?.initialized) {
+					if (lspDiagnostics.length === 0) {
+						return (
+							<div className="absolute bottom-4 right-4 max-w-sm bg-green-900/90 text-white p-3 rounded-lg shadow-lg">
+								<div className="font-semibold">{lspType} LSP Active!</div>
+								<div className="text-sm">
+									No issues found in {activeFile.name.split("/").pop()}
+								</div>
 							</div>
-						))}
-						{lspDiagnostics.length > 3 && (
-							<div className="mt-1 text-gray-300">
-								...and {lspDiagnostics.length - 3} more
+						);
+					} else {
+						return (
+							<div className="absolute bottom-4 right-4 max-w-sm bg-red-900/90 text-white p-3 rounded-lg shadow-lg">
+								<div className="font-semibold mb-1">{lspType} LSP Active!</div>
+								<div className="text-sm">
+									{lspDiagnostics.length} diagnostic
+									{lspDiagnostics.length !== 1 ? "s" : ""} found:
+								</div>
+								<div className="text-xs mt-1 max-h-32 overflow-y-auto">
+									{lspDiagnostics.slice(0, 3).map((diag, i) => (
+										<div key={i} className="mt-1">
+											• Line {diag.line + 1}: {diag.message}
+										</div>
+									))}
+									{lspDiagnostics.length > 3 && (
+										<div className="mt-1 text-gray-300">
+											...and {lspDiagnostics.length - 3} more
+										</div>
+									)}
+								</div>
 							</div>
-						)}
-					</div>
-				</div>
-			)}
+						);
+					}
+				}
+
+				return null;
+			})()}
 		</div>
 	);
 };
