@@ -63,25 +63,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 					setCurrentInterpreterScriptState(savedState.currentInterpreterScript);
 					// Handle migration from old osSessions to new gitProjects structure
 					if (savedState.gitProjects) {
-						console.log('Loading saved projects from disk:', savedState.gitProjects.length);
-						savedState.gitProjects.forEach((projectData: any, index: number) => {
-							console.log(`Project ${index}:`, {
-								name: projectData.name,
-								canvasCount: projectData.canvases?.length,
-								canvases: projectData.canvases?.map((c: any) => ({ id: c.id, name: c.name }))
-							});
-						});
-						
 						const projects = savedState.gitProjects.map((projectData: any) => 
 							GitProject.fromJSON(projectData)
 						).filter((p) => {
 							// Only filter out truly invalid projects (keep projects with empty canvases)
-							const keep = p.canvases.length > 0;
-							console.log(`Project ${p.name}: ${p.canvases.length} canvases - keeping: ${keep}`);
-							return keep;
+							return p.canvases.length > 0;
 						});
-						
-						console.log('Final loaded projects:', projects.length);
 						setGitProjects(projects);
 					} else if ((savedState as any).osSessions) {
 						// Migration: convert old OsSessions to GitProjects
@@ -204,7 +191,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 			return gitProjects.find(p => p.id === projectId) || null;
 		},
 		updateGitProject: (projectId: string) => {
-			console.log('updateGitProject called for project:', projectId);
 			// Force React to re-render and save by creating a new array
 			setGitProjects((prev) => [...prev]);
 		},

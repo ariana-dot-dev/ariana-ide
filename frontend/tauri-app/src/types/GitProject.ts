@@ -7,7 +7,7 @@ export interface ProcessState {
 	processId: string;
 	terminalId: string;
 	type: 'claude-code' | 'custom-terminal';
-	status: 'running' | 'completed' | 'error';
+	status: 'running' | 'completed' | 'finished' | 'error';
 	startTime: number;
 	elementId: string; // Which canvas element owns this process
 	prompt?: string; // For claude-code processes
@@ -222,7 +222,7 @@ export class GitProject {
 
 	// Serialization
 	toJSON(): any {
-		const result = {
+		return {
 			id: this.id,
 			name: this.name,
 			root: this.root,
@@ -231,29 +231,12 @@ export class GitProject {
 			createdAt: this.createdAt,
 			lastModified: this.lastModified,
 		};
-		
-		console.log('GitProject.toJSON: Serializing project:', {
-			name: this.name,
-			canvasCount: this.canvases.length,
-			canvases: this.canvases.map(c => ({ id: c.id, name: c.name, osSession: c.osSession }))
-		});
-		
-		return result;
 	}
 
 	static fromJSON(data: any): GitProject {
-		console.log('GitProject.fromJSON: Loading project data:', {
-			name: data.name,
-			canvasCount: data.canvases?.length,
-			canvases: data.canvases?.map((c: any) => ({ id: c.id, name: c.name, osSession: c.osSession }))
-		});
-		
 		const project = new GitProject(data.root, data.name);
 		project.id = data.id;
 		project.canvases = data.canvases || [project.createDefaultCanvas()];
-		
-		console.log('GitProject.fromJSON: Set canvases to:', project.canvases.length, 'canvases');
-		
 		// Handle migration for canvases that don't have osSession or runningProcesses yet
 		project.canvases = project.canvases.map(canvas => ({
 			...canvas,
@@ -263,8 +246,6 @@ export class GitProject {
 		project.currentCanvasIndex = data.currentCanvasIndex || 0;
 		project.createdAt = data.createdAt || Date.now();
 		project.lastModified = data.lastModified || Date.now();
-		
-		console.log('GitProject.fromJSON: Final project has', project.canvases.length, 'canvases');
 		return project;
 	}
 

@@ -132,6 +132,30 @@ const DERIVED_SCALES = [
         "--blackest",
         [[600, 0.1], [700, 0.2], [800, 0.3], [900, 0.4]],
     ],
+    [
+        "--positive",
+        "--positive-500",
+        "--whitest",
+        [[100, 0.9], [200, 0.7], [300, 0.5], [400, 0.3]],
+    ],
+    [
+        "--positive",
+        "--positive-500",
+        "--blackest",
+        [[600, 0.1], [700, 0.2], [800, 0.3], [900, 0.4]],
+    ],
+    [
+        "--negative",
+        "--negative-500",
+        "--whitest",
+        [[100, 0.9], [200, 0.7], [300, 0.5], [400, 0.3]],
+    ],
+    [
+        "--negative",
+        "--negative-500",
+        "--blackest",
+        [[600, 0.1], [700, 0.2], [800, 0.3], [900, 0.4]],
+    ],
 ];
 
 const OUT_CSS = path.join("src", "generated", "colors.css");

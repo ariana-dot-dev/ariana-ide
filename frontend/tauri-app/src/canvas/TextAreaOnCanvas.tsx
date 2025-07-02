@@ -5,7 +5,7 @@ import { CanvasElement, ElementLayout, TextAreaKind } from "./types";
 import { CustomTerminalRenderer } from "./CustomTerminalRenderer";
 import { TerminalSpec } from "../services/CustomTerminalAPI";
 import { ClaudeCodeAgent } from "../services/ClaudeCodeAgent";
-import { useOsSession, useGitProject } from "../contexts/GitProjectContext";
+import { useGitProject } from "../contexts/GitProjectContext";
 import { useStore } from "../state";
 import { ProcessManager } from "../services/ProcessManager";
 import { ProcessState } from "../types/GitProject";
@@ -39,6 +39,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const [text, setText] = useState((layout.element.kind as TextAreaKind).textArea.content);
 	const [isLocked, setIsLocked] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
+	const [isFinished, setIsFinished] = useState(false);
 	
 	// Terminal state
 	const [showTerminal, setShowTerminal] = useState(false);
@@ -51,7 +52,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const textAreaRef = useRef<HTMLTextAreaElement>(null);
 	const [dragging, setDragging] = useState(false);
 	
-	const osSession = (element.kind as TextAreaKind).textArea.osSession; 
+	const textAreaOsSession = (element.kind as TextAreaKind).textArea.osSession; 
 	
 	const handleDragStartInternal = () => {
 		propOnDragStart(element);
@@ -94,7 +95,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			setShowTerminal(true);
 
 			await agent.startTask(
-				osSession || { Local: "." }, // Use the project's OS session or fallback to local
+				textAreaOsSession || { Local: "." }, // Use textArea OS session (which is canvas-specific) or fallback
 				text.trim(),
 				(terminalId: string) => {
 					console.log("[TextAreaOnCanvas]", "Terminal ready, ID:", terminalId);
@@ -143,26 +144,37 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	useEffect(() => {
 		const existingProcess = getProcessByElementId(elementId);
 		
-		if (existingProcess && existingProcess.status === 'running') {
+		if (existingProcess) {
 			console.log('[TextAreaOnCanvas] Restoring existing process:', existingProcess);
 			
-			// Restore UI state
-			setIsLoading(true);
-			setIsLocked(true);
-			setShowTerminal(true);
-			setTerminalId(existingProcess.terminalId);
-			
-			// Try to restore the ClaudeCodeAgent instance from ProcessManager
-			const restoredAgent = ProcessManager.getProcess(existingProcess.processId);
-			if (restoredAgent) {
-				console.log('[TextAreaOnCanvas] Restored ClaudeCodeAgent instance');
-				setClaudeAgent(restoredAgent);
-			} else {
-				console.warn('[TextAreaOnCanvas] ClaudeCodeAgent instance not found in ProcessManager');
-				// Mark process as completed since we can't restore it
-				updateProcess(existingProcess.processId, { status: 'completed' });
+			if (existingProcess.status === 'running') {
+				// Restore running process UI state
+				setIsLoading(true);
+				setIsLocked(true);
+				setShowTerminal(true);
+				setTerminalId(existingProcess.terminalId);
+				setIsFinished(false);
+				
+				// Try to restore the ClaudeCodeAgent instance from ProcessManager
+				const restoredAgent = ProcessManager.getProcess(existingProcess.processId);
+				if (restoredAgent) {
+					console.log('[TextAreaOnCanvas] Restored ClaudeCodeAgent instance');
+					setClaudeAgent(restoredAgent);
+				} else {
+					console.warn('[TextAreaOnCanvas] ClaudeCodeAgent instance not found in ProcessManager');
+					// Mark process as finished since we can't restore it
+					updateProcess(existingProcess.processId, { status: 'finished' });
+					setIsLoading(false);
+					setIsLocked(false);
+					setIsFinished(true);
+				}
+			} else if (existingProcess.status === 'finished' || existingProcess.status === 'completed') {
+				// Restore finished/completed process UI state (no terminal shown)
 				setIsLoading(false);
 				setIsLocked(false);
+				setIsFinished(true);
+				setShowTerminal(false); // Don't show terminal for finished tasks
+				setTerminalId(null);
 			}
 		}
 	}, [elementId, getProcessByElementId, updateProcess]);
@@ -180,11 +192,13 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			console.log("[TextAreaOnCanvas]", "✅ Task completed:", result);
 			setIsLoading(false);
 			setIsLocked(false);
+			setIsFinished(true);
+			setShowTerminal(false); // Close terminal when task finishes
 			
 			// Update process state
 			const existingProcess = getProcessByElementId(elementId);
 			if (existingProcess) {
-				updateProcess(existingProcess.processId, { status: 'completed' });
+				updateProcess(existingProcess.processId, { status: 'finished' });
 				ProcessManager.unregisterProcess(existingProcess.processId);
 			}
 		};
@@ -193,6 +207,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			console.error("[TextAreaOnCanvas]", "❌ Claude Code task error:", error);
 			setIsLoading(false);
 			setIsLocked(false);
+			setIsFinished(false);
 			
 			// Update process state
 			const existingProcess = getProcessByElementId(elementId);
@@ -215,14 +230,14 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			);
 		};
 
-		claudeAgent.on("taskComplete", handleTaskComplete);
+		claudeAgent.on("taskCompleted", handleTaskComplete);
 		claudeAgent.on("taskError", handleTaskError);
 		claudeAgent.on("taskStarted", handleTaskStarted);
 		claudeAgent.on("screenUpdate", handleScreenUpdate);
 
 		return () => {
 			console.log("[TextAreaOnCanvas]", "🧹 Cleaning up event listeners");
-			claudeAgent.off("taskComplete", handleTaskComplete);
+			claudeAgent.off("taskCompleted", handleTaskComplete);
 			claudeAgent.off("taskError", handleTaskError);
 			claudeAgent.off("taskStarted", handleTaskStarted);
 			claudeAgent.off("screenUpdate", handleScreenUpdate);
@@ -245,6 +260,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		
 		setIsLoading(false);
 		setIsLocked(false);
+		setIsFinished(false);
 		setShowTerminal(false);
 		setTerminalId(null);
 	};
@@ -353,6 +369,23 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 										</div>
 									</div>
 									<div className="group-hover:hidden block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1em] h-[400%] animate-spin bg-[var(--base-500)] blur-[1px]"></div>
+								</div>
+							</button>
+						) : isFinished ? (
+							<button
+								className={cn(
+									"group rounded-lg rounded-br-2xl transition-all p-0.5 bg-[var(--positive-200)] opacity-90",
+								)}
+								disabled
+							>
+								<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg rounded-br-2xl transition-all">
+									<div
+										className={cn(
+											"px-5 py-1 rounded-lg rounded-br-2xl bg-[var(--positive-600)] font-medium transition-all text-[var(--whitest)] z-10",
+										)}
+									>
+										Finished ✓
+									</div>
 								</div>
 							</button>
 						) : (
