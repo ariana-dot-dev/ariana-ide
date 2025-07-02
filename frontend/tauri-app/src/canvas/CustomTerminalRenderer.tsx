@@ -391,7 +391,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					event.preventDefault();
 					return;
 				} else if (event.key === "Backspace") {
-					await sendRawInput("\b");
+					// Handle backspace key - backward delete
+					await sendRawInput("\x7f"); // Use DEL character (127) instead of \b for better compatibility
 					event.preventDefault();
 					return;
 				} else if (event.key === "Tab") {
@@ -439,6 +440,10 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 					event.preventDefault();
 					return;
 				} else if (event.key === "Delete") {
+					// Handle delete key properly
+					// On Mac: Delete key = forward delete (\x1b[3~)
+					// On Mac: Backspace key = backward delete (\b) - handled above
+					// On other platforms: Delete = forward delete (\x1b[3~)
 					await sendRawInput("\x1b[3~");
 					event.preventDefault();
 					return;
@@ -643,8 +648,8 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 						{/* <div className="h-[90%] w-full bg-[var(--blackest-70)] rounded-xs">
 							{" "}
 						</div> */}
-						<div className="absolute flex items-center justify-center top-0 left-0 h-full w-[200%] opacity-80">
-							<div>{"😎"}</div>
+						<div className="h-[90%] w-full bg-[var(--blackest)] opacity-70 rounded-sm animate-pulse">
+							{" "}
 						</div>
 					</motion.div>
 					<span ref={phantomCharRef} className="absolute -left-full -top-full">

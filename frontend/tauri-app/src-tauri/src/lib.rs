@@ -72,6 +72,8 @@ pub fn run() {
 			execute_command_in_dir,
 			// System integration commands
 			open_path_in_explorer
+			// Git repository commands
+			check_git_repository,
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -155,6 +157,7 @@ async fn start_git_directories_search(
 	Ok(search_id)
 }
 
+#[tauri::command]
 async fn check_git_repository(directory: String) -> Result<bool, String> {
 	let path = Path::new(&directory);
 	
