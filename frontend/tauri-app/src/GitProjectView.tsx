@@ -30,18 +30,22 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 		return "";
 	};
 
-	// Compute task progress for each canvas
+	// Compute task progress for each canvas using TaskManager (persistent data)
 	const getCanvasTaskCounts = (canvasId: string) => {
 		if (!selectedGitProject) return { running: 0, finished: 0, error: 0, total: 0 };
 		
 		const canvas = selectedGitProject.canvases.find(c => c.id === canvasId);
-		if (!canvas?.runningProcesses) return { running: 0, finished: 0, error: 0, total: 0 };
+		if (!canvas?.taskManager) return { running: 0, finished: 0, error: 0, total: 0 };
 		
-		const processes = canvas.runningProcesses;
-		const running = processes.filter(p => p.status === 'running').length;
-		const finished = processes.filter(p => p.status === 'finished' || p.status === 'completed').length;
+		const taskManager = canvas.taskManager;
+		const allTasks = taskManager.getTasks();
+		const running = taskManager.getInProgressTasks().length;
+		const finished = taskManager.getCompletedTasks().length;
+		const total = allTasks.length;
+		
+		// For error count, we could check processes since tasks don't have error state yet
+		const processes = canvas.runningProcesses || [];
 		const error = processes.filter(p => p.status === 'error').length;
-		const total = processes.length;
 		
 		return { running, finished, error, total };
 	};

@@ -76,6 +76,8 @@ pub fn run() {
 			delete_path_with_os_session,
 			// Git repository commands
 			check_git_repository,
+			git_commit,
+			git_revert_to_commit,
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -438,6 +440,188 @@ fn create_git_branch_wsl(directory: &str, branch_name: &str, distribution: &str)
 #[cfg(not(target_os = "windows"))]
 fn create_git_branch_wsl(_directory: &str, _branch_name: &str, _distribution: &str) -> Result<(), String> {
 	Err("WSL is only available on Windows".to_string())
+}
+
+#[tauri::command]
+async fn git_commit(directory: String, message: String, os_session: OsSession) -> Result<String, String> {
+	match os_session {
+		OsSession::Local(_) => {
+			git_commit_local(&directory, &message)
+		}
+		OsSession::Wsl(wsl_session) => {
+			git_commit_wsl(&directory, &message, &wsl_session.distribution)
+		}
+	}
+}
+
+fn git_commit_local(directory: &str, message: &str) -> Result<String, String> {
+	// First, add all changes
+	let add_output = Command::new("git")
+		.arg("add")
+		.arg(".")
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git add command: {}", e))?;
+	
+	if !add_output.status.success() {
+		return Err(format!("Git add failed: {}", String::from_utf8_lossy(&add_output.stderr)));
+	}
+	
+	// Then commit
+	let commit_output = Command::new("git")
+		.arg("commit")
+		.arg("-m")
+		.arg(message)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git commit command: {}", e))?;
+	
+	if !commit_output.status.success() {
+		let stderr = String::from_utf8_lossy(&commit_output.stderr);
+		let stdout = String::from_utf8_lossy(&commit_output.stdout);
+		
+		// Check for "nothing to commit" scenarios
+		if stderr.contains("nothing to commit") || stdout.contains("nothing to commit") {
+			return Err("NO_CHANGES_TO_COMMIT".to_string());
+		}
+		
+		return Err(format!("Git commit failed: {}", stderr));
+	}
+	
+	// Get the commit hash
+	let hash_output = Command::new("git")
+		.arg("rev-parse")
+		.arg("HEAD")
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to get commit hash: {}", e))?;
+	
+	if !hash_output.status.success() {
+		return Err(format!("Failed to get commit hash: {}", String::from_utf8_lossy(&hash_output.stderr)));
+	}
+	
+	Ok(String::from_utf8_lossy(&hash_output.stdout).trim().to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn git_commit_wsl(directory: &str, message: &str, distribution: &str) -> Result<String, String> {
+	// First, add all changes
+	let add_output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("add")
+		.arg(".")
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git add command: {}", e))?;
+	
+	if !add_output.status.success() {
+		return Err(format!("WSL git add failed: {}", String::from_utf8_lossy(&add_output.stderr)));
+	}
+	
+	// Then commit
+	let commit_output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("commit")
+		.arg("-m")
+		.arg(message)
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git commit command: {}", e))?;
+	
+	if !commit_output.status.success() {
+		let stderr = String::from_utf8_lossy(&commit_output.stderr);
+		let stdout = String::from_utf8_lossy(&commit_output.stdout);
+		
+		// Check for "nothing to commit" scenarios
+		if stderr.contains("nothing to commit") || stdout.contains("nothing to commit") {
+			return Err("NO_CHANGES_TO_COMMIT".to_string());
+		}
+		
+		return Err(format!("WSL git commit failed: {}", stderr));
+	}
+	
+	// Get the commit hash
+	let hash_output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("rev-parse")
+		.arg("HEAD")
+		.output()
+		.map_err(|e| format!("Failed to get WSL commit hash: {}", e))?;
+	
+	if !hash_output.status.success() {
+		return Err(format!("Failed to get WSL commit hash: {}", String::from_utf8_lossy(&hash_output.stderr)));
+	}
+	
+	Ok(String::from_utf8_lossy(&hash_output.stdout).trim().to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn git_commit_wsl(_directory: &str, _message: &str, _distribution: &str) -> Result<String, String> {
+	Err("WSL is only supported on Windows".to_string())
+}
+
+#[tauri::command]
+async fn git_revert_to_commit(directory: String, commit_hash: String, os_session: OsSession) -> Result<(), String> {
+	match os_session {
+		OsSession::Local(_) => {
+			git_revert_to_commit_local(&directory, &commit_hash)
+		}
+		OsSession::Wsl(wsl_session) => {
+			git_revert_to_commit_wsl(&directory, &commit_hash, &wsl_session.distribution)
+		}
+	}
+}
+
+fn git_revert_to_commit_local(directory: &str, commit_hash: &str) -> Result<(), String> {
+	let output = Command::new("git")
+		.arg("reset")
+		.arg("--hard")
+		.arg(commit_hash)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git reset command: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("Git reset failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn git_revert_to_commit_wsl(directory: &str, commit_hash: &str, distribution: &str) -> Result<(), String> {
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("reset")
+		.arg("--hard")
+		.arg(commit_hash)
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git reset command: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("WSL git reset failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn git_revert_to_commit_wsl(_directory: &str, _commit_hash: &str, _distribution: &str) -> Result<(), String> {
+	Err("WSL is only supported on Windows".to_string())
 }
 
 #[tauri::command]

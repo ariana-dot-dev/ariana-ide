@@ -3,6 +3,7 @@ import { GitProject, GitProjectCanvas, ProcessState } from '../types/GitProject'
 import { CanvasElement } from '../canvas/types';
 import { ProcessManager } from '../services/ProcessManager';
 import { useStore } from '../state';
+import { TaskManager } from '../types/Task';
 
 interface GitProjectContextValue {
 	selectedGitProject: GitProject | null;
@@ -18,6 +19,14 @@ interface GitProjectContextValue {
 	removeProcess: (processId: string) => boolean;
 	getProcessByElementId: (elementId: string) => ProcessState | undefined;
 	getCurrentCanvasProcesses: () => ProcessState[];
+	// Task management methods
+	createTask: (prompt: string) => string | null;
+	startTask: (taskId: string, processId?: string) => boolean;
+	completeTask: (taskId: string, commitHash: string) => boolean;
+	updateTaskPrompt: (taskId: string, prompt: string) => boolean;
+	revertTask: (taskId: string) => boolean;
+	restoreTask: (taskId: string) => boolean;
+	getCurrentTaskManager: () => TaskManager | null;
 }
 
 const GitProjectContext = createContext<GitProjectContextValue | null>(null);
@@ -142,6 +151,74 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return [];
 			return gitProject.getCanvasProcesses(currentCanvas.id);
+		},
+
+		// Task management methods
+		createTask: (prompt: string) => {
+			if (!gitProject) return null;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return null;
+			
+			const taskId = currentCanvas.taskManager.createPromptingTask(prompt);
+			updateGitProject(gitProject.id);
+			return taskId;
+		},
+
+		startTask: (taskId: string, processId?: string) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			
+			const result = currentCanvas.taskManager.startTask(taskId, processId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		completeTask: (taskId: string, commitHash: string) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			
+			const result = currentCanvas.taskManager.completeTask(taskId, commitHash);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		updateTaskPrompt: (taskId: string, prompt: string) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			
+			const result = currentCanvas.taskManager.updateTaskPrompt(taskId, prompt);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		revertTask: (taskId: string) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			
+			const result = currentCanvas.taskManager.revertTask(taskId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		restoreTask: (taskId: string) => {
+			if (!gitProject) return false;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return false;
+			
+			const result = currentCanvas.taskManager.restoreTask(taskId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		getCurrentTaskManager: () => {
+			if (!gitProject) return null;
+			const currentCanvas = gitProject.getCurrentCanvas();
+			if (!currentCanvas) return null;
+			return currentCanvas.taskManager;
 		},
 	};
 

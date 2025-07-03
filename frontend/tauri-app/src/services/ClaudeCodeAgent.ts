@@ -282,53 +282,53 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	}
 
 	private async handleTerminalEvents(events: TerminalEvent[]): Promise<void> {
-		console.log(this.logPrefix, "Received", events.length, "terminal events");
+		// console.log(this.logPrefix, "Received", events.length, "terminal events");
 
 		for (const event of events) {
-			console.log(this.logPrefix, "Processing event:", event.type);
+			// console.log(this.logPrefix, "Processing event:", event.type);
 
 			switch (event.type) {
 				case "screenUpdate":
 					if (event.screen) {
-						console.log(
-							this.logPrefix,
-							"Screen update - new screen has",
-							event.screen.length,
-							"lines",
-						);
+						// console.log(
+						// 	this.logPrefix,
+						// 	"Screen update - new screen has",
+						// 	event.screen.length,
+						// 	"lines",
+						// );
 						this.screenLines = [...event.screen];
 
 						// Log current screen content for debugging
-						const screenText = event.screen.map((line) =>
-							line.map((item) => item.lexeme).join(""),
-						);
-						console.log(this.logPrefix, "Current screen content:");
-						screenText.forEach((line, i) => {
-							if (line.trim()) {
-								console.log(
-									this.logPrefix,
-									`  Line ${i}:`,
-									JSON.stringify(line),
-								);
-							}
-						});
+						// const screenText = event.screen.map((line) =>
+						// 	line.map((item) => item.lexeme).join(""),
+						// );
+						// console.log(this.logPrefix, "Current screen content:");
+						// screenText.forEach((line, i) => {
+						// 	if (line.trim()) {
+						// 		console.log(
+						// 			this.logPrefix,
+						// 			`  Line ${i}:`,
+						// 			JSON.stringify(line),
+						// 		);
+						// 	}
+						// });
 					}
 					break;
 
 				case "newLines":
 					if (event.lines) {
-						console.log(this.logPrefix, "New lines added:", event.lines.length);
+						// console.log(this.logPrefix, "New lines added:", event.lines.length);
 						this.screenLines.push(...event.lines);
 
 						// Log new lines content
 						event.lines.forEach((line, i) => {
 							const lineText = line.map((item) => item.lexeme).join("");
 							if (lineText.trim()) {
-								console.log(
-									this.logPrefix,
-									`  New line ${i}:`,
-									JSON.stringify(lineText),
-								);
+								// console.log(
+								// 	this.logPrefix,
+								// 	`  New line ${i}:`,
+								// 	JSON.stringify(lineText),
+								// );
 							}
 						});
 					}
@@ -336,14 +336,14 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 				case "patch":
 					if (event.line !== undefined && event.items) {
-						console.log(
-							this.logPrefix,
-							"Patching line",
-							event.line,
-							"with",
-							event.items.length,
-							"items",
-						);
+						// console.log(
+						// 	this.logPrefix,
+						// 	"Patching line",
+						// 	event.line,
+						// 	"with",
+						// 	event.items.length,
+						// 	"items",
+						// );
 						// Ensure we have enough lines
 						while (this.screenLines.length <= event.line) {
 							this.screenLines.push([]);
@@ -352,11 +352,11 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 						// Log patched line content
 						const lineText = event.items.map((item) => item.lexeme).join("");
-						console.log(
-							this.logPrefix,
-							`  Patched line ${event.line}:`,
-							JSON.stringify(lineText),
-						);
+						// console.log(
+						// 	this.logPrefix,
+						// 	`  Patched line ${event.line}:`,
+						// 	JSON.stringify(lineText),
+						// );
 					}
 					break;
 			}
@@ -516,12 +516,12 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 		newLines = newLines.map((line) => line.replaceAll(" ", " "));
 
-		console.log(this.logPrefix, "Analyzing new lines for TUI interactions:");
-		newLines.forEach((line, i) => {
-			if (line.trim()) {
-				console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(line));
-			}
-		});
+		// console.log(this.logPrefix, "Analyzing new lines for TUI interactions:");
+		// newLines.forEach((line, i) => {
+		// 	if (line.trim()) {
+		// 		console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(line));
+		// 	}
+		// });
 
 		// Check for trust folder confirmation
 		const hasEnterToConfirm = newLines.some((line) =>
@@ -585,7 +585,7 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			line.includes("esc to interrupt"),
 		);
 		if (hasEscToInterrupt) {
-			console.log(this.logPrefix, "Found 'esc to interrupt', waiting...");
+			// console.log(this.logPrefix, "Found 'esc to interrupt', waiting...");
 			return;
 		}
 	}

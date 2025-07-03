@@ -1,7 +1,8 @@
 import { OsSession, osSessionGetWorkingDirectory } from "../bindings/os";
-import { TextArea } from "../canvas/TextArea";
 import type { CanvasElement } from "../canvas/types";
 import { CanvasService } from "../services/CanvasService";
+import { TaskManager } from "./Task";
+import { TextArea } from "../canvas/TextArea";
 
 export interface ProcessState {
 	processId: string;
@@ -17,7 +18,8 @@ export interface GitProjectCanvas {
 	id: string;
 	name: string;
 	elements: CanvasElement[];
-	osSession?: OsSession; // Optional OS session for canvas-specific operations
+	osSession: OsSession; // Each canvas has its own OS session (branch)
+	taskManager: TaskManager; // Domain model for task management
 	runningProcesses?: ProcessState[]; // Track processes running in this canvas
 	createdAt: number;
 	lastModified: number;
@@ -62,11 +64,17 @@ export class GitProject {
 	}
 
 	addCanvas(canvas?: Partial<GitProjectCanvas>): string {
+		const canvasOsSession = canvas?.osSession || this.root; // Fallback to root session
+		
 		const newCanvas: GitProjectCanvas = {
 			id: crypto.randomUUID(),
 			name: canvas?.name || "", // No automatic naming
-			elements: canvas?.elements || [],
-			osSession: canvas?.osSession,
+			elements: canvas?.elements || [
+				// Automatically add a TextArea element for new canvases
+				TextArea.canvasElement(canvasOsSession, "")
+			],
+			osSession: canvasOsSession,
+			taskManager: canvas?.taskManager || new TaskManager(),
 			createdAt: Date.now(),
 			lastModified: Date.now(),
 		};
@@ -147,13 +155,12 @@ export class GitProject {
 				};
 			}
 
-			// Step 4: Create the new canvas with the new OsSession and TextArea
+			// Step 4: Create the new canvas with the new OsSession
 			const canvasId = this.addCanvas({
 				name: `Canvas ${this.canvases.length + 1} (${branchName})`,
 				osSession: newOsSession,
-				elements: [
-					TextArea.canvasElement(newOsSession, "")
-				]
+				taskManager: new TaskManager(),
+				// Don't override elements - let addCanvas create the default TextArea
 			});
 
 			return { success: true, canvasId };
@@ -235,7 +242,10 @@ export class GitProject {
 			id: this.id,
 			name: this.name,
 			root: this.root,
-			canvases: this.canvases,
+			canvases: this.canvases.map(canvas => ({
+				...canvas,
+				taskManager: canvas.taskManager.toJSON()
+			})),
 			currentCanvasIndex: this.currentCanvasIndex,
 			createdAt: this.createdAt,
 			lastModified: this.lastModified,
@@ -246,10 +256,11 @@ export class GitProject {
 		const project = new GitProject(data.root, data.name);
 		project.id = data.id;
 		project.canvases = data.canvases || [];
-		// Handle migration for canvases that don't have osSession or runningProcesses yet
+		// Handle migration for canvases that don't have proper structure yet
 		project.canvases = project.canvases.map(canvas => ({
 			...canvas,
-			osSession: canvas.osSession || undefined,
+			osSession: canvas.osSession || data.root, // Fallback to project root
+			taskManager: canvas.taskManager ? TaskManager.fromJSON(canvas.taskManager) : new TaskManager(),
 			runningProcesses: canvas.runningProcesses || []
 		}));
 		project.currentCanvasIndex = data.currentCanvasIndex >= 0 ? data.currentCanvasIndex : (project.canvases.length > 0 ? 0 : -1);
@@ -279,9 +290,11 @@ export class GitProject {
 			id: crypto.randomUUID(),
 			name: 'Initial version',
 			elements: [
+				// Automatically add a TextArea element for new canvases
 				TextArea.canvasElement(this.root, "")
 			],
 			osSession: this.root, // Set the osSession to the root
+			taskManager: new TaskManager(),
 			createdAt: Date.now(),
 			lastModified: Date.now(),
 		};

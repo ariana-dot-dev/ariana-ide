@@ -131,6 +131,23 @@ function App() {
 		setSelectedGitProjectId(null);
 	};
 
+	const handleResetStore = async () => {
+		const confirmed = window.confirm(
+			"⚠️ This will permanently delete all your projects, settings, and data. This action cannot be undone.\n\nAre you sure you want to reset the store?"
+		);
+		
+		if (confirmed) {
+			try {
+				await store.resetStore();
+				setSelectedGitProjectId(null);
+				alert("✅ Store reset successfully! The application will refresh.");
+				window.location.reload();
+			} catch (error) {
+				alert("❌ Failed to reset store: " + error);
+			}
+		}
+	};
+
 	const toggleDiffManagement = () => {
 		setShowDiffManagement(!showDiffManagement);
 	};
@@ -224,7 +241,7 @@ function App() {
 										type="button"
 										onClick={handleResetSessions}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 										title="Reset all sessions"
 									>
@@ -234,10 +251,20 @@ function App() {
 										type="button"
 										onClick={toggleDiffManagement}
 										className={cn(
-											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] transition-colors cursor-pointer",
 										)}
 									>
 										🔀
+									</button>
+									<button
+										type="button"
+										onClick={handleResetStore}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-red-500 hover:text-white rounded-r-md transition-colors cursor-pointer",
+										)}
+										title="Reset Store - Delete all data"
+									>
+										🗑️
 									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>

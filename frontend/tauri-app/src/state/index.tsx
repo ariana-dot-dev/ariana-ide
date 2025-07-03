@@ -30,6 +30,7 @@ export interface IStore extends AppState {
 	getGitProject: (projectId: string) => GitProject | null;
 	updateGitProject: (projectId: string) => void;
 	clearAllGitProjects: () => void;
+	resetStore: () => Promise<void>;
 	gitProjects: GitProject[];
 	processCommand: (command: Command) => void;
 	revertCommand: () => void;
@@ -196,6 +197,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 		},
 		clearAllGitProjects: () => {
 			setGitProjects([]);
+		},
+		resetStore: async () => {
+			try {
+				if (tauriStore) {
+					// Clear the store completely
+					await tauriStore.clear();
+					await tauriStore.save();
+				}
+				// Reset all state to defaults
+				setThemeState("light");
+				setShowOnboardingState(false);
+				setCurrentInterpreterScriptState("");
+				setGitProjects([]);
+				setProcessedCommandsStack([]);
+				console.log("[Store] Store reset successfully");
+			} catch (error) {
+				console.error("[Store] Failed to reset store:", error);
+				throw error;
+			}
 		},
 	};
 
