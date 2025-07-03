@@ -429,7 +429,7 @@ impl GitSearchManager {
 	}
 
 	fn get_root_directories(os_session_kind: &OsSessionKind) -> Vec<String> {
-		match os_session_kind {
+		let roots = match os_session_kind {
 			OsSessionKind::Local => {
 				#[cfg(target_os = "windows")]
 				{
@@ -455,6 +455,9 @@ impl GitSearchManager {
 					let mut roots = Vec::new();
 					let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
 					
+					// Add home directory first to catch projects in the root
+					roots.push(home_dir.clone());
+					
 					// Add Documents, Desktop, Downloads in priority order
 					let user_dirs = ["Documents", "Desktop", "Downloads"];
 					for dir in user_dirs {
@@ -462,11 +465,6 @@ impl GitSearchManager {
 						if Path::new(&path).exists() {
 							roots.push(path);
 						}
-					}
-					
-					// Fallback to home directory if no user dirs found
-					if roots.is_empty() {
-						roots.push(home_dir);
 					}
 					
 					roots
@@ -483,7 +481,10 @@ impl GitSearchManager {
 				}
 				roots
 			}
-		}
+		};
+		
+		println!("Git Search - Root directories determined: {:?}", roots);
+		roots
 	}
 
 	fn search_git_directories(
@@ -503,6 +504,7 @@ impl GitSearchManager {
 				os_session_kind,
 			);
 		} else {
+			println!("Git Search - Searching in local directory: {}", root_path);
 			Self::search_git_directories_local(
 				root_path, found_dirs, searches, search_id,
 			);
