@@ -1,3 +1,4 @@
+import { CustomTerminal } from "./CustomTerminal";
 import type { FileTreeCanvas } from "./FileTreeCanvas";
 import type { Rectangle } from "./Rectangle";
 import type { Terminal } from "./Terminal";
@@ -40,12 +41,14 @@ export type CanvasElementKind =
 	| RectangleKind
 	| TerminalKind
 	| FileTreeKind
+	| CustomTerminalKind
 	| TextAreaKind;
 
 export type RectangleKind = { rectangle: Rectangle };
 export type TerminalKind = { terminal: Terminal };
 export type FileTreeKind = { fileTree: FileTreeCanvas };
 export type TextAreaKind = { textArea: TextArea };
+export type CustomTerminalKind = { customTerminal: CustomTerminal }
 
 export class CanvasElement {
 	public weight: number;
