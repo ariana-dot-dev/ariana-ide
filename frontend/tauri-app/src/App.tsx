@@ -354,19 +354,20 @@ function App() {
 								</div>
 							)}
 							
-							{/* Communication Palette */}
-							<CommunicationPalette
-								isOpen={showCommunicationPalette}
-								onClose={() => setShowCommunicationPalette(false)}
-								apiKey="YOUR_API_KEY_HERE"
-								provider="anthropic"
-								model="claude-3-5-sonnet-20241022"
-								systemPrompt="You are a helpful coding assistant integrated into the Ariana IDE."
-							/>
 							<GitProjectView/>
 							<Repl />
 						</GitProjectProvider>
 					)}
+
+					{/* Communication Palette - Available globally */}
+					<CommunicationPalette
+						isOpen={showCommunicationPalette}
+						onClose={() => setShowCommunicationPalette(false)}
+						apiKey="YOUR_API_KEY_HERE"
+						provider="anthropic"
+						model="claude-3-5-sonnet-20241022"
+						systemPrompt="You are a helpful coding assistant integrated into the Ariana IDE."
+					/>
 
 					<div className="absolute hover:opacity-100 opacity-0 bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-50">
 						{THEMES.map((theme) => (
