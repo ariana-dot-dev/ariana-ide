@@ -1693,16 +1693,19 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
       const scrollContainer = scrollContainerRef.current;
       const hunkElement = currentHunkRef.current;
       
-      // Calculate the position to scroll to (exactly at the top of the hunk)
+      // Calculate the position to scroll to (hunk top just below the fixed file header)
       const hunkTop = hunkElement.offsetTop;
+      // Account for the fixed file header height (approximately 60px: text height + py-2 padding + border)
+      const fileHeaderHeight = 60;
+      const targetScrollTop = Math.max(0, hunkTop - fileHeaderHeight);
       
       console.log(`[SCROLL] Scrolling to hunk ${currentHunkIndex}`);
-      console.log(`[SCROLL] Hunk top: ${hunkTop}, Target scroll: ${hunkTop}`);
+      console.log(`[SCROLL] Hunk top: ${hunkTop}, File header height: ${fileHeaderHeight}, Target scroll: ${targetScrollTop}`);
       console.log(`[SCROLL] Container scrollable: ${scrollContainer.scrollHeight > scrollContainer.clientHeight}`);
       
       if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
         scrollContainer.scrollTo({
-          top: Math.max(0, hunkTop),
+          top: targetScrollTop,
           behavior: 'smooth'
         });
       } else {
