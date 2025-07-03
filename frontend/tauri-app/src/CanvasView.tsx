@@ -8,7 +8,10 @@ interface CanvasViewProps {
 	onAddElementRef?: React.RefObject<((element: CanvasElement) => void) | null>;
 }
 
-const CanvasView: React.FC<CanvasViewProps> = ({ elements, onElementsChange }) => {
+const CanvasView: React.FC<CanvasViewProps> = ({
+	elements,
+	onElementsChange,
+}) => {
 	const [stabilityWeight, _setStabilityWeight] = useState(0.3);
 
 	return (

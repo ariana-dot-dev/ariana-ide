@@ -33,6 +33,11 @@ tauri-plugin-store = "2"
 tauri-plugin-fs = "2"
 walkdir = "2.5.0"
 tauri-plugin-os = "2"
+colored = "3.0.0"
+log = "0.4.27"
+env_logger = "0.11.8"
+chrono = "0.4.41"
+tauri-plugin-log = "2.6.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

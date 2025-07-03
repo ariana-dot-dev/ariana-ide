@@ -1,4 +1,4 @@
-export type TaskStatus = 'prompting' | 'in_progress' | 'completed';
+export type TaskStatus = "prompting" | "in_progress" | "completed";
 
 export interface TaskBase {
 	id: string;
@@ -8,17 +8,17 @@ export interface TaskBase {
 }
 
 export interface PromptingTask extends TaskBase {
-	status: 'prompting';
+	status: "prompting";
 }
 
 export interface InProgressTask extends TaskBase {
-	status: 'in_progress';
+	status: "in_progress";
 	startedAt: number;
 	processId?: string; // Link to ProcessState if needed
 }
 
 export interface CompletedTask extends TaskBase {
-	status: 'completed';
+	status: "completed";
 	startedAt: number;
 	completedAt: number;
 	commitHash: string; // Empty string or "NO_CHANGES" for tasks with no file changes
@@ -31,53 +31,57 @@ export type Task = PromptingTask | InProgressTask | CompletedTask;
 
 export class TaskManager {
 	private tasks: Task[] = [];
-	
+
 	// Task creation and state transitions
 	createPromptingTask(prompt: string): string {
 		const task: PromptingTask = {
 			id: crypto.randomUUID(),
 			prompt,
 			createdAt: Date.now(),
-			status: 'prompting'
+			status: "prompting",
 		};
 		this.tasks.push(task);
 		return task.id;
 	}
 
 	startTask(taskId: string, processId?: string): boolean {
-		const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+		const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
 		if (taskIndex === -1) return false;
-		
+
 		const task = this.tasks[taskIndex];
-		if (task.status !== 'prompting') return false;
+		if (task.status !== "prompting") return false;
 
 		const inProgressTask: InProgressTask = {
 			...task,
-			status: 'in_progress',
+			status: "in_progress",
 			startedAt: Date.now(),
-			processId
+			processId,
 		};
-		
+
 		this.tasks[taskIndex] = inProgressTask;
 		return true;
 	}
 
-	completeTask(taskId: string, commitHash: string, dependsOn?: string[]): boolean {
-		const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+	completeTask(
+		taskId: string,
+		commitHash: string,
+		dependsOn?: string[],
+	): boolean {
+		const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
 		if (taskIndex === -1) return false;
-		
+
 		const task = this.tasks[taskIndex];
-		if (task.status !== 'in_progress') return false;
+		if (task.status !== "in_progress") return false;
 
 		const completedTask: CompletedTask = {
 			...task,
-			status: 'completed',
+			status: "completed",
 			completedAt: Date.now(),
 			commitHash,
 			isReverted: false,
-			dependsOn
+			dependsOn,
 		};
-		
+
 		this.tasks[taskIndex] = completedTask;
 		return true;
 	}
@@ -88,19 +92,25 @@ export class TaskManager {
 	}
 
 	getTask(taskId: string): Task | undefined {
-		return this.tasks.find(t => t.id === taskId);
+		return this.tasks.find((t) => t.id === taskId);
 	}
 
 	getPromptingTasks(): PromptingTask[] {
-		return this.tasks.filter(t => t.status === 'prompting') as PromptingTask[];
+		return this.tasks.filter(
+			(t) => t.status === "prompting",
+		) as PromptingTask[];
 	}
 
 	getInProgressTasks(): InProgressTask[] {
-		return this.tasks.filter(t => t.status === 'in_progress') as InProgressTask[];
+		return this.tasks.filter(
+			(t) => t.status === "in_progress",
+		) as InProgressTask[];
 	}
 
 	getCompletedTasks(): CompletedTask[] {
-		return this.tasks.filter(t => t.status === 'completed') as CompletedTask[];
+		return this.tasks.filter(
+			(t) => t.status === "completed",
+		) as CompletedTask[];
 	}
 
 	getCurrentPromptingTask(): PromptingTask | undefined {
@@ -115,30 +125,28 @@ export class TaskManager {
 
 	// Revert/Restore logic
 	getRevertableCommits(): CompletedTask[] {
-		return this.getCompletedTasks().filter(task => 
-			task.commitHash && 
-			task.commitHash !== "NO_CHANGES" && 
-			!task.isReverted
+		return this.getCompletedTasks().filter(
+			(task) =>
+				task.commitHash && task.commitHash !== "NO_CHANGES" && !task.isReverted,
 		);
 	}
 
 	getRestorableCommits(): CompletedTask[] {
-		return this.getCompletedTasks().filter(task => 
-			task.commitHash && 
-			task.commitHash !== "NO_CHANGES" && 
-			task.isReverted
+		return this.getCompletedTasks().filter(
+			(task) =>
+				task.commitHash && task.commitHash !== "NO_CHANGES" && task.isReverted,
 		);
 	}
 
 	revertTask(taskId: string): boolean {
 		const completedTasks = this.getCompletedTasks();
-		const taskIndex = completedTasks.findIndex(t => t.id === taskId);
+		const taskIndex = completedTasks.findIndex((t) => t.id === taskId);
 		if (taskIndex === -1) return false;
 
 		// Mark this task and all subsequent tasks as reverted
 		for (let i = taskIndex; i < completedTasks.length; i++) {
 			const task = completedTasks[i];
-			const globalIndex = this.tasks.findIndex(t => t.id === task.id);
+			const globalIndex = this.tasks.findIndex((t) => t.id === task.id);
 			if (globalIndex !== -1) {
 				(this.tasks[globalIndex] as CompletedTask).isReverted = true;
 			}
@@ -148,13 +156,13 @@ export class TaskManager {
 
 	restoreTask(taskId: string): boolean {
 		const completedTasks = this.getCompletedTasks();
-		const taskIndex = completedTasks.findIndex(t => t.id === taskId);
+		const taskIndex = completedTasks.findIndex((t) => t.id === taskId);
 		if (taskIndex === -1) return false;
 
 		// Restore this task and all previous tasks
 		for (let i = 0; i <= taskIndex; i++) {
 			const task = completedTasks[i];
-			const globalIndex = this.tasks.findIndex(t => t.id === task.id);
+			const globalIndex = this.tasks.findIndex((t) => t.id === task.id);
 			if (globalIndex !== -1) {
 				(this.tasks[globalIndex] as CompletedTask).isReverted = false;
 			}
@@ -165,7 +173,7 @@ export class TaskManager {
 	// Get target commit for revert operations
 	getRevertTargetCommit(taskId: string): string | undefined {
 		const completedTasks = this.getCompletedTasks();
-		const taskIndex = completedTasks.findIndex(t => t.id === taskId);
+		const taskIndex = completedTasks.findIndex((t) => t.id === taskId);
 		if (taskIndex === -1) return undefined;
 
 		// Find the last valid commit before this task
@@ -175,17 +183,17 @@ export class TaskManager {
 				return task.commitHash;
 			}
 		}
-		
+
 		return "HEAD~1"; // Fallback to git's previous commit
 	}
 
 	// Update task prompt (only for prompting tasks)
 	updateTaskPrompt(taskId: string, prompt: string): boolean {
-		const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+		const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
 		if (taskIndex === -1) return false;
-		
+
 		const task = this.tasks[taskIndex];
-		if (task.status !== 'prompting') return false;
+		if (task.status !== "prompting") return false;
 
 		this.tasks[taskIndex] = { ...task, prompt };
 		return true;
@@ -194,7 +202,7 @@ export class TaskManager {
 	// Serialization for persistence
 	toJSON(): any {
 		return {
-			tasks: this.tasks
+			tasks: this.tasks,
 		};
 	}
 

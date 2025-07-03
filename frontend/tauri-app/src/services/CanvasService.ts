@@ -13,19 +13,19 @@ export class CanvasService {
 	static async copyDirectory(
 		source: string,
 		destination: string,
-		osSession: OsSession
+		osSession: OsSession,
 	): Promise<CanvasOperationResult> {
 		try {
 			await invoke("copy_directory", {
 				source,
 				destination,
-				osSession
+				osSession,
 			});
 			return { success: true };
 		} catch (error) {
 			return {
 				success: false,
-				error: error as string
+				error: error as string,
 			};
 		}
 	}
@@ -36,19 +36,19 @@ export class CanvasService {
 	static async createGitBranch(
 		directory: string,
 		branchName: string,
-		osSession: OsSession
+		osSession: OsSession,
 	): Promise<CanvasOperationResult> {
 		try {
 			await invoke("create_git_branch", {
 				directory,
 				branchName,
-				osSession
+				osSession,
 			});
 			return { success: true };
 		} catch (error) {
 			return {
 				success: false,
-				error: error as string
+				error: error as string,
 			};
 		}
 	}
@@ -59,21 +59,21 @@ export class CanvasService {
 	static async executeCommand(
 		command: string,
 		args: string[],
-		directory?: string
+		directory?: string,
 	): Promise<{ success: boolean; output?: string; error?: string }> {
 		try {
 			let output: string;
-			
+
 			if (directory) {
 				output = await invoke("execute_command_in_dir", {
 					command,
 					args,
-					directory
+					directory,
 				});
 			} else {
 				output = await invoke("execute_command", {
 					command,
-					args
+					args,
 				});
 			}
 
@@ -81,7 +81,7 @@ export class CanvasService {
 		} catch (error) {
 			return {
 				success: false,
-				error: error as string
+				error: error as string,
 			};
 		}
 	}
@@ -90,6 +90,6 @@ export class CanvasService {
 	 * Generates a random ID for canvas operations
 	 */
 	static generateRandomId(): string {
-		return crypto.randomUUID().replace(/-/g, '').substring(0, 8);
+		return crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 	}
 }

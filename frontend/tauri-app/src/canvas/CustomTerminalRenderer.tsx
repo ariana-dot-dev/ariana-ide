@@ -24,11 +24,14 @@ interface CustomTerminalRendererProps {
 // Enhanced connection manager to reuse connections and persist screen state
 class TerminalConnectionManager {
 	private static connections = new Map<string, string>(); // elementId -> terminalId
-	private static screenStates = new Map<string, {
-		screen: LineItem[][];
-		cursorPosition: { line: number; col: number };
-		windowDimensions: { rows: number; cols: number };
-	}>(); // elementId -> terminal screen state
+	private static screenStates = new Map<
+		string,
+		{
+			screen: LineItem[][];
+			cursorPosition: { line: number; col: number };
+			windowDimensions: { rows: number; cols: number };
+		}
+	>(); // elementId -> terminal screen state
 
 	static getConnection(elementId: string): string | undefined {
 		return TerminalConnectionManager.connections.get(elementId);
@@ -54,15 +57,15 @@ class TerminalConnectionManager {
 	}
 
 	static setScreenState(
-		elementId: string, 
-		screen: LineItem[][], 
+		elementId: string,
+		screen: LineItem[][],
 		cursorPosition: { line: number; col: number },
-		windowDimensions: { rows: number; cols: number }
+		windowDimensions: { rows: number; cols: number },
 	): void {
 		TerminalConnectionManager.screenStates.set(elementId, {
 			screen: [...screen], // Deep copy to avoid mutation issues
 			cursorPosition: { ...cursorPosition },
-			windowDimensions: { ...windowDimensions }
+			windowDimensions: { ...windowDimensions },
 		});
 	}
 
@@ -86,16 +89,20 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 	// Initialize state from persistent storage if available
 	const persistedState = TerminalConnectionManager.getScreenState(elementId);
-	
+
 	const [terminalId, setTerminalId] = useState<string | null>(null);
-	const [screen, setScreen] = useState<LineItem[][]>(persistedState?.screen || []);
-	const [cursorPosition, setCursorPosition] = useState(persistedState?.cursorPosition || { line: 0, col: 0 });
+	const [screen, setScreen] = useState<LineItem[][]>(
+		persistedState?.screen || [],
+	);
+	const [cursorPosition, setCursorPosition] = useState(
+		persistedState?.cursorPosition || { line: 0, col: 0 },
+	);
 	const [isConnected, setIsConnected] = useState(false);
 	const [windowDimensions, setWindowDimensions] = useState(
 		persistedState?.windowDimensions || {
 			rows: 24,
 			cols: 60,
-		}
+		},
 	);
 	const [charDimensions, setCharDimensions] = useState({
 		width: 7.35,
@@ -112,12 +119,16 @@ export const CustomTerminalRenderer: React.FC<CustomTerminalRendererProps> = ({
 
 	// Persist state whenever it changes
 	useEffect(() => {
-		if (screen.length > 0 || cursorPosition.line > 0 || cursorPosition.col > 0) {
+		if (
+			screen.length > 0 ||
+			cursorPosition.line > 0 ||
+			cursorPosition.col > 0
+		) {
 			TerminalConnectionManager.setScreenState(
 				elementId,
 				screen,
 				cursorPosition,
-				windowDimensions
+				windowDimensions,
 			);
 		}
 	}, [elementId, screen, cursorPosition, windowDimensions]);

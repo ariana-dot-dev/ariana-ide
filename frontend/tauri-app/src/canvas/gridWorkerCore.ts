@@ -126,12 +126,12 @@ class WorkerGridOptimizer {
 	): number {
 		const targets = element.targets;
 		console.log("GridWorker - element:", element, "targets:", targets);
-		
+
 		if (!targets) {
 			console.error("GridWorker - targets is undefined for element:", element);
 			return 0;
 		}
-		
+
 		const cellArea = cell.width * cell.height;
 		const cellRatio = cell.width / cell.height;
 
