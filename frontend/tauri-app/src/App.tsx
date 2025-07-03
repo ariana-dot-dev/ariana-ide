@@ -315,7 +315,7 @@ function App() {
 						</GitProjectProvider>
 					)}
 
-					<div className="absolute hover:opacity-100 opacity-0 bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-20">
+					<div className="absolute hover:opacity-100 opacity-0 bottom-0 left-2 flex rounded-t-4 pb-2 justify-center gap-1 z-50">
 						{THEMES.map((theme) => (
 							<button
 								type="button"
