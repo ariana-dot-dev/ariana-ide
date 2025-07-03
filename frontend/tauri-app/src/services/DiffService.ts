@@ -1023,6 +1023,91 @@ export class DiffService {
       promptSegment: "general-logic"
     };
   }
+
+  async discardFileChanges(filePaths: string[]): Promise<void> {
+    try {
+      console.log("[FRONTEND] Starting discard file changes operation");
+      console.log("[FRONTEND] Files to discard:", filePaths);
+      
+      for (const filePath of filePaths) {
+        try {
+          console.log(`[FRONTEND] Discarding changes for file: ${filePath}`);
+          
+          // Use git checkout to discard unstaged changes
+          await this.executeGitCommand(["checkout", "HEAD", "--", filePath]);
+          
+          // Also remove from staging area if it was staged
+          try {
+            await this.executeGitCommand(["reset", "HEAD", "--", filePath]);
+          } catch (error) {
+            // Ignore errors for reset - file might not be staged
+            console.log(`[FRONTEND] Reset not needed for ${filePath}:`, error);
+          }
+          
+          console.log(`[FRONTEND] Successfully discarded changes for: ${filePath}`);
+        } catch (error) {
+          console.error(`[FRONTEND] Failed to discard changes for ${filePath}:`, error);
+          throw new Error(`Failed to discard changes for ${filePath}: ${error}`);
+        }
+      }
+    } catch (error) {
+      console.error("[FRONTEND] Discard file changes operation failed:", error);
+      throw error;
+    }
+  }
+
+  async discardHunkChanges(filePath: string, hunk: GitDiffHunk): Promise<void> {
+    try {
+      console.log("[FRONTEND] Starting discard hunk changes operation");
+      console.log("[FRONTEND] File:", filePath);
+      console.log("[FRONTEND] Hunk:", hunk);
+      
+      // For now, provide a helpful message about hunk-level discard
+      // This would require more advanced git operations with temporary files
+      throw new Error(
+        "Hunk-level discard is not yet implemented. " +
+        "This feature requires creating and applying reverse patches, which needs more complex implementation. " +
+        "For now, please use 'Discard File' to discard all changes in the file, " +
+        "or manually edit the file to remove specific changes."
+      );
+      
+    } catch (error) {
+      console.error("[FRONTEND] Discard hunk changes operation failed:", error);
+      throw error;
+    }
+  }
+
+  async validateHunkChanges(filePath: string, hunk: GitDiffHunk): Promise<void> {
+    try {
+      console.log("[FRONTEND] Starting validate hunk changes operation");
+      console.log("[FRONTEND] File:", filePath);
+      console.log("[FRONTEND] Hunk:", hunk);
+      
+      // For now, just validate the whole file when a hunk is validated
+      // This could be enhanced to validate individual hunks with git add --patch
+      await this.addFilesToGit([filePath]);
+      
+      console.log("[FRONTEND] Successfully validated hunk changes (whole file)");
+    } catch (error) {
+      console.error("[FRONTEND] Validate hunk changes operation failed:", error);
+      throw error;
+    }
+  }
+
+  async validateFileChanges(filePath: string): Promise<void> {
+    try {
+      console.log("[FRONTEND] Starting validate file changes operation");
+      console.log("[FRONTEND] File:", filePath);
+      
+      // Validate the entire file by adding it to git
+      await this.addFilesToGit([filePath]);
+      
+      console.log("[FRONTEND] Successfully validated file changes");
+    } catch (error) {
+      console.error("[FRONTEND] Validate file changes operation failed:", error);
+      throw error;
+    }
+  }
 }
 
 export const diffService = new DiffService();
