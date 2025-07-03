@@ -53,22 +53,12 @@ const THEMES = {
         "--border-radius": "8px",
         "--border-thickness": "2px",
     },
-    "semi-sun": {
-        "--acc-500": "#feae34",  // blue equivalent
-        "--base-500": "#f77622",  // ~ oklch(82.8% 0.111 230.318)
-        "--blackest": "#ead4aa",
-        "--whitest": "#3e2731",
-        "--positive-500": "#38b764",  // green
-        "--negative-500": "#b13e53",  // red
-        "--border-radius": "8px",
-        "--border-thickness": "2px",
-    },
     "ghi": {
         "--acc-500": "#000000",  // blue equivalent
         "--base-500": "#ffffff",  // ~ oklch(82.8% 0.111 230.318)
         "--whitest": "#00AEED",
         "--blackest": "#000000",
-        "--positive-500": "#1ebc73",  // green
+        "--positive-500": "#bfffa8",  // green
         "--negative-500": "#a24b6f",  // red
         "--border-radius": "8px",
         "--border-thickness": "2px",

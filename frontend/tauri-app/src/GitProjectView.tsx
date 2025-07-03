@@ -203,19 +203,69 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 				{showCanvases && (
 					<>
 						{/* Project Directory Header */}
-						<div className="w-full text-center py-2">
-							<div className="text-sm text-[var(--base-500)]">
+						<div className="w-full pl-3 py-2">
+							<div className="text-sm text-[var(--base-500-50)]">
 								{getProjectDirectoryName()}
 							</div>
 						</div>
 						
 						<div className="flex flex-col h-full w-full overflow-y-auto">
-							{/* <div className="text-sm px-2 text-[var(--base-400)] mb-2">
-								Working Agents:
-							</div> */}
+							<div className="flex flex-col">
+								{selectedGitProject.canvases.map((canvas, index) => {
+									const taskCounts = getCanvasTaskCounts(canvas.id);
+
+									if (!currentCanvas) {
+										return null;
+									}
+
+									return (
+										<button 
+											key={index}
+											className={cn(
+												"group w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors border-[var(--base-300)] border-2 not-last:border-b-transparent not-first:border-t-transparent",
+												currentCanvas.id === canvas.id
+													? "bg-[var(--acc-200-20)] opacity-100"
+													: "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-pointer hover:border-solid border-dashed opacity-50 hover:opacity-100 hover:bg-[var(--acc-200-50)]",
+											)}
+											onClick={() => {
+												selectedGitProject.setCurrentCanvasIndex(index);
+												// Trigger state update to save to disk
+												updateGitProject(selectedGitProject.id);
+											}}
+											onContextMenu={(e) => handleWorkspaceContextMenu(e, canvas.id)}
+										>
+											<div className="flex items-center justify-between">
+												<span className="text-[var(--base-600)]">Agent N°{index+1}</span>
+												{taskCounts.total > 0 && (
+													<div className="flex items-center gap-1 text-xs">
+														{taskCounts.running > 0 && (
+															<span className="w-5 aspect-square flex items-center justify-center relative text-[var(--whitest)] rounded-md">
+																<div className="absolute top-0 left-0 w-full h-full bg-[var(--acc-400)] animate-spin rounded-lg"></div>
+																<div className="z-10">
+																	{taskCounts.running}
+																</div>
+															</span>
+														)}
+														{taskCounts.finished > 0 && (
+															<span className="w-5 aspect-square flex items-center justify-center bg-[var(--positive-400)] text-[var(--whitest)] rounded-full">
+																{taskCounts.finished}
+															</span>
+														)}
+														{taskCounts.error > 0 && (
+															<span className="w-5 aspect-square flex items-center justify-center bg-[var(--negative-600)] text-[var(--whitest)] rounded-sm">
+																{taskCounts.error}
+															</span>
+														)}
+													</div>
+												)}
+											</div>
+										</button>
+									);
+								})}
+							</div>
 							<button 
 								className={cn(
-									"w-full px-4 py-2 border-2 border-dashed border-[var(--positive-500-50)] text-[var(--positive-500-70)] hover:border-[var(--positive-500)] text-sm text-center rounded-xl mb-2 transition-colors",
+									"w-full px-4 py-2 border-2 border-dashed bg-[var(--positive-300-10)] hover:bg-[var(--positive-300-20)] border-[var(--positive-500-50)] text-[var(--positive-500-70)] hover:text-[var(--positive-500)] hover:border-solid hover:border-[var(--positive-500)] text-sm text-center rounded-xl mt-2 transition-all",
 									isCreatingCanvas 
 										? "opacity-50 cursor-not-allowed" 
 										: "cursor-pointer"
@@ -247,58 +297,6 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 							>
 								{isCreatingCanvas ? "Creating..." : "+ New Agent"}
 							</button>
-							<div className="flex flex-col">
-								{selectedGitProject.canvases.map((canvas, index) => {
-									const taskCounts = getCanvasTaskCounts(canvas.id);
-
-									if (!currentCanvas) {
-										return null;
-									}
-
-									return (
-										<button 
-											key={index}
-											className={cn(
-												"w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors",
-												currentCanvas.id === canvas.id
-													? "bg-[var(--base-300-70)]"
-													: "odd:bg-[var(--base-300-20)] even:bg-[var(--base-300-30)] cursor-pointer hover:bg-[var(--base-300-50)]",
-											)}
-											onClick={() => {
-												selectedGitProject.setCurrentCanvasIndex(index);
-												// Trigger state update to save to disk
-												updateGitProject(selectedGitProject.id);
-											}}
-											onContextMenu={(e) => handleWorkspaceContextMenu(e, canvas.id)}
-										>
-											<div className="flex items-center justify-between">
-												<span className={cn(
-													currentCanvas.id === canvas.id ? "opacity-100" : "opacity-50"
-												)}>Agent N°{index+1}</span>
-												{taskCounts.total > 0 && (
-													<div className="flex items-center gap-1 text-xs">
-														{taskCounts.running > 0 && (
-															<span className="bg-[var(--acc-500)] text-[var(--whitest)] px-1.5 py-0.5 rounded-md">
-																{taskCounts.running}
-															</span>
-														)}
-														{taskCounts.finished > 0 && (
-															<span className="bg-[var(--positive-600)] text-[var(--whitest)] px-1.5 py-0.5 rounded-md">
-																{taskCounts.finished}
-															</span>
-														)}
-														{taskCounts.error > 0 && (
-															<span className="bg-[var(--negative-600)] text-[var(--whitest)] px-1.5 py-0.5 rounded-md">
-																{taskCounts.error}
-															</span>
-														)}
-													</div>
-												)}
-											</div>
-										</button>
-									);
-								})}
-							</div>
 						</div>
 
 					</>

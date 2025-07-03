@@ -467,7 +467,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	return (
 		<motion.div
 			className={cn(
-				"absolute select-none overflow-hidden border-2 rounded-md border-[var(--base-400-20)]",
+				"absolute select-none overflow-hidden p-1",
 				isDragging ? "z-30" : "z-10",
 			)}
 			initial={{
@@ -494,7 +494,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		>
 			{/* <div className="fixed w-full h-full opacity-30" style={{ background: 'url("assets/noise.png")' }}>
 			</div> */}
-			<div className={cn("w-full h-full flex flex-col py-4 px-5")}>
+			<div className={cn("w-full h-full flex flex-col p-3")}>
 				{/* Text Area Section */}
 				<div
 					className={cn(
@@ -503,16 +503,16 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 					)}
 					style={{
 						backgroundImage:
-							"radial-gradient(circle at 3px 3px, var(--base-400-40) 1.4px, transparent 0)",
+							"radial-gradient(circle at 3px 3px, var(--base-400-30) 1.4px, transparent 0)",
 						backgroundSize: "24px 24px",
 						backgroundPosition: "10px 20px",
 					}}
 				>
 					{/* Container for all prompts */}
-					<div className="flex-1 overflow-y-auto">
+					<div className="h-full overflow-y-auto">
 						{/* Completed Tasks */}
-						{completedTasks.map((task) => (
-							<div key={task.id} className="relative mb-[18px] group">
+						{completedTasks.map((task, index, array) => (
+							<div key={task.id} className="relative not-last:mb-2 group">
 								<div className="relative">
 									<textarea
 										value={task.prompt}
@@ -569,7 +569,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 
 						{/* Current/Running Prompt */}
 						{currentInProgressTask && (
-							<div className="relative mb-[18px]">
+							<div className="relative">
 								<textarea
 									value={`${currentInProgressTask.prompt} 🔄`}
 									readOnly
@@ -611,14 +611,14 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 								}
 								spellCheck={false}
 								className={cn(
-									"w-full font-mono border-none text-base resize-none bg-transparent",
-									"text-[var(--acc-800)]",
-									"focus:text-[var(--acc-900)]",
+									"w-full h-fit font-bl font-mono border-none text-base resize-none",
+									"text-[var(--base-500)]",
+									"focus:text-[var(--base-500)]",
 									"placeholder:text-[var(--base-600-50)]",
 									currentInProgressTask && "opacity-60 cursor-not-allowed",
 									"scrollbar-thin scrollbar-thumb-[var(--base-400)] scrollbar-track-transparent",
 								)}
-								rows={Math.max(4, Math.floor((cell.height - (completedTasks.length * 40) - 120) / 20))}
+								rows={Math.max(1, currentPrompt.split("\n").length)}
 							/>
 
 							{/* Action Button */}
@@ -644,7 +644,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 										<div className="flex overflow-hidden relative p-0.5 bg-[var(--whitest)] rounded-lg group-hover:rounded-3xl rounded-br-2xl transition-all">
 											<div
 												className={cn(
-													"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] group-hover:bg-[var(--acc-300)] font-medium transition-all text-[var(--whitest)] z-10",
+													"px-5 py-1 rounded-lg group-hover:rounded-3xl rounded-br-2xl bg-[var(--base-300)] group-hover:bg-[var(--acc-300)]  transition-all text-[var(--whitest)] z-10",
 												)}
 											>
 												Go

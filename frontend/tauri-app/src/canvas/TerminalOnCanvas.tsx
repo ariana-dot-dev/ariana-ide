@@ -324,7 +324,7 @@ const TerminalOnCanvas: React.FC<TerminalOnCanvasProps> = ({
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
-					<span className="text-xs font-medium">
+					<span className="text-xs ">
 						💻 {terminal.getConnectionString()}
 					</span>
 					<div className="flex items-center gap-2">

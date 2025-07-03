@@ -256,7 +256,7 @@ export function ProjectDirectoryList({
 	return (
 		<div className="flex flex-col gap-2 p-4 h-fit max-h-full">
 			<div className="flex items-center gap-2">
-				<h3 className="text-lg font-semibold text-[var(--blackest)]">
+				<h3 className="text-lg  text-[var(--blackest)]">
 					Repositories
 				</h3>
 				{!isComplete && (

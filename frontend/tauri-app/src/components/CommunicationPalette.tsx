@@ -139,7 +139,7 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
       <div className="bg-[var(--base-100)] rounded-lg shadow-xl w-[600px] max-w-[90vw] max-h-[80vh] p-4 border border-[var(--acc-400)] flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[var(--blackest)]">
+          <h2 className="text-lg  text-[var(--blackest)]">
             Communication Palette
           </h2>
           <button

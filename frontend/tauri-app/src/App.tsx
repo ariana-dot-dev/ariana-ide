@@ -174,7 +174,7 @@ function App() {
 		<InterpreterContext value={interpreter}>
 			<div
 				className={cn(
-					"relative font-sans font-semibold h-screen max-h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)] bg-[var(--whitest)]",
+					"relative font-sans font-[600] h-screen max-h-screen w-screen overflow-hidden selection:bg-[var(--acc-300)] text-[var(--blackest)] bg-[var(--whitest)]",
 					isMaximized ? "rounded-none" : "rounded-lg",
 					`theme-${store.theme}`,
 				)}
@@ -210,7 +210,7 @@ function App() {
 							"flex items-center outline-0 justify-center rounded-md select-none relative z-50  transition-[height] border-[var(--acc-400-50)]",
 							showTitlebar
 								? "h-fit py-1"
-								: "h-1 mx-2 hover:h-3 not-hover:bg-[var(--base-400-20)] hover:border-2",
+								: "h-[3px] mx-2 hover:h-3 not-hover:bg-[var(--base-400-20)] hover:border-2",
 						)}
 					>
 						{showTitlebar && (
@@ -218,7 +218,7 @@ function App() {
 								<span
 									data-tauri-drag-region
 									className={cn(
-										"starting:opacity-0 text-[var(--base-500)] opacity-100 text-sm font-medium font-sans w-full text-center",
+										"starting:opacity-0 text-[var(--base-500)] opacity-100 text-sm  font-sans w-full text-center",
 									)}
 								>
 									Ariana IDE
@@ -328,7 +328,7 @@ function App() {
 								<div className="w-32">
 									<Logo className="" />
 								</div>
-								<h1 className="text-2xl font-semibold">
+								<h1 className="text-2xl ">
 									Welcome to the Ariana IDE
 								</h1>
 							</div>

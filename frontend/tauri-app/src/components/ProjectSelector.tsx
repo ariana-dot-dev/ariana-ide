@@ -112,7 +112,7 @@ export function ProjectSelector({ onProjectCreated }: ProjectSelectorProps) {
 				<div className="mt-6">
 					<button
 						onClick={handleCreateSession}
-						className="px-6 py-3 bg-[var(--acc-400)] hover:bg-[var(--acc-500)] text-[var(--whitest)] rounded-md font-semibold transition-colors"
+						className="px-6 py-3 bg-[var(--acc-400)] hover:bg-[var(--acc-500)] text-[var(--whitest)] rounded-md  transition-colors"
 					>
 						Open Project
 					</button>

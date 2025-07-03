@@ -63,7 +63,7 @@ const ElementOverlay: React.FC<ElementOverlayProps> = ({
 		>
 			<div className={cn("flex flex-col gap-3")}>
 				<div className={cn("flex justify-between items-center")}>
-					<h3 className={cn("text-sm font-medium")}>Edit Element</h3>
+					<h3 className={cn("text-sm ")}>Edit Element</h3>
 					<button
 						onClick={onClose}
 						className={cn(

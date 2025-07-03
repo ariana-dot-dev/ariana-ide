@@ -712,7 +712,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center">
           <div className="text-red-500 text-xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-[var(--base-700)] mb-2">Error Loading Diff</h2>
+          <h2 className="text-xl  text-[var(--base-700)] mb-2">Error Loading Diff</h2>
           <p className="text-[var(--base-600)] mb-4">{error}</p>
           <button
             onClick={() => loadDiffData()}
@@ -740,7 +740,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>
+            <h1 className="text-2xl font-black text-[var(--acc-600)]">Diff Management</h1>
           </div>
           
           <button
@@ -755,7 +755,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="text-6xl mb-4">✅</div>
-            <h2 className="text-xl font-semibold text-[var(--base-700)] mb-2">No Changes Found</h2>
+            <h2 className="text-xl  text-[var(--base-700)] mb-2">No Changes Found</h2>
             <p className="text-[var(--base-600)] mb-4">
               Your working directory is clean - there are no uncommitted changes to review.
             </p>
@@ -791,7 +791,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
         {(showHeader || mainTitlebarVisible) && (
           <>
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>
+              <h1 className="text-2xl font-black text-[var(--acc-600)]">Diff Management</h1>
               <div className="flex items-center space-x-2 text-sm text-[var(--base-600)]">
                 <span>{diffSummary.totalFiles} files</span>
                 <span className="text-green-500">+{diffSummary.totalAdditions}</span>
@@ -826,7 +826,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
                 onClick={validateAllChanges}
                 disabled={diffSummary.validationState.allValidated}
                 className={cn(
-                  "px-4 py-2 rounded-lg font-medium transition-colors",
+                  "px-4 py-2 rounded-lg  transition-colors",
                   diffSummary.validationState.allValidated
                     ? "bg-green-500 text-white"
                     : "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
@@ -956,7 +956,7 @@ function OverviewMode({
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Search Bar */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Overview</h1>
+          <h1 className="text-2xl font-black text-[var(--acc-600)]">Overview</h1>
           <div className="flex items-center space-x-4">
             <div className="relative">
               <input
@@ -986,7 +986,7 @@ function OverviewMode({
         {/* Main Logic Changes */}
         {filteredMainChanges.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-[var(--acc-600)]">
+            <h2 className="text-xl  text-[var(--acc-600)]">
               Main Logic Changes 
               {searchQuery && (
                 <span className="text-sm font-normal text-[var(--base-600)]">
@@ -1011,7 +1011,7 @@ function OverviewMode({
         {/* Small Changes */}
         {filteredSmallChanges.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-[var(--acc-600)]">
+            <h2 className="text-xl  text-[var(--acc-600)]">
               Small Changes
               {searchQuery && (
                 <span className="text-sm font-normal text-[var(--base-600)]">
@@ -1037,7 +1037,7 @@ function OverviewMode({
         {searchQuery && filteredMainChanges.length === 0 && filteredSmallChanges.length === 0 && (
           <div className="text-center py-8">
             <div className="text-4xl mb-4">🔍</div>
-            <h3 className="text-lg font-semibold text-[var(--base-700)] mb-2">No results found</h3>
+            <h3 className="text-lg  text-[var(--base-700)] mb-2">No results found</h3>
             <p className="text-[var(--base-600)]">
               No files or content match "{searchQuery}". Try a different search term.
             </p>
@@ -1081,7 +1081,7 @@ function MainLogicChangeCard({
     >
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-[var(--base-700)]">
+          <h3 className=" text-[var(--base-700)]">
             {highlightSearchTerm(change.title, searchQuery)}
           </h3>
           {isHovered && (
@@ -1103,7 +1103,7 @@ function MainLogicChangeCard({
             onClick={onValidate}
             disabled={change.validated}
             className={cn(
-              "px-3 py-1 rounded text-sm font-medium transition-colors",
+              "px-3 py-1 rounded text-sm  transition-colors",
               change.validated
                 ? "bg-green-500 text-white"
                 : "bg-[var(--base-400)] text-[var(--base-700)] hover:bg-[var(--base-500)]"
@@ -1117,7 +1117,7 @@ function MainLogicChangeCard({
       {/* Blocks (only visible on hover) */}
       {isHovered && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-[var(--base-600)]">Blocks:</h4>
+          <h4 className="text-sm  text-[var(--base-600)]">Blocks:</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {change.subLogicPaths.map((subPath) => (
               <SubLogicPathCard
@@ -1161,7 +1161,7 @@ function SubLogicPathCard({ subPath, isSelected, onSelect }: SubLogicPathCardPro
       )}
     >
       <div className="flex items-center justify-between">
-        <h5 className="text-sm font-medium text-[var(--base-700)]">{subPath.title}</h5>
+        <h5 className="text-sm  text-[var(--base-700)]">{subPath.title}</h5>
         {subPath.validated && <span className="text-green-500 text-xs">✓</span>}
       </div>
       <p className="text-xs text-[var(--base-600)] mt-1">{subPath.description}</p>
@@ -1198,7 +1198,7 @@ function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic
     >
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-[var(--base-700)]">
+          <h3 className=" text-[var(--base-700)]">
             {highlightSearchTerm(change.title, searchQuery)}
           </h3>
           {isHovered && (
@@ -1220,7 +1220,7 @@ function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic
             onClick={onValidate}
             disabled={change.validated}
             className={cn(
-              "px-3 py-1 rounded text-sm font-medium transition-colors",
+              "px-3 py-1 rounded text-sm  transition-colors",
               change.validated
                 ? "bg-green-500 text-white"
                 : "bg-[var(--base-400)] text-[var(--base-700)] hover:bg-[var(--base-500)]"
@@ -1234,7 +1234,7 @@ function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic
       {/* Blocks (only visible on hover) */}
       {isHovered && change.subLogicPaths && change.subLogicPaths.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-[var(--base-600)]">Blocks:</h4>
+          <h4 className="text-sm  text-[var(--base-600)]">Blocks:</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {change.subLogicPaths.map((subPath) => (
               <SubLogicPathCard
@@ -1413,7 +1413,7 @@ function DetailedMode({
       <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)] bg-[var(--base-150)]">
         <div className="flex items-center space-x-4">
           <div>
-            <h3 className="font-semibold text-[var(--base-700)]">{change.title}</h3>
+            <h3 className=" text-[var(--base-700)]">{change.title}</h3>
             <p className="text-sm text-[var(--base-600)]">
               File {currentFileIndex + 1} of {change.files.length}: {currentFile.filePath}
             </p>
@@ -1511,7 +1511,7 @@ function DetailedMode({
             onClick={() => onValidateChange(selectedChange)}
             disabled={change.validated}
             className={cn(
-              "px-4 py-1 rounded font-medium transition-colors",
+              "px-4 py-1 rounded  transition-colors",
               change.validated
                 ? "bg-green-500 text-white"
                 : "bg-[var(--acc-600)] text-white hover:bg-[var(--acc-700)]"
@@ -1673,7 +1673,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
                       @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
                     </span>
                     {hunkIndex === currentHunkIndex && (
-                      <span className="text-[var(--acc-600)] font-medium text-xs">← Current</span>
+                      <span className="text-[var(--acc-600)]  text-xs">← Current</span>
                     )}
                   </div>
                 </div>
@@ -1800,7 +1800,7 @@ function BranchSelectionPage({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--acc-600)]">Branch Comparison</h1>
+          <h1 className="text-2xl font-black text-[var(--acc-600)]">Branch Comparison</h1>
           <p className="text-sm text-[var(--base-600)] mt-1">
             Repository: <span className="font-mono">{selectedDirectory}</span>
           </p>
@@ -1826,7 +1826,7 @@ function BranchSelectionPage({
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <h3 className="text-red-800 font-medium mb-2">Error</h3>
+            <h3 className="text-red-800  mb-2">Error</h3>
             <p className="text-red-700 mb-4">{error}</p>
             <button
               onClick={onRetry}
@@ -1843,7 +1843,7 @@ function BranchSelectionPage({
             <div className="grid md:grid-cols-2 gap-6">
               {/* Base Branch */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[var(--base-700)]">Base Branch</h3>
+                <h3 className="text-lg  text-[var(--base-700)]">Base Branch</h3>
                 <select
                   value={selectedBaseBranch}
                   onChange={(e) => onBaseBranchChange(e.target.value)}
@@ -1860,7 +1860,7 @@ function BranchSelectionPage({
                 {/* Base Commit Selection */}
                 {selectedBaseBranch && (
                   <div>
-                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                    <label className="block text-sm  text-[var(--base-600)] mb-2">
                       Specific commit (optional)
                     </label>
                     <select
@@ -1883,7 +1883,7 @@ function BranchSelectionPage({
                 {/* Show staged/unstaged options even without branch selection */}
                 {!selectedBaseBranch && (
                   <div>
-                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                    <label className="block text-sm  text-[var(--base-600)] mb-2">
                       Or compare changes directly
                     </label>
                     <select
@@ -1901,7 +1901,7 @@ function BranchSelectionPage({
 
               {/* Target Branch */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[var(--base-700)]">Target Branch</h3>
+                <h3 className="text-lg  text-[var(--base-700)]">Target Branch</h3>
                 <select
                   value={selectedTargetBranch}
                   onChange={(e) => onTargetBranchChange(e.target.value)}
@@ -1918,7 +1918,7 @@ function BranchSelectionPage({
                 {/* Target Commit Selection */}
                 {selectedTargetBranch && (
                   <div>
-                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                    <label className="block text-sm  text-[var(--base-600)] mb-2">
                       Specific commit (optional)
                     </label>
                     <select
@@ -1941,7 +1941,7 @@ function BranchSelectionPage({
                 {/* Show staged/unstaged options even without branch selection */}
                 {!selectedTargetBranch && (
                   <div>
-                    <label className="block text-sm font-medium text-[var(--base-600)] mb-2">
+                    <label className="block text-sm  text-[var(--base-600)] mb-2">
                       Or compare changes directly
                     </label>
                     <select
@@ -1964,7 +1964,7 @@ function BranchSelectionPage({
                 onClick={onCompare}
                 disabled={!selectedBaseBranch && !selectedTargetCommit}
                 className={cn(
-                  "w-full px-6 py-3 rounded-lg font-medium transition-colors",
+                  "w-full px-6 py-3 rounded-lg  transition-colors",
                   (selectedBaseBranch || selectedTargetCommit) && !isComparing
                     ? "bg-[var(--acc-500)] text-white hover:bg-[var(--acc-600)]"
                     : "bg-[var(--base-300)] text-[var(--base-500)] cursor-not-allowed"
@@ -2037,7 +2037,7 @@ function UnifiedDiffModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)]">
           <div>
-            <h2 className="text-xl font-bold text-[var(--acc-600)]">Unified Diff</h2>
+            <h2 className="text-xl font-black text-[var(--acc-600)]">Unified Diff</h2>
             <p className="text-sm text-[var(--base-600)]">
               {(targetCommit === 'UNSTAGED' || baseCommit === 'UNSTAGED') && "Unstaged changes (working directory vs HEAD)"}
               {(targetCommit === 'STAGED' || baseCommit === 'STAGED') && "Staged changes (index vs HEAD)"}

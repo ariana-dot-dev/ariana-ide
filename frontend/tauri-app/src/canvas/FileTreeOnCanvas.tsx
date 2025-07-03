@@ -122,7 +122,7 @@ const FileTreeOnCanvas: React.FC<FileTreeOnCanvasProps> = ({
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
-					<span className="text-xs font-medium">📁 Files</span>
+					<span className="text-xs ">📁 Files</span>
 					<button
 						type="button"
 						onClick={(e) => {

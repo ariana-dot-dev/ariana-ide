@@ -133,7 +133,7 @@ const RectangleOnCanvas: React.FC<RectangleOnCanvasProps> = ({
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-2 border-b border-[var(--acc-600)]/20 bg-[var(--base-500)]/50">
-					<span className="text-xs font-medium">✨ Ariana</span>
+					<span className="text-xs ">✨ Ariana</span>
 					<button
 						type="button"
 						onClick={(e) => {
