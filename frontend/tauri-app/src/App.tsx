@@ -19,6 +19,7 @@ import Logo from "./components/Logo";
 import { GitProjectProvider } from "./contexts/GitProjectContext";
 import GitProjectView from "./GitProjectView";
 import { osSessionGetWorkingDirectory } from "./bindings/os";
+import { CommunicationPalette } from "./components/CommunicationPalette";
 
 const appWindow = getCurrentWebviewWindow();
 
@@ -35,6 +36,7 @@ function App() {
 	const [selectedGitProjectId, setSelectedGitProjectId] = useState<string | null>(null);
 	const [showDiffManagement, setShowDiffManagement] = useState(false);
 	const [diffManagementState, setDiffManagementState] = useState<any>(null);
+	const [showCommunicationPalette, setShowCommunicationPalette] = useState(false);
 	const { isLightTheme } = store;
 
 	const titleBarHoveredRef = useRef(false);
@@ -152,6 +154,10 @@ function App() {
 		setShowDiffManagement(!showDiffManagement);
 	};
 
+	const toggleCommunicationPalette = () => {
+		setShowCommunicationPalette(!showCommunicationPalette);
+	};
+
 	if (loading) {
 		return (
 			<div
@@ -266,6 +272,16 @@ function App() {
 									>
 										🗑️
 									</button>
+									<button
+										type="button"
+										onClick={toggleCommunicationPalette}
+										className={cn(
+											"starting:opacity-0 opacity-90 px-1.5 py-1 text-xs bg-[var(--base-400-20)] hover:bg-[var(--acc-400-50)] rounded-r-md transition-colors cursor-pointer",
+										)}
+										title="Open Communication Palette"
+									>
+										💬
+									</button>
 								</div>
 								<div className={cn("absolute left-2 gap-2 flex items-center")}>
 									<button
@@ -337,6 +353,16 @@ function App() {
 									</div>
 								</div>
 							)}
+							
+							{/* Communication Palette */}
+							<CommunicationPalette
+								isOpen={showCommunicationPalette}
+								onClose={() => setShowCommunicationPalette(false)}
+								apiKey="YOUR_API_KEY_HERE"
+								provider="anthropic"
+								model="claude-3-5-sonnet-20241022"
+								systemPrompt="You are a helpful coding assistant integrated into the Ariana IDE."
+							/>
 							<GitProjectView/>
 							<Repl />
 						</GitProjectProvider>
@@ -356,6 +382,7 @@ function App() {
 							/>
 						))}
 					</div>
+
 				</div>
 			</div>
 		</InterpreterContext>
