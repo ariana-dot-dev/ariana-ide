@@ -170,27 +170,27 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 	return selectedGitProject ? (
 		<div className="w-full h-full flex gap-1.5">
 			<div
-				onMouseEnter={() => {
-					canvasesHoveredRef.current = true;
+				// onMouseEnter={() => {
+				// 	canvasesHoveredRef.current = true;
 
-					setTimeout(() => {
-						console.log("canvasesHovered", canvasesHoveredRef.current);
-						if (canvasesHoveredRef.current) {
-							setShowCanvases(true);
-						}
-					}, 400);
-				}}
-				onMouseLeave={() => {
-					canvasesHoveredRef.current = false;
+				// 	setTimeout(() => {
+				// 		console.log("canvasesHovered", canvasesHoveredRef.current);
+				// 		if (canvasesHoveredRef.current) {
+				// 			setShowCanvases(true);
+				// 		}
+				// 	}, 400);
+				// }}
+				// onMouseLeave={() => {
+				// 	canvasesHoveredRef.current = false;
 
-					setTimeout(() => {
-						if (!canvasesHoveredRef.current) {
-							setShowCanvases(false);
-						}
-					}, 1000);
-				}}
+				// 	setTimeout(() => {
+				// 		if (!canvasesHoveredRef.current) {
+				// 			setShowCanvases(false);
+				// 		}
+				// 	}, 1000);
+				// }}
 				className={cn(
-					"flex flex-col gap-1.5 outline-0 rounded-md select-none relative z-50  transition-[height] border-[var(--acc-400-50)]",
+					"group flex flex-col gap-1.5 transition-all outline-0 rounded-md select-none relative z-50 border-[var(--acc-400-50)]",
 					showCanvases
 						? "w-52"
 						: "w-1 my-0 hover:w-3 not-hover:bg-[var(--base-400-20)] hover:border-2",
@@ -205,16 +205,16 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 							</div>
 						</div>
 						
-						<div className="flex flex-col h-full overflow-y-auto">
-							<div className="text-sm px-2 text-[var(--base-400)] mb-2">
+						<div className="flex flex-col h-full w-full overflow-y-auto">
+							{/* <div className="text-sm px-2 text-[var(--base-400)] mb-2">
 								Working Agents:
-							</div>
+							</div> */}
 							<button 
 								className={cn(
-									"w-full px-4 py-2 bg-[var(--positive-500-50)] hover:bg-[var(--positive-500)] text-sm text-center rounded-xl mb-2 transition-colors",
+									"w-full px-4 py-2 border-2 border-dashed border-[var(--positive-500-50)] text-[var(--positive-500-70)] hover:border-[var(--positive-500)] text-sm text-center rounded-xl mb-2 transition-colors",
 									isCreatingCanvas 
-										? "opacity-50 cursor-not-allowed bg-[var(--base-400-20)]" 
-										: "hover:bg-[var(--base-400-20)] cursor-pointer"
+										? "opacity-50 cursor-not-allowed" 
+										: "cursor-pointer"
 								)}
 								disabled={isCreatingCanvas}
 								onClick={async () => {
@@ -241,7 +241,7 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 									}
 								}}
 							>
-								{isCreatingCanvas ? "Creating..." : "+ New"}
+								{isCreatingCanvas ? "Creating..." : "+ New Agent"}
 							</button>
 							<div className="flex flex-col">
 								{selectedGitProject.canvases.map((canvas, index) => {
@@ -255,10 +255,10 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 										<button 
 											key={index}
 											className={cn(
-												"w-full px-4 py-2 text-sm text-center first:rounded-t-xl last:rounded-b-xl transition-colors",
+												"w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors",
 												currentCanvas.id === canvas.id
-													? "bg-[var(--acc-400-40)]"
-													: "odd:bg-[var(--base-300-20)] even:bg-[var(--base-300-30)] cursor-pointer hover:bg-[var(--acc-400-70)]",
+													? "bg-[var(--base-300-70)]"
+													: "odd:bg-[var(--base-300-20)] even:bg-[var(--base-300-30)] cursor-pointer hover:bg-[var(--base-300-50)]",
 											)}
 											onClick={() => {
 												selectedGitProject.setCurrentCanvasIndex(index);
@@ -268,7 +268,9 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 											onContextMenu={(e) => handleWorkspaceContextMenu(e, canvas.id)}
 										>
 											<div className="flex items-center justify-between">
-												<span>Agent N°{index+1}</span>
+												<span className={cn(
+													currentCanvas.id === canvas.id ? "opacity-100" : "opacity-50"
+												)}>Agent N°{index+1}</span>
 												{taskCounts.total > 0 && (
 													<div className="flex items-center gap-1 text-xs">
 														{taskCounts.running > 0 && (
@@ -289,11 +291,6 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 													</div>
 												)}
 											</div>
-											{taskCounts.total === 0 && (
-												<div className="text-xs text-[var(--base-600)] mt-1">
-													No tasks yet
-												</div>
-											)}
 										</button>
 									);
 								})}
@@ -323,7 +320,7 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 			{contextMenu && (
 				<div
 					ref={contextMenuRef}
-					className="fixed z-50 bg-[var(--base-100)] border border-[var(--acc-600)]/20 rounded-md shadow-lg py-1 min-w-[150px]"
+					className="fixed z-50 bg-[var(--base-100)] border border-[var(--acc-600)]/20 rounded-md shadow-lg py-1 w-fit flex flex-col"
 					style={{
 						left: contextMenu.x,
 						top: contextMenu.y,
@@ -331,15 +328,15 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 				>
 					<button
 						onClick={() => showWorkspaceInExplorer(contextMenu.canvasId)}
-						className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--base-200)] text-[var(--blackest)] transition-colors"
+						className="w-fit min-w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-[var(--base-200)] text-[var(--blackest)] transition-colors"
 					>
 						📁 Show in Explorer
 					</button>
 					<button
 						onClick={async () => await deleteWorkspace(contextMenu.canvasId)}
-						className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--negative-200)] text-[var(--negative-800)] transition-colors"
+						className="w-fit min-w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-[var(--negative-200)] text-[var(--negative-800)] transition-colors"
 					>
-						🗑️ Delete Workspace
+						🗑️ Delete agent & its work
 					</button>
 				</div>
 			)}
