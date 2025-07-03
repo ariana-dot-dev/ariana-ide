@@ -397,6 +397,81 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     }
   };
 
+  const discardFileChanges = async (filePaths: string[]) => {
+    try {
+      setLoading(true);
+      await diffService.discardFileChanges(filePaths);
+      
+      // Reload diff data to reflect the discarded changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to discard file changes:", error);
+      setError(`Failed to discard file changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const discardHunkChanges = async (filePath: string, hunk: GitDiffHunk) => {
+    try {
+      setLoading(true);
+      await diffService.discardHunkChanges(filePath, hunk);
+      
+      // Reload diff data to reflect the discarded changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to discard hunk changes:", error);
+      setError(`Failed to discard hunk changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateHunkChanges = async (filePath: string, hunk: GitDiffHunk) => {
+    try {
+      setLoading(true);
+      await diffService.validateHunkChanges(filePath, hunk);
+      
+      // Reload diff data to reflect the validated changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to validate hunk changes:", error);
+      setError(`Failed to validate hunk changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateSingleFileChanges = async (filePath: string) => {
+    try {
+      setLoading(true);
+      await diffService.validateFileChanges(filePath);
+      
+      // Reload diff data to reflect the validated changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to validate file changes:", error);
+      setError(`Failed to validate file changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const discardSingleFileChanges = async (filePath: string) => {
+    try {
+      setLoading(true);
+      await diffService.discardFileChanges([filePath]);
+      
+      // Reload diff data to reflect the discarded changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to discard file changes:", error);
+      setError(`Failed to discard file changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const enterDetailedView = (changeId: string) => {
     setSelectedChange(changeId);
     setViewMode('detailed');
@@ -861,6 +936,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
           selectedSubLogic={selectedSubLogic}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          onDiscardFileChanges={discardFileChanges}
         />
       ) : (
         <DetailedMode
@@ -884,6 +960,11 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
           searchHunks={searchHunks}
           nextSearchResult={nextSearchResult}
           previousSearchResult={previousSearchResult}
+          onDiscardFileChanges={discardFileChanges}
+          onDiscardHunkChanges={discardHunkChanges}
+          onValidateHunkChanges={validateHunkChanges}
+          onDiscardSingleFile={discardSingleFileChanges}
+          onValidateSingleFile={validateSingleFileChanges}
         />
       )}
     </div>
@@ -899,6 +980,7 @@ interface OverviewModeProps {
   selectedSubLogic: string | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
 }
 
 function OverviewMode({ 
@@ -908,7 +990,8 @@ function OverviewMode({
   onSelectSubLogic, 
   selectedSubLogic,
   searchQuery,
-  setSearchQuery
+  setSearchQuery,
+  onDiscardFileChanges
 }: OverviewModeProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -1003,6 +1086,7 @@ function OverviewMode({
                 onSelectSubLogic={onSelectSubLogic}
                 selectedSubLogic={selectedSubLogic}
                 searchQuery={searchQuery}
+                onDiscardFileChanges={onDiscardFileChanges}
               />
             ))}
           </div>
@@ -1028,6 +1112,7 @@ function OverviewMode({
                 onSelectSubLogic={onSelectSubLogic}
                 selectedSubLogic={selectedSubLogic}
                 searchQuery={searchQuery}
+                onDiscardFileChanges={onDiscardFileChanges}
               />
             ))}
           </div>
@@ -1056,6 +1141,7 @@ interface MainLogicChangeCardProps {
   onSelectSubLogic: (subLogicId: string) => void;
   selectedSubLogic: string | null;
   searchQuery?: string;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
 }
 
 function MainLogicChangeCard({ 
@@ -1064,7 +1150,8 @@ function MainLogicChangeCard({
   onEnterDetailed, 
   onSelectSubLogic, 
   selectedSubLogic,
-  searchQuery = ""
+  searchQuery = "",
+  onDiscardFileChanges
 }: MainLogicChangeCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -1097,6 +1184,17 @@ function MainLogicChangeCard({
             className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors text-sm"
           >
             Detailed View
+          </button>
+          
+          <button
+            onClick={() => {
+              const filePaths = change.files.map(file => file.filePath);
+              onDiscardFileChanges(filePaths);
+            }}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+            title="Discard all changes in this change set"
+          >
+            Discard
           </button>
           
           <button
@@ -1180,9 +1278,10 @@ interface SmallChangeCardProps {
   onSelectSubLogic?: (subLogicId: string) => void;
   selectedSubLogic?: string | null;
   searchQuery?: string;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
 }
 
-function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic, selectedSubLogic, searchQuery = "" }: SmallChangeCardProps) {
+function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic, selectedSubLogic, searchQuery = "", onDiscardFileChanges }: SmallChangeCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -1214,6 +1313,17 @@ function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic
             className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors text-sm"
           >
             View
+          </button>
+          
+          <button
+            onClick={() => {
+              const filePaths = change.files.map(file => file.filePath);
+              onDiscardFileChanges(filePaths);
+            }}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+            title="Discard all changes in this change set"
+          >
+            Discard
           </button>
           
           <button
@@ -1273,6 +1383,11 @@ interface DetailedModeProps {
   searchHunks: (query: string) => void;
   nextSearchResult: () => void;
   previousSearchResult: () => void;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
+  onDiscardHunkChanges: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onValidateHunkChanges: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onDiscardSingleFile: (filePath: string) => Promise<void>;
+  onValidateSingleFile: (filePath: string) => Promise<void>;
 }
 
 function DetailedMode({
@@ -1295,7 +1410,12 @@ function DetailedMode({
   currentSearchIndex,
   searchHunks,
   nextSearchResult,
-  previousSearchResult
+  previousSearchResult,
+  onDiscardFileChanges,
+  onDiscardHunkChanges,
+  onValidateHunkChanges,
+  onDiscardSingleFile,
+  onValidateSingleFile
 }: DetailedModeProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Keyboard navigation
@@ -1507,6 +1627,7 @@ function DetailedMode({
             </button>
           </div>
           
+          
           <button
             onClick={() => onValidateChange(selectedChange)}
             disabled={change.validated}
@@ -1524,7 +1645,15 @@ function DetailedMode({
 
       {/* File Diff Content */}
       <div className="flex-1 relative">
-        <FileDiffViewer file={currentFile} currentHunkIndex={currentLineIndex} searchQuery={searchQuery} />
+        <FileDiffViewer 
+          file={currentFile} 
+          currentHunkIndex={currentLineIndex} 
+          searchQuery={searchQuery}
+          onDiscardHunk={onDiscardHunkChanges}
+          onValidateHunk={onValidateHunkChanges}
+          onDiscardFile={onDiscardSingleFile}
+          onValidateFile={onValidateSingleFile}
+        />
       </div>
     </div>
   );
@@ -1559,9 +1688,13 @@ interface FileDiffViewerProps {
   file: GitDiffFile;
   currentHunkIndex?: number;
   searchQuery?: string;
+  onDiscardHunk?: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onValidateHunk?: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onDiscardFile?: (filePath: string) => Promise<void>;
+  onValidateFile?: (filePath: string) => Promise<void>;
 }
 
-function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDiffViewerProps) {
+function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscardHunk, onValidateHunk, onDiscardFile, onValidateFile }: FileDiffViewerProps) {
   const currentHunkRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -1646,6 +1779,34 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
                   <span className="text-[var(--base-600)]">
                     Block {currentHunkIndex + 1}/{file.hunks.length}
                   </span>
+                  
+                  {/* File Action Buttons */}
+                  <div className="flex items-center space-x-1">
+                    {onDiscardFile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDiscardFile(file.filePath);
+                        }}
+                        className="px-1 py-0.5 hover:bg-red-100 hover:bg-opacity-50 rounded transition-colors"
+                        title="Discard entire file"
+                      >
+                        ❌
+                      </button>
+                    )}
+                    {onValidateFile && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onValidateFile(file.filePath);
+                        }}
+                        className="px-1 py-0.5 hover:bg-green-100 hover:bg-opacity-50 rounded transition-colors"
+                        title="Validate entire file"
+                      >
+                        ✅
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1672,9 +1833,34 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
                     <span>
                       @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
                     </span>
-                    {hunkIndex === currentHunkIndex && (
-                      <span className="text-[var(--acc-600)] font-medium text-xs">← Current</span>
-                    )}
+                    
+                    {/* Hunk Action Buttons */}
+                    <div className="flex items-center space-x-1">
+                      {onDiscardHunk && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDiscardHunk(file.filePath, hunk);
+                          }}
+                          className="px-1 py-0.5 hover:bg-red-100 hover:bg-opacity-50 rounded transition-colors"
+                          title="Discard this hunk"
+                        >
+                          ❌
+                        </button>
+                      )}
+                      {onValidateHunk && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onValidateHunk(file.filePath, hunk);
+                          }}
+                          className="px-1 py-0.5 hover:bg-green-100 hover:bg-opacity-50 rounded transition-colors"
+                          title="Validate this hunk"
+                        >
+                          ✅
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
