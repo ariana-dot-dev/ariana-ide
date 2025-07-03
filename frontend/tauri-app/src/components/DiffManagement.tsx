@@ -862,23 +862,14 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
-      {/* Header */}
+      {/* Header - Always Visible */}
       <div 
         className={cn(
-          "flex items-center justify-between border-b border-[var(--base-300)] transition-all duration-300 relative",
-          (showHeader || mainTitlebarVisible) ? "p-4 h-auto opacity-100" : "p-1 h-8 opacity-0",
+          "flex items-center justify-between border-b border-[var(--base-300)] p-4 h-auto opacity-100 relative",
           mainTitlebarVisible && "mt-12"
         )}
-        onMouseEnter={() => setShowHeader(true)}
-        onMouseLeave={() => setShowHeader(false)}
       >
-        {/* Invisible hover trigger area extending 20px below header */}
-        <div 
-          className="absolute -bottom-5 left-0 right-0 h-9 bg-transparent cursor-pointer"
-          onMouseEnter={() => setShowHeader(true)}
-        />
-        {(showHeader || mainTitlebarVisible) && (
-          <>
+        <>
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-bold text-[var(--acc-600)]">Diff Management</h1>
               <div className="flex items-center space-x-2 text-sm text-[var(--base-600)]">
@@ -974,8 +965,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
                 {diffSummary.validationState.allValidated ? "✓ All Validated" : "Validate All"}
               </button>
             </div>
-          </>
-        )}
+        </>
       </div>
 
       {/* Unified Diff Modal */}
@@ -1585,99 +1575,6 @@ function DetailedMode({
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Navigation Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)] bg-[var(--base-150)]">
-        <div className="flex items-center space-x-4">
-          <div>
-            <h3 className="font-semibold text-[var(--base-700)]">{change.title}</h3>
-            <p className="text-sm text-[var(--base-600)]">
-              File {currentFileIndex + 1} of {change.files.length}: {currentFile.filePath}
-            </p>
-            <p className="text-xs text-[var(--base-500)]">
-              Block {currentLineIndex + 1} of {currentFile.hunks.length}
-              {currentFile.hunks[currentLineIndex] && (
-                <span className="ml-2">
-                  (Lines -{currentFile.hunks[currentLineIndex].oldStart},{currentFile.hunks[currentLineIndex].oldCount} 
-                  +{currentFile.hunks[currentLineIndex].newStart},{currentFile.hunks[currentLineIndex].newCount})
-                </span>
-              )}
-            </p>
-          </div>
-          
-          {/* Search Bar */}
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  searchHunks(e.target.value);
-                }}
-                className="px-3 py-1 border border-[var(--base-300)] rounded text-sm w-48 focus:outline-none focus:border-[var(--acc-500)]"
-              />
-              {searchResults.length > 0 && (
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-[var(--base-600)]">
-                  {currentSearchIndex + 1}/{searchResults.length}
-                </div>
-              )}
-            </div>
-            {searchResults.length > 0 && (
-              <>
-                <button
-                  onClick={previousSearchResult}
-                  className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={nextSearchResult}
-                  className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
-                >
-                  ↓
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation Controls */}
-        <div className="flex items-center space-x-1">
-          {/* Change Navigation */}
-          <div className="flex items-center space-x-1 mr-2">
-            <button
-              onClick={onPreviousChange}
-              className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
-              title="Previous Change (P)"
-            >
-              ←
-            </button>
-            <button
-              onClick={onNextChange}
-              className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
-              title="Next Change"
-            >
-              →
-            </button>
-          </div>
-
-          
-          <button
-            onClick={() => onValidateChange(selectedChange)}
-            disabled={change.validated}
-            className={cn(
-              "px-4 py-1 rounded font-medium transition-colors",
-              change.validated
-                ? "bg-green-500 text-white"
-                : "bg-[var(--acc-600)] text-white hover:bg-[var(--acc-700)]"
-            )}
-          >
-            {change.validated ? "✓ Validated" : "Validate Change"}
-          </button>
-        </div>
-      </div>
 
       {/* File Diff Content */}
       <div className="flex-1 relative">
@@ -1843,50 +1740,53 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
   }, []);
 
   return (
-    <div ref={scrollContainerRef} className="absolute inset-0 overflow-auto">
-      <div className="relative min-h-full">
+    <div className="absolute inset-0 flex flex-col">
+      {/* Fixed File Header */}
+      <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] z-30 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
+          <div className="flex items-center space-x-4 text-sm">
+            <span className="text-green-600">+{file.additions}</span>
+            <span className="text-red-600">-{file.deletions}</span>
+            <span className="text-[var(--base-600)]">
+              Block {currentHunkIndex + 1}/{file.hunks.length}
+            </span>
+            
+            {/* File Action Buttons */}
+            <div className="flex items-center space-x-1">
+              {onDiscardFile && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDiscardFile(file.filePath);
+                  }}
+                  className="px-1 py-0.5 hover:bg-red-100 hover:bg-opacity-50 rounded transition-colors"
+                  title="Discard entire file"
+                >
+                  ❌
+                </button>
+              )}
+              {onValidateFile && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onValidateFile(file.filePath);
+                  }}
+                  className="px-1 py-0.5 hover:bg-green-100 hover:bg-opacity-50 rounded transition-colors"
+                  title="Validate entire file"
+                >
+                  ✅
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable Content Area */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <div className="p-4">
           <div className="bg-[var(--base-200)] rounded-lg overflow-hidden">
-            <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] sticky top-0 z-20">
-              <div className="flex items-center justify-between">
-                <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
-                <div className="flex items-center space-x-4 text-sm">
-                  <span className="text-green-600">+{file.additions}</span>
-                  <span className="text-red-600">-{file.deletions}</span>
-                  <span className="text-[var(--base-600)]">
-                    Block {currentHunkIndex + 1}/{file.hunks.length}
-                  </span>
-                  
-                  {/* File Action Buttons */}
-                  <div className="flex items-center space-x-1">
-                    {onDiscardFile && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDiscardFile(file.filePath);
-                        }}
-                        className="px-1 py-0.5 hover:bg-red-100 hover:bg-opacity-50 rounded transition-colors"
-                        title="Discard entire file"
-                      >
-                        ❌
-                      </button>
-                    )}
-                    {onValidateFile && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onValidateFile(file.filePath);
-                        }}
-                        className="px-1 py-0.5 hover:bg-green-100 hover:bg-opacity-50 rounded transition-colors"
-                        title="Validate entire file"
-                      >
-                        ✅
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {file.hunks.map((hunk, hunkIndex) => (
               <div 
@@ -1901,7 +1801,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
                 )}
               >
                 <div className={cn(
-                  "px-4 py-2 text-xs font-mono sticky top-12 z-10 transition-colors duration-300",
+                  "px-4 py-2 text-xs font-mono transition-colors duration-300",
                   hunkIndex === currentHunkIndex 
                     ? "bg-[var(--acc-200)] text-[var(--acc-800)] border-l-4 border-[var(--acc-500)]" 
                     : "bg-[var(--base-250)] text-[var(--base-600)]"
@@ -1940,9 +1840,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
                     </div>
                   </div>
                 </div>
-                
-                <div>
-                  {hunk.lines.map((line, lineIndex) => (
+                {hunk.lines.map((line, lineIndex) => (
                     <DiffLine 
                       key={lineIndex} 
                       line={line} 
@@ -1952,7 +1850,6 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
                       searchQuery={searchQuery}
                     />
                   ))}
-                </div>
               </div>
             ))}
           </div>
