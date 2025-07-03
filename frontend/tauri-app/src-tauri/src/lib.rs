@@ -4,9 +4,9 @@
 	windows_subsystem = "windows"
 )]
 
-use std::sync::Arc;
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
+use std::sync::Arc;
 use tauri::State;
 
 mod terminal;
@@ -15,6 +15,7 @@ use terminal::TerminalManager;
 mod custom_terminal;
 mod custom_terminal_commands;
 
+mod logger;
 mod os;
 
 use custom_terminal_commands::{
@@ -38,6 +39,7 @@ pub fn run() {
 		.plugin(tauri_plugin_os::init())
 		.plugin(tauri_plugin_store::Builder::new().build())
 		.plugin(tauri_plugin_fs::init())
+		.plugin(logger::init(log::LevelFilter::Info))
 		.manage(terminals_manager)
 		.manage(custom_terminals_manager)
 		.manage(git_search_manager)
@@ -164,25 +166,25 @@ async fn start_git_directories_search(
 #[tauri::command]
 async fn check_git_repository(directory: String) -> Result<bool, String> {
 	let path = Path::new(&directory);
-	
+
 	// Check if the directory exists
 	if !path.exists() {
 		return Ok(false);
 	}
-	
+
 	// Check if .git directory exists
 	let git_dir = path.join(".git");
 	if git_dir.exists() {
 		return Ok(true);
 	}
-	
+
 	// Alternatively, try using git command to check if it's a repository
 	let output = Command::new("git")
 		.arg("rev-parse")
 		.arg("--git-dir")
 		.current_dir(&directory)
 		.output();
-		
+
 	match output {
 		Ok(result) => Ok(result.status.success()),
 		Err(_) => Ok(false),
@@ -195,7 +197,7 @@ async fn execute_command(command: String, args: Vec<String>) -> Result<String, S
 		.args(&args)
 		.output()
 		.map_err(|e| format!("Failed to execute command: {}", e))?;
-	
+
 	if output.status.success() {
 		Ok(String::from_utf8_lossy(&output.stdout).to_string())
 	} else {
@@ -204,13 +206,17 @@ async fn execute_command(command: String, args: Vec<String>) -> Result<String, S
 }
 
 #[tauri::command]
-async fn execute_command_in_dir(command: String, args: Vec<String>, directory: String) -> Result<String, String> {
+async fn execute_command_in_dir(
+	command: String,
+	args: Vec<String>,
+	directory: String,
+) -> Result<String, String> {
 	let output = Command::new(&command)
 		.args(&args)
 		.current_dir(&directory)
 		.output()
 		.map_err(|e| format!("Failed to execute command: {}", e))?;
-	
+
 	if output.status.success() {
 		Ok(String::from_utf8_lossy(&output.stdout).to_string())
 	} else {
@@ -226,13 +232,16 @@ async fn get_found_git_directories_so_far(
 	let mut result = git_search_manager
 		.get_results(&search_id)
 		.ok_or_else(|| "Search ID not found".to_string())?;
-	
-	println!("Backend - Raw search results before filtering: {} directories", result.directories.len());
-	
+
+	println!(
+		"Backend - Raw search results before filtering: {} directories",
+		result.directories.len()
+	);
+
 	// Filter out deleted directories using appropriate method for each path type
 	let original_count = result.directories.len();
 	let mut filtered_dirs = Vec::new();
-	
+
 	for path in &result.directories {
 		let exists = if path.starts_with("/mnt/") || path.starts_with("/home") {
 			// WSL path - check existence using WSL command
@@ -242,17 +251,21 @@ async fn get_found_git_directories_so_far(
 			let path_obj = Path::new(path);
 			path_obj.exists() && path_obj.is_dir()
 		};
-		
+
 		if exists {
 			filtered_dirs.push(path.clone());
 		} else {
 			println!("Backend - Filtering out non-existent directory: {}", path);
 		}
 	}
-	
+
 	result.directories = filtered_dirs;
-	println!("Backend - After existence filtering: {} directories (removed {})", result.directories.len(), original_count - result.directories.len());
-	
+	println!(
+		"Backend - After existence filtering: {} directories (removed {})",
+		result.directories.len(),
+		original_count - result.directories.len()
+	);
+
 	Ok(result)
 }
 
@@ -270,7 +283,7 @@ fn check_wsl_path_exists(path: &str) -> bool {
 					.arg("-d")
 					.arg(path)
 					.output();
-				
+
 				if let Ok(result) = output {
 					return result.status.success();
 				}
@@ -293,11 +306,13 @@ async fn list_available_os_session_kinds() -> Result<Vec<OsSessionKind>, String>
 }
 
 #[tauri::command]
-async fn copy_directory(source: String, destination: String, os_session: OsSession) -> Result<(), String> {
+async fn copy_directory(
+	source: String,
+	destination: String,
+	os_session: OsSession,
+) -> Result<(), String> {
 	match os_session {
-		OsSession::Local(_) => {
-			copy_directory_local(&source, &destination)
-		}
+		OsSession::Local(_) => copy_directory_local(&source, &destination),
 		OsSession::Wsl(wsl_session) => {
 			copy_directory_wsl(&source, &destination, &wsl_session.distribution)
 		}
@@ -307,20 +322,21 @@ async fn copy_directory(source: String, destination: String, os_session: OsSessi
 fn copy_directory_local(source: &str, destination: &str) -> Result<(), String> {
 	use std::fs;
 	use std::path::Path;
-	
+
 	let src_path = Path::new(source);
 	let dst_path = Path::new(destination);
-	
+
 	if !src_path.exists() {
 		return Err("Source directory does not exist".to_string());
 	}
-	
+
 	// Create destination directory if it doesn't exist
 	if let Some(parent) = dst_path.parent() {
-		fs::create_dir_all(parent)
-			.map_err(|e| format!("Failed to create destination parent directory: {}", e))?;
+		fs::create_dir_all(parent).map_err(|e| {
+			format!("Failed to create destination parent directory: {}", e)
+		})?;
 	}
-	
+
 	// Use system copy command for better performance
 	#[cfg(target_os = "windows")]
 	{
@@ -330,20 +346,20 @@ fn copy_directory_local(source: &str, destination: &str) -> Result<(), String> {
 			source.replace("'", "''"),
 			destination.replace("'", "''")
 		);
-		
+
 		let output = Command::new("powershell")
 			.arg("-Command")
 			.arg(&ps_command)
 			.output()
 			.map_err(|e| format!("Failed to execute PowerShell copy: {}", e))?;
-		
+
 		if !output.status.success() {
 			let stderr = String::from_utf8_lossy(&output.stderr);
 			let stdout = String::from_utf8_lossy(&output.stdout);
 			return Err(format!("PowerShell copy failed: {} {}", stderr, stdout));
 		}
 	}
-	
+
 	#[cfg(any(target_os = "linux", target_os = "macos"))]
 	{
 		let output = Command::new("cp")
@@ -352,17 +368,24 @@ fn copy_directory_local(source: &str, destination: &str) -> Result<(), String> {
 			.arg(destination)
 			.output()
 			.map_err(|e| format!("Failed to execute cp: {}", e))?;
-		
+
 		if !output.status.success() {
-			return Err(format!("cp failed: {}", String::from_utf8_lossy(&output.stderr)));
+			return Err(format!(
+				"cp failed: {}",
+				String::from_utf8_lossy(&output.stderr)
+			));
 		}
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(target_os = "windows")]
-fn copy_directory_wsl(source: &str, destination: &str, distribution: &str) -> Result<(), String> {
+fn copy_directory_wsl(
+	source: &str,
+	destination: &str,
+	distribution: &str,
+) -> Result<(), String> {
 	let output = Command::new("wsl")
 		.arg("-d")
 		.arg(distribution)
@@ -372,25 +395,34 @@ fn copy_directory_wsl(source: &str, destination: &str, distribution: &str) -> Re
 		.arg(destination)
 		.output()
 		.map_err(|e| format!("Failed to execute WSL cp: {}", e))?;
-	
+
 	if !output.status.success() {
-		return Err(format!("WSL cp failed: {}", String::from_utf8_lossy(&output.stderr)));
+		return Err(format!(
+			"WSL cp failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn copy_directory_wsl(_source: &str, _destination: &str, _distribution: &str) -> Result<(), String> {
+fn copy_directory_wsl(
+	_source: &str,
+	_destination: &str,
+	_distribution: &str,
+) -> Result<(), String> {
 	Err("WSL is only available on Windows".to_string())
 }
 
 #[tauri::command]
-async fn create_git_branch(directory: String, branch_name: String, os_session: OsSession) -> Result<(), String> {
+async fn create_git_branch(
+	directory: String,
+	branch_name: String,
+	os_session: OsSession,
+) -> Result<(), String> {
 	match os_session {
-		OsSession::Local(_) => {
-			create_git_branch_local(&directory, &branch_name)
-		}
+		OsSession::Local(_) => create_git_branch_local(&directory, &branch_name),
 		OsSession::Wsl(wsl_session) => {
 			create_git_branch_wsl(&directory, &branch_name, &wsl_session.distribution)
 		}
@@ -405,16 +437,23 @@ fn create_git_branch_local(directory: &str, branch_name: &str) -> Result<(), Str
 		.current_dir(directory)
 		.output()
 		.map_err(|e| format!("Failed to execute git command: {}", e))?;
-	
+
 	if !output.status.success() {
-		return Err(format!("Git checkout failed: {}", String::from_utf8_lossy(&output.stderr)));
+		return Err(format!(
+			"Git checkout failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(target_os = "windows")]
-fn create_git_branch_wsl(directory: &str, branch_name: &str, distribution: &str) -> Result<(), String> {
+fn create_git_branch_wsl(
+	directory: &str,
+	branch_name: &str,
+	distribution: &str,
+) -> Result<(), String> {
 	// Execute git command inside WSL using --cd to change directory
 	let output = Command::new("wsl")
 		.arg("-d")
@@ -427,27 +466,36 @@ fn create_git_branch_wsl(directory: &str, branch_name: &str, distribution: &str)
 		.arg(branch_name)
 		.output()
 		.map_err(|e| format!("Failed to execute WSL git command: {}", e))?;
-	
+
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr);
 		let stdout = String::from_utf8_lossy(&output.stdout);
-		return Err(format!("WSL git checkout failed: stderr: {} stdout: {}", stderr, stdout));
+		return Err(format!(
+			"WSL git checkout failed: stderr: {} stdout: {}",
+			stderr, stdout
+		));
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn create_git_branch_wsl(_directory: &str, _branch_name: &str, _distribution: &str) -> Result<(), String> {
+fn create_git_branch_wsl(
+	_directory: &str,
+	_branch_name: &str,
+	_distribution: &str,
+) -> Result<(), String> {
 	Err("WSL is only available on Windows".to_string())
 }
 
 #[tauri::command]
-async fn git_commit(directory: String, message: String, os_session: OsSession) -> Result<String, String> {
+async fn git_commit(
+	directory: String,
+	message: String,
+	os_session: OsSession,
+) -> Result<String, String> {
 	match os_session {
-		OsSession::Local(_) => {
-			git_commit_local(&directory, &message)
-		}
+		OsSession::Local(_) => git_commit_local(&directory, &message),
 		OsSession::Wsl(wsl_session) => {
 			git_commit_wsl(&directory, &message, &wsl_session.distribution)
 		}
@@ -462,11 +510,14 @@ fn git_commit_local(directory: &str, message: &str) -> Result<String, String> {
 		.current_dir(directory)
 		.output()
 		.map_err(|e| format!("Failed to execute git add command: {}", e))?;
-	
+
 	if !add_output.status.success() {
-		return Err(format!("Git add failed: {}", String::from_utf8_lossy(&add_output.stderr)));
+		return Err(format!(
+			"Git add failed: {}",
+			String::from_utf8_lossy(&add_output.stderr)
+		));
 	}
-	
+
 	// Then commit
 	let commit_output = Command::new("git")
 		.arg("commit")
@@ -475,19 +526,19 @@ fn git_commit_local(directory: &str, message: &str) -> Result<String, String> {
 		.current_dir(directory)
 		.output()
 		.map_err(|e| format!("Failed to execute git commit command: {}", e))?;
-	
+
 	if !commit_output.status.success() {
 		let stderr = String::from_utf8_lossy(&commit_output.stderr);
 		let stdout = String::from_utf8_lossy(&commit_output.stdout);
-		
+
 		// Check for "nothing to commit" scenarios
 		if stderr.contains("nothing to commit") || stdout.contains("nothing to commit") {
 			return Err("NO_CHANGES_TO_COMMIT".to_string());
 		}
-		
+
 		return Err(format!("Git commit failed: {}", stderr));
 	}
-	
+
 	// Get the commit hash
 	let hash_output = Command::new("git")
 		.arg("rev-parse")
@@ -495,16 +546,25 @@ fn git_commit_local(directory: &str, message: &str) -> Result<String, String> {
 		.current_dir(directory)
 		.output()
 		.map_err(|e| format!("Failed to get commit hash: {}", e))?;
-	
+
 	if !hash_output.status.success() {
-		return Err(format!("Failed to get commit hash: {}", String::from_utf8_lossy(&hash_output.stderr)));
+		return Err(format!(
+			"Failed to get commit hash: {}",
+			String::from_utf8_lossy(&hash_output.stderr)
+		));
 	}
-	
-	Ok(String::from_utf8_lossy(&hash_output.stdout).trim().to_string())
+
+	Ok(String::from_utf8_lossy(&hash_output.stdout)
+		.trim()
+		.to_string())
 }
 
 #[cfg(target_os = "windows")]
-fn git_commit_wsl(directory: &str, message: &str, distribution: &str) -> Result<String, String> {
+fn git_commit_wsl(
+	directory: &str,
+	message: &str,
+	distribution: &str,
+) -> Result<String, String> {
 	// First, add all changes
 	let add_output = Command::new("wsl")
 		.arg("-d")
@@ -516,11 +576,14 @@ fn git_commit_wsl(directory: &str, message: &str, distribution: &str) -> Result<
 		.arg(".")
 		.output()
 		.map_err(|e| format!("Failed to execute WSL git add command: {}", e))?;
-	
+
 	if !add_output.status.success() {
-		return Err(format!("WSL git add failed: {}", String::from_utf8_lossy(&add_output.stderr)));
+		return Err(format!(
+			"WSL git add failed: {}",
+			String::from_utf8_lossy(&add_output.stderr)
+		));
 	}
-	
+
 	// Then commit
 	let commit_output = Command::new("wsl")
 		.arg("-d")
@@ -533,19 +596,19 @@ fn git_commit_wsl(directory: &str, message: &str, distribution: &str) -> Result<
 		.arg(message)
 		.output()
 		.map_err(|e| format!("Failed to execute WSL git commit command: {}", e))?;
-	
+
 	if !commit_output.status.success() {
 		let stderr = String::from_utf8_lossy(&commit_output.stderr);
 		let stdout = String::from_utf8_lossy(&commit_output.stdout);
-		
+
 		// Check for "nothing to commit" scenarios
 		if stderr.contains("nothing to commit") || stdout.contains("nothing to commit") {
 			return Err("NO_CHANGES_TO_COMMIT".to_string());
 		}
-		
+
 		return Err(format!("WSL git commit failed: {}", stderr));
 	}
-	
+
 	// Get the commit hash
 	let hash_output = Command::new("wsl")
 		.arg("-d")
@@ -557,25 +620,36 @@ fn git_commit_wsl(directory: &str, message: &str, distribution: &str) -> Result<
 		.arg("HEAD")
 		.output()
 		.map_err(|e| format!("Failed to get WSL commit hash: {}", e))?;
-	
+
 	if !hash_output.status.success() {
-		return Err(format!("Failed to get WSL commit hash: {}", String::from_utf8_lossy(&hash_output.stderr)));
+		return Err(format!(
+			"Failed to get WSL commit hash: {}",
+			String::from_utf8_lossy(&hash_output.stderr)
+		));
 	}
-	
-	Ok(String::from_utf8_lossy(&hash_output.stdout).trim().to_string())
+
+	Ok(String::from_utf8_lossy(&hash_output.stdout)
+		.trim()
+		.to_string())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn git_commit_wsl(_directory: &str, _message: &str, _distribution: &str) -> Result<String, String> {
+fn git_commit_wsl(
+	_directory: &str,
+	_message: &str,
+	_distribution: &str,
+) -> Result<String, String> {
 	Err("WSL is only supported on Windows".to_string())
 }
 
 #[tauri::command]
-async fn git_revert_to_commit(directory: String, commit_hash: String, os_session: OsSession) -> Result<(), String> {
+async fn git_revert_to_commit(
+	directory: String,
+	commit_hash: String,
+	os_session: OsSession,
+) -> Result<(), String> {
 	match os_session {
-		OsSession::Local(_) => {
-			git_revert_to_commit_local(&directory, &commit_hash)
-		}
+		OsSession::Local(_) => git_revert_to_commit_local(&directory, &commit_hash),
 		OsSession::Wsl(wsl_session) => {
 			git_revert_to_commit_wsl(&directory, &commit_hash, &wsl_session.distribution)
 		}
@@ -590,16 +664,23 @@ fn git_revert_to_commit_local(directory: &str, commit_hash: &str) -> Result<(), 
 		.current_dir(directory)
 		.output()
 		.map_err(|e| format!("Failed to execute git reset command: {}", e))?;
-	
+
 	if !output.status.success() {
-		return Err(format!("Git reset failed: {}", String::from_utf8_lossy(&output.stderr)));
+		return Err(format!(
+			"Git reset failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(target_os = "windows")]
-fn git_revert_to_commit_wsl(directory: &str, commit_hash: &str, distribution: &str) -> Result<(), String> {
+fn git_revert_to_commit_wsl(
+	directory: &str,
+	commit_hash: &str,
+	distribution: &str,
+) -> Result<(), String> {
 	let output = Command::new("wsl")
 		.arg("-d")
 		.arg(distribution)
@@ -611,16 +692,23 @@ fn git_revert_to_commit_wsl(directory: &str, commit_hash: &str, distribution: &s
 		.arg(commit_hash)
 		.output()
 		.map_err(|e| format!("Failed to execute WSL git reset command: {}", e))?;
-	
+
 	if !output.status.success() {
-		return Err(format!("WSL git reset failed: {}", String::from_utf8_lossy(&output.stderr)));
+		return Err(format!(
+			"WSL git reset failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn git_revert_to_commit_wsl(_directory: &str, _commit_hash: &str, _distribution: &str) -> Result<(), String> {
+fn git_revert_to_commit_wsl(
+	_directory: &str,
+	_commit_hash: &str,
+	_distribution: &str,
+) -> Result<(), String> {
 	Err("WSL is only supported on Windows".to_string())
 }
 
@@ -630,19 +718,24 @@ async fn open_path_in_explorer(path: String) -> Result<(), String> {
 	{
 		// On Windows, normalize the path and use explorer.exe to open it
 		let windows_path = path.replace('/', "\\");
-		println!("Opening path in explorer - Original: '{}', Windows path: '{}'", path, windows_path);
-		
+		println!(
+			"Opening path in explorer - Original: '{}', Windows path: '{}'",
+			path, windows_path
+		);
+
 		// Use /select to open the parent directory and highlight the folder
 		// But if it's a directory, just open it directly
 		let path_obj = std::path::Path::new(&windows_path);
-		println!("Path exists: {}, Is directory: {}", path_obj.exists(), path_obj.is_dir());
-		
+		println!(
+			"Path exists: {}, Is directory: {}",
+			path_obj.exists(),
+			path_obj.is_dir()
+		);
+
 		let output = if path_obj.is_dir() {
 			// Open the directory directly
 			println!("Opening directory directly: '{}'", windows_path);
-			Command::new("explorer")
-				.arg(&windows_path)
-				.output()
+			Command::new("explorer").arg(&windows_path).output()
 		} else {
 			// If it's a file, open the parent and select it
 			println!("Using /select for file: '{}'", windows_path);
@@ -651,16 +744,19 @@ async fn open_path_in_explorer(path: String) -> Result<(), String> {
 				.arg(&windows_path)
 				.output()
 		};
-		
+
 		let result = output.map_err(|e| format!("Failed to open explorer: {}", e))?;
-		
+
 		if !result.status.success() {
-			return Err(format!("Explorer failed: {}", String::from_utf8_lossy(&result.stderr)));
+			return Err(format!(
+				"Explorer failed: {}",
+				String::from_utf8_lossy(&result.stderr)
+			));
 		}
-		
+
 		println!("Explorer command succeeded");
 	}
-	
+
 	#[cfg(target_os = "macos")]
 	{
 		// On macOS, use open command
@@ -668,23 +764,24 @@ async fn open_path_in_explorer(path: String) -> Result<(), String> {
 			.arg(&path)
 			.output()
 			.map_err(|e| format!("Failed to open finder: {}", e))?;
-		
+
 		if !output.status.success() {
-			return Err(format!("Open failed: {}", String::from_utf8_lossy(&output.stderr)));
+			return Err(format!(
+				"Open failed: {}",
+				String::from_utf8_lossy(&output.stderr)
+			));
 		}
 	}
-	
+
 	#[cfg(target_os = "linux")]
 	{
 		// On Linux, try various file managers
 		let file_managers = ["xdg-open", "nautilus", "dolphin", "thunar", "pcmanfm"];
 		let mut success = false;
-		
+
 		for manager in &file_managers {
-			let result = Command::new(manager)
-				.arg(&path)
-				.output();
-			
+			let result = Command::new(manager).arg(&path).output();
+
 			if let Ok(output) = result {
 				if output.status.success() {
 					success = true;
@@ -692,27 +789,27 @@ async fn open_path_in_explorer(path: String) -> Result<(), String> {
 				}
 			}
 		}
-		
+
 		if !success {
 			return Err("Failed to open file manager on Linux".to_string());
 		}
 	}
-	
+
 	Ok(())
 }
 
 #[tauri::command]
 async fn delete_path(path: String) -> Result<(), String> {
 	use std::fs;
-	
+
 	let path_obj = Path::new(&path);
-	
+
 	if !path_obj.exists() {
 		return Err(format!("Path does not exist: {}", path));
 	}
-	
+
 	println!("Deleting path: {}", path);
-	
+
 	if path_obj.is_dir() {
 		// Delete directory and all contents recursively
 		fs::remove_dir_all(&path)
@@ -724,33 +821,32 @@ async fn delete_path(path: String) -> Result<(), String> {
 			.map_err(|e| format!("Failed to delete file '{}': {}", path, e))?;
 		println!("Successfully deleted file: {}", path);
 	}
-	
+
 	Ok(())
 }
 
 #[tauri::command]
-async fn delete_path_with_os_session(path: String, os_session: OsSession) -> Result<(), String> {
+async fn delete_path_with_os_session(
+	path: String,
+	os_session: OsSession,
+) -> Result<(), String> {
 	match os_session {
-		OsSession::Local(_) => {
-			delete_path_local(&path)
-		}
-		OsSession::Wsl(wsl_session) => {
-			delete_path_wsl(&path, &wsl_session.distribution)
-		}
+		OsSession::Local(_) => delete_path_local(&path),
+		OsSession::Wsl(wsl_session) => delete_path_wsl(&path, &wsl_session.distribution),
 	}
 }
 
 fn delete_path_local(path: &str) -> Result<(), String> {
 	use std::fs;
-	
+
 	let path_obj = Path::new(path);
-	
+
 	if !path_obj.exists() {
 		return Err(format!("Path does not exist: {}", path));
 	}
-	
+
 	println!("Deleting local path: {}", path);
-	
+
 	if path_obj.is_dir() {
 		// Delete directory and all contents recursively
 		fs::remove_dir_all(&path)
@@ -762,14 +858,17 @@ fn delete_path_local(path: &str) -> Result<(), String> {
 			.map_err(|e| format!("Failed to delete file '{}': {}", path, e))?;
 		println!("Successfully deleted file: {}", path);
 	}
-	
+
 	Ok(())
 }
 
 #[cfg(target_os = "windows")]
 fn delete_path_wsl(path: &str, distribution: &str) -> Result<(), String> {
-	println!("Deleting WSL path: {} using distribution: {}", path, distribution);
-	
+	println!(
+		"Deleting WSL path: {} using distribution: {}",
+		path, distribution
+	);
+
 	// Use WSL rm command to delete the path
 	let output = Command::new("wsl")
 		.arg("-d")
@@ -779,13 +878,16 @@ fn delete_path_wsl(path: &str, distribution: &str) -> Result<(), String> {
 		.arg(path)
 		.output()
 		.map_err(|e| format!("Failed to execute WSL rm command: {}", e))?;
-	
+
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr);
 		let stdout = String::from_utf8_lossy(&output.stdout);
-		return Err(format!("WSL rm failed: stderr: {} stdout: {}", stderr, stdout));
+		return Err(format!(
+			"WSL rm failed: stderr: {} stdout: {}",
+			stderr, stdout
+		));
 	}
-	
+
 	println!("Successfully deleted WSL path: {}", path);
 	Ok(())
 }
