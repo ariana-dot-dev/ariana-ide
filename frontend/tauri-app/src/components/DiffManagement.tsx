@@ -79,6 +79,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<{ changeId: string, fileIndex: number, hunkIndex: number, hunk: GitDiffHunk, context: string }[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize diff service with current git project directory
   useEffect(() => {
@@ -157,6 +158,19 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     selectedTargetCommit,
     onStateChange
   ]);
+
+  // Add keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const loadBranches = async () => {
     console.log("[COMPONENT] loadBranches method entry");
@@ -872,6 +886,56 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
                 <span className="text-green-500">+{diffSummary.totalAdditions}</span>
                 <span className="text-red-500">-{diffSummary.totalDeletions}</span>
               </div>
+              
+              {/* Search Bar */}
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search files and content..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    searchHunks(e.target.value);
+                  }}
+                  className="px-3 py-2 border border-[var(--base-300)] rounded text-sm w-64 focus:outline-none focus:border-[var(--acc-500)]"
+                />
+                {searchResults.length > 0 && (
+                  <div className="absolute right-8 top-1/2 transform -translate-y-1/2 text-xs text-[var(--base-600)]">
+                    {currentSearchIndex + 1}/{searchResults.length}
+                  </div>
+                )}
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchResults([]);
+                      setCurrentSearchIndex(-1);
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[var(--base-500)] hover:text-[var(--base-700)]"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              
+              {/* Search Navigation */}
+              {searchResults.length > 0 && (
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={previousSearchResult}
+                    className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={nextSearchResult}
+                    className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
+                  >
+                    ↓
+                  </button>
+                </div>
+              )}
             </div>
 
             
@@ -1493,14 +1557,6 @@ function DetailedMode({
             event.preventDefault();
             onPreviousChange();
             break;
-          case 'j':
-            event.preventDefault();
-            onNextHunk();
-            break;
-          case 'k':
-            event.preventDefault();
-            onPreviousHunk();
-            break;
         }
       }
       
@@ -1607,26 +1663,6 @@ function DetailedMode({
             </button>
           </div>
 
-          {/* Block Navigation */}
-          <div className="flex items-center space-x-1 mr-2">
-            <button
-              onClick={onPreviousHunk}
-              disabled={currentLineIndex <= 0}
-              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Previous Block (K or Ctrl+↑)"
-            >
-              ◀
-            </button>
-            <button
-              onClick={onNextHunk}
-              disabled={currentLineIndex >= currentFile.hunks.length - 1}
-              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Next Block (J or Ctrl+↓)"
-            >
-              ▶
-            </button>
-          </div>
-          
           
           <button
             onClick={() => onValidateChange(selectedChange)}
@@ -1654,6 +1690,47 @@ function DetailedMode({
           onDiscardFile={onDiscardSingleFile}
           onValidateFile={onValidateSingleFile}
         />
+        
+        {/* Navigation Controls - Bottom Right */}
+        <div className="fixed bottom-4 right-4 flex items-center space-x-1 z-50">
+          {/* Previous File */}
+          <button
+            onClick={onPreviousFile}
+            className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors shadow-lg text-sm"
+            title="Previous File (←)"
+          >
+            ◀
+          </button>
+          
+          {/* Hunk Navigation */}
+          <div className="flex flex-col items-center space-y-1">
+            <button
+              onClick={onPreviousHunk}
+              disabled={currentLineIndex <= 0}
+              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+              title="Previous Block (Ctrl+↑)"
+            >
+              ▲
+            </button>
+            <button
+              onClick={onNextHunk}
+              disabled={currentLineIndex >= currentFile.hunks.length - 1}
+              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+              title="Next Block (Ctrl+↓)"
+            >
+              ▼
+            </button>
+          </div>
+          
+          {/* Next File */}
+          <button
+            onClick={onNextFile}
+            className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors shadow-lg text-sm"
+            title="Next File (→)"
+          >
+            ▶
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1770,7 +1847,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
       <div className="relative min-h-full">
         <div className="p-4">
           <div className="bg-[var(--base-200)] rounded-lg overflow-hidden">
-            <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] sticky top-0 z-10">
+            <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] sticky top-0 z-20">
               <div className="flex items-center justify-between">
                 <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
                 <div className="flex items-center space-x-4 text-sm">
@@ -1824,7 +1901,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscar
                 )}
               >
                 <div className={cn(
-                  "px-4 py-2 text-xs font-mono sticky top-12 z-5 transition-colors duration-300",
+                  "px-4 py-2 text-xs font-mono sticky top-12 z-10 transition-colors duration-300",
                   hunkIndex === currentHunkIndex 
                     ? "bg-[var(--acc-200)] text-[var(--acc-800)] border-l-4 border-[var(--acc-500)]" 
                     : "bg-[var(--base-250)] text-[var(--base-600)]"
