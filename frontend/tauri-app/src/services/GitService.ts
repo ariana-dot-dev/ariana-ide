@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
-import { OsSession, osSessionGetWorkingDirectory } from '../bindings/os';
+import { invoke } from "@tauri-apps/api/core";
+import { OsSession, osSessionGetWorkingDirectory } from "../bindings/os";
 
 export class GitService {
 	/**
@@ -8,20 +8,25 @@ export class GitService {
 	 * @param message - The commit message
 	 * @returns Promise<string> - The commit hash
 	 */
-	static async createCommit(osSession: OsSession, message: string): Promise<string> {
+	static async createCommit(
+		osSession: OsSession,
+		message: string,
+	): Promise<string> {
 		const directory = osSessionGetWorkingDirectory(osSession);
-		
+
 		try {
-			const commitHash = await invoke<string>('git_commit', {
+			const commitHash = await invoke<string>("git_commit", {
 				directory,
 				message,
-				osSession
+				osSession,
 			});
-			
-			console.log(`[GitService] Created commit: ${commitHash} with message: "${message}"`);
+
+			console.log(
+				`[GitService] Created commit: ${commitHash} with message: "${message}"`,
+			);
 			return commitHash;
 		} catch (error) {
-			console.error('[GitService] Failed to create commit:', error);
+			console.error("[GitService] Failed to create commit:", error);
 			throw new Error(`Failed to create git commit: ${error}`);
 		}
 	}
@@ -31,19 +36,22 @@ export class GitService {
 	 * @param osSession - The OS session for the git repository
 	 * @param commitHash - The commit hash to revert to
 	 */
-	static async revertToCommit(osSession: OsSession, commitHash: string): Promise<void> {
+	static async revertToCommit(
+		osSession: OsSession,
+		commitHash: string,
+	): Promise<void> {
 		const directory = osSessionGetWorkingDirectory(osSession);
-		
+
 		try {
-			await invoke<void>('git_revert_to_commit', {
+			await invoke<void>("git_revert_to_commit", {
 				directory,
 				commitHash,
-				osSession
+				osSession,
 			});
-			
+
 			console.log(`[GitService] Reverted to commit: ${commitHash}`);
 		} catch (error) {
-			console.error('[GitService] Failed to revert to commit:', error);
+			console.error("[GitService] Failed to revert to commit:", error);
 			throw new Error(`Failed to revert to commit: ${error}`);
 		}
 	}

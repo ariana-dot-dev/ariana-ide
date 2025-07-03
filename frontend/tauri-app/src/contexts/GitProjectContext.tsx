@@ -1,9 +1,19 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { GitProject, GitProjectCanvas, ProcessState } from '../types/GitProject';
-import { CanvasElement } from '../canvas/types';
-import { ProcessManager } from '../services/ProcessManager';
-import { useStore } from '../state';
-import { TaskManager } from '../types/Task';
+import React, {
+	createContext,
+	useContext,
+	useEffect,
+	useState,
+	ReactNode,
+} from "react";
+import {
+	GitProject,
+	GitProjectCanvas,
+	ProcessState,
+} from "../types/GitProject";
+import { CanvasElement } from "../canvas/types";
+import { ProcessManager } from "../services/ProcessManager";
+import { useStore } from "../state";
+import { TaskManager } from "../types/Task";
 
 interface GitProjectContextValue {
 	selectedGitProject: GitProject | null;
@@ -36,7 +46,10 @@ interface GitProjectProviderProps {
 	gitProject: GitProject | null;
 }
 
-export function GitProjectProvider({ children, gitProject }: GitProjectProviderProps) {
+export function GitProjectProvider({
+	children,
+	gitProject,
+}: GitProjectProviderProps) {
 	const [, forceUpdate] = useState(0);
 	const { updateGitProject } = useStore();
 
@@ -46,13 +59,16 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			return;
 		}
 
-		const unsubscribeCanvases = gitProject.subscribe('canvases', () => {
-			forceUpdate(prev => prev + 1);
+		const unsubscribeCanvases = gitProject.subscribe("canvases", () => {
+			forceUpdate((prev) => prev + 1);
 		});
 
-		const unsubscribeCurrentCanvas = gitProject.subscribe('currentCanvasIndex', () => {
-			forceUpdate(prev => prev + 1);
-		});
+		const unsubscribeCurrentCanvas = gitProject.subscribe(
+			"currentCanvasIndex",
+			() => {
+				forceUpdate((prev) => prev + 1);
+			},
+		);
 
 		return () => {
 			unsubscribeCanvases();
@@ -61,19 +77,19 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 	}, [gitProject]);
 
 	const currentCanvas = gitProject?.getCurrentCanvas() || null;
-	
+
 	console.log("GitProjectContext:", {
 		gitProject: gitProject?.name,
 		canvasCount: gitProject?.canvases.length,
 		currentCanvasIndex: gitProject?.currentCanvasIndex,
 		currentCanvas: currentCanvas?.name,
-		canvasElements: currentCanvas?.elements.length
+		canvasElements: currentCanvas?.elements.length,
 	});
 
 	const contextValue: GitProjectContextValue = {
 		selectedGitProject: gitProject,
 		currentCanvas: currentCanvas,
-		
+
 		updateCanvasElements: (elements: any[]) => {
 			if (!gitProject) return;
 			const currentCanvas = gitProject.getCurrentCanvas();
@@ -91,7 +107,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 		},
 
 		addCanvas: (canvas?: any) => {
-			if (!gitProject) return '';
+			if (!gitProject) return "";
 			const canvasId = gitProject.addCanvas(canvas);
 			updateGitProject(gitProject.id);
 			return canvasId;
@@ -125,7 +141,11 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			const result = gitProject.updateProcessInCanvas(currentCanvas.id, processId, updates);
+			const result = gitProject.updateProcessInCanvas(
+				currentCanvas.id,
+				processId,
+				updates,
+			);
 			if (result) updateGitProject(gitProject.id);
 			return result;
 		},
@@ -134,7 +154,10 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			const result = gitProject.removeProcessFromCanvas(currentCanvas.id, processId);
+			const result = gitProject.removeProcessFromCanvas(
+				currentCanvas.id,
+				processId,
+			);
 			if (result) updateGitProject(gitProject.id);
 			return result;
 		},
@@ -158,7 +181,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return null;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return null;
-			
+
 			const taskId = currentCanvas.taskManager.createPromptingTask(prompt);
 			updateGitProject(gitProject.id);
 			return taskId;
@@ -168,7 +191,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			
+
 			const result = currentCanvas.taskManager.startTask(taskId, processId);
 			if (result) updateGitProject(gitProject.id);
 			return result;
@@ -178,7 +201,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			
+
 			const result = currentCanvas.taskManager.completeTask(taskId, commitHash);
 			if (result) updateGitProject(gitProject.id);
 			return result;
@@ -188,7 +211,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			
+
 			const result = currentCanvas.taskManager.updateTaskPrompt(taskId, prompt);
 			if (result) updateGitProject(gitProject.id);
 			return result;
@@ -198,7 +221,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			
+
 			const result = currentCanvas.taskManager.revertTask(taskId);
 			if (result) updateGitProject(gitProject.id);
 			return result;
@@ -208,7 +231,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			if (!gitProject) return false;
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return false;
-			
+
 			const result = currentCanvas.taskManager.restoreTask(taskId);
 			if (result) updateGitProject(gitProject.id);
 			return result;
@@ -232,7 +255,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 export function useGitProject(): GitProjectContextValue {
 	const context = useContext(GitProjectContext);
 	if (!context) {
-		throw new Error('useGitProject must be used within a GitProjectProvider');
+		throw new Error("useGitProject must be used within a GitProjectProvider");
 	}
 	return context;
 }

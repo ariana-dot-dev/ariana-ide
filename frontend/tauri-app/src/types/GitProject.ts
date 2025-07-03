@@ -7,8 +7,8 @@ import { TextArea } from "../canvas/TextArea";
 export interface ProcessState {
 	processId: string;
 	terminalId: string;
-	type: 'claude-code' | 'custom-terminal';
-	status: 'running' | 'completed' | 'finished' | 'error';
+	type: "claude-code" | "custom-terminal";
+	status: "running" | "completed" | "finished" | "error";
 	startTime: number;
 	elementId: string; // Which canvas element owns this process
 	prompt?: string; // For claude-code processes
@@ -46,7 +46,7 @@ export class GitProject {
 		this.createdAt = Date.now();
 		this.lastModified = Date.now();
 
-		console.log(this.canvases)
+		console.log(this.canvases);
 	}
 
 	// Reactive getters
@@ -56,22 +56,26 @@ export class GitProject {
 
 	// Reactive setters
 	setCurrentCanvasIndex(index: number): void {
-		if (index >= -1 && index < this.canvases.length && index !== this.currentCanvasIndex) {
+		if (
+			index >= -1 &&
+			index < this.canvases.length &&
+			index !== this.currentCanvasIndex
+		) {
 			this.currentCanvasIndex = index;
 			this.lastModified = Date.now();
-			this.notifyListeners('currentCanvasIndex');
+			this.notifyListeners("currentCanvasIndex");
 		}
 	}
 
 	addCanvas(canvas?: Partial<GitProjectCanvas>): string {
 		const canvasOsSession = canvas?.osSession || this.root; // Fallback to root session
-		
+
 		const newCanvas: GitProjectCanvas = {
 			id: crypto.randomUUID(),
 			name: canvas?.name || "", // No automatic naming
 			elements: canvas?.elements || [
 				// Automatically add a TextArea element for new canvases
-				TextArea.canvasElement(canvasOsSession, "")
+				TextArea.canvasElement(canvasOsSession, ""),
 			],
 			osSession: canvasOsSession,
 			taskManager: canvas?.taskManager || new TaskManager(),
@@ -80,16 +84,16 @@ export class GitProject {
 		};
 
 		this.canvases.push(newCanvas);
-		
+
 		// If this is the first canvas, automatically select it
 		if (this.canvases.length === 1) {
 			this.currentCanvasIndex = 0;
 		}
-		
+
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		if (this.canvases.length === 1) {
-			this.notifyListeners('currentCanvasIndex');
+			this.notifyListeners("currentCanvasIndex");
 		}
 		return newCanvas.id;
 	}
@@ -97,12 +101,16 @@ export class GitProject {
 	/**
 	 * Creates a new canvas that is a copy of the repository on another branch and location
 	 */
-	async addCanvasCopy(): Promise<{ success: boolean; canvasId?: string; error?: string }> {
+	async addCanvasCopy(): Promise<{
+		success: boolean;
+		canvasId?: string;
+		error?: string;
+	}> {
 		try {
 			// Generate random ID for the new version
 			const randomId = CanvasService.generateRandomId();
 			const branchName = `canvas-${randomId}`;
-			
+
 			// Get the root working directory
 			const rootDirectory = osSessionGetWorkingDirectory(this.root);
 			if (!rootDirectory) {
@@ -111,31 +119,31 @@ export class GitProject {
 
 			// Create new location path (add suffix to avoid conflicts)
 			const newLocation = `${rootDirectory}-${randomId}`;
-			
+
 			// Step 1: Copy the folder to new location
 			const copyResult = await CanvasService.copyDirectory(
 				rootDirectory,
 				newLocation,
-				this.root
+				this.root,
 			);
-			
+
 			if (!copyResult.success) {
-				return { 
-					success: false, 
-					error: `Failed to copy directory: ${copyResult.error}` 
+				return {
+					success: false,
+					error: `Failed to copy directory: ${copyResult.error}`,
 				};
 			}
 
 			// Step 2: Create new OsSession with the new working directory
 			let newOsSession: OsSession;
-			if ('Local' in this.root) {
+			if ("Local" in this.root) {
 				newOsSession = { Local: newLocation };
-			} else if ('Wsl' in this.root) {
+			} else if ("Wsl" in this.root) {
 				newOsSession = {
 					Wsl: {
 						distribution: this.root.Wsl.distribution,
-						working_directory: newLocation
-					}
+						working_directory: newLocation,
+					},
 				};
 			} else {
 				return { success: false, error: "Unknown OS session type" };
@@ -145,13 +153,13 @@ export class GitProject {
 			const gitResult = await CanvasService.createGitBranch(
 				newLocation,
 				branchName,
-				newOsSession
+				newOsSession,
 			);
-			
+
 			if (!gitResult.success) {
-				return { 
-					success: false, 
-					error: `Failed to create git branch: ${gitResult.error}` 
+				return {
+					success: false,
+					error: `Failed to create git branch: ${gitResult.error}`,
 				};
 			}
 
@@ -165,19 +173,19 @@ export class GitProject {
 
 			return { success: true, canvasId };
 		} catch (error) {
-			return { 
-				success: false, 
-				error: `Unexpected error: ${error}` 
+			return {
+				success: false,
+				error: `Unexpected error: ${error}`,
 			};
 		}
 	}
 
 	removeCanvas(canvasId: string): boolean {
-		const index = this.canvases.findIndex(c => c.id === canvasId);
+		const index = this.canvases.findIndex((c) => c.id === canvasId);
 		if (index === -1 || this.canvases.length <= 1) return false;
 
 		this.canvases.splice(index, 1);
-		
+
 		// Adjust currentCanvasIndex if needed
 		if (this.currentCanvasIndex >= this.canvases.length) {
 			this.currentCanvasIndex = this.canvases.length - 1;
@@ -186,41 +194,44 @@ export class GitProject {
 		}
 
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
-		this.notifyListeners('currentCanvasIndex');
+		this.notifyListeners("canvases");
+		this.notifyListeners("currentCanvasIndex");
 		return true;
 	}
 
 	updateCanvasElements(canvasId: string, elements: CanvasElement[]): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas) return false;
 
 		canvas.elements = elements;
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
 	addToCurrentCanvasElements(element: CanvasElement): boolean {
 		const canvas = this.canvases[this.currentCanvasIndex];
 		if (!canvas) return false;
-		return this.updateCanvasElements(canvas.id, [...canvas.elements, element])
+		return this.updateCanvasElements(canvas.id, [...canvas.elements, element]);
 	}
 
 	renameCanvas(canvasId: string, name: string): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas) return false;
 
 		canvas.name = name;
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
 	// Reactive event system
-	subscribe(property: 'canvases' | 'currentCanvasIndex', callback: () => void): () => void {
+	subscribe(
+		property: "canvases" | "currentCanvasIndex",
+		callback: () => void,
+	): () => void {
 		if (!this.listeners.has(property)) {
 			this.listeners.set(property, new Set());
 		}
@@ -233,7 +244,7 @@ export class GitProject {
 	}
 
 	private notifyListeners(property: string): void {
-		this.listeners.get(property)?.forEach(callback => callback());
+		this.listeners.get(property)?.forEach((callback) => callback());
 	}
 
 	// Serialization
@@ -242,9 +253,9 @@ export class GitProject {
 			id: this.id,
 			name: this.name,
 			root: this.root,
-			canvases: this.canvases.map(canvas => ({
+			canvases: this.canvases.map((canvas) => ({
 				...canvas,
-				taskManager: canvas.taskManager.toJSON()
+				taskManager: canvas.taskManager.toJSON(),
 			})),
 			currentCanvasIndex: this.currentCanvasIndex,
 			createdAt: this.createdAt,
@@ -257,13 +268,20 @@ export class GitProject {
 		project.id = data.id;
 		project.canvases = data.canvases || [];
 		// Handle migration for canvases that don't have proper structure yet
-		project.canvases = project.canvases.map(canvas => ({
+		project.canvases = project.canvases.map((canvas) => ({
 			...canvas,
 			osSession: canvas.osSession || data.root, // Fallback to project root
-			taskManager: canvas.taskManager ? TaskManager.fromJSON(canvas.taskManager) : new TaskManager(),
-			runningProcesses: canvas.runningProcesses || []
+			taskManager: canvas.taskManager
+				? TaskManager.fromJSON(canvas.taskManager)
+				: new TaskManager(),
+			runningProcesses: canvas.runningProcesses || [],
 		}));
-		project.currentCanvasIndex = data.currentCanvasIndex >= 0 ? data.currentCanvasIndex : (project.canvases.length > 0 ? 0 : -1);
+		project.currentCanvasIndex =
+			data.currentCanvasIndex >= 0
+				? data.currentCanvasIndex
+				: project.canvases.length > 0
+					? 0
+					: -1;
 		project.createdAt = data.createdAt || Date.now();
 		project.lastModified = data.lastModified || Date.now();
 		return project;
@@ -272,26 +290,28 @@ export class GitProject {
 	// Helper methods
 	private generateDefaultName(): string {
 		// Extract name from the root OsSession path
-		if (this.root && typeof this.root === 'object') {
-			if ('Local' in this.root) {
+		if (this.root && typeof this.root === "object") {
+			if ("Local" in this.root) {
 				const path = this.root.Local;
-				return path.split('/').pop() || path.split('\\').pop() || 'Local Project';
+				return (
+					path.split("/").pop() || path.split("\\").pop() || "Local Project"
+				);
 			}
-			if ('Wsl' in this.root) {
+			if ("Wsl" in this.root) {
 				const path = this.root.Wsl.working_directory;
-				return path.split('/').pop() || 'WSL Project';
+				return path.split("/").pop() || "WSL Project";
 			}
 		}
-		return 'Untitled Project';
+		return "Untitled Project";
 	}
 
 	createDefaultCanvas(): GitProjectCanvas {
 		return {
 			id: crypto.randomUUID(),
-			name: 'Initial version',
+			name: "Initial version",
 			elements: [
 				// Automatically add a TextArea element for new canvases
-				TextArea.canvasElement(this.root, "")
+				TextArea.canvasElement(this.root, ""),
 			],
 			osSession: this.root, // Set the osSession to the root
 			taskManager: new TaskManager(),
@@ -307,7 +327,7 @@ export class GitProject {
 
 	// Process management methods
 	addProcessToCanvas(canvasId: string, process: ProcessState): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas) return false;
 
 		if (!canvas.runningProcesses) {
@@ -317,45 +337,56 @@ export class GitProject {
 		canvas.runningProcesses.push(process);
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
-	updateProcessInCanvas(canvasId: string, processId: string, updates: Partial<ProcessState>): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+	updateProcessInCanvas(
+		canvasId: string,
+		processId: string,
+		updates: Partial<ProcessState>,
+	): boolean {
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas?.runningProcesses) return false;
 
-		const process = canvas.runningProcesses.find(p => p.processId === processId);
+		const process = canvas.runningProcesses.find(
+			(p) => p.processId === processId,
+		);
 		if (!process) return false;
 
 		Object.assign(process, updates);
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
 	removeProcessFromCanvas(canvasId: string, processId: string): boolean {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		if (!canvas?.runningProcesses) return false;
 
-		const index = canvas.runningProcesses.findIndex(p => p.processId === processId);
+		const index = canvas.runningProcesses.findIndex(
+			(p) => p.processId === processId,
+		);
 		if (index === -1) return false;
 
 		canvas.runningProcesses.splice(index, 1);
 		canvas.lastModified = Date.now();
 		this.lastModified = Date.now();
-		this.notifyListeners('canvases');
+		this.notifyListeners("canvases");
 		return true;
 	}
 
 	getCanvasProcesses(canvasId: string): ProcessState[] {
-		const canvas = this.canvases.find(c => c.id === canvasId);
+		const canvas = this.canvases.find((c) => c.id === canvasId);
 		return canvas?.runningProcesses || [];
 	}
 
-	getProcessByElementId(canvasId: string, elementId: string): ProcessState | undefined {
-		const canvas = this.canvases.find(c => c.id === canvasId);
-		return canvas?.runningProcesses?.find(p => p.elementId === elementId);
+	getProcessByElementId(
+		canvasId: string,
+		elementId: string,
+	): ProcessState | undefined {
+		const canvas = this.canvases.find((c) => c.id === canvasId);
+		return canvas?.runningProcesses?.find((p) => p.elementId === elementId);
 	}
 }

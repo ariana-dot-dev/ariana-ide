@@ -58,7 +58,7 @@ export class TextArea {
 			prompt,
 			commitHash,
 			isReverted: false,
-			completedAt: Date.now()
+			completedAt: Date.now(),
 		});
 		this.currentPrompt = ""; // Reset current prompt
 		this.content = ""; // Reset content
@@ -87,10 +87,15 @@ export class TextArea {
 	}
 
 	public getValidCommitTasks(): CompletedTask[] {
-		return this.completedTasks.filter(task => task.commitHash && task.commitHash !== "NO_CHANGES");
+		return this.completedTasks.filter(
+			(task) => task.commitHash && task.commitHash !== "NO_CHANGES",
+		);
 	}
 
-	static canvasElement(osSession: OsSession, content: string = ""): CanvasElement {
+	static canvasElement(
+		osSession: OsSession,
+		content: string = "",
+	): CanvasElement {
 		const textArea = new TextArea(osSession, content);
 		return new CanvasElement({ textArea }, 1);
 	}

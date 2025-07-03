@@ -396,7 +396,10 @@ impl GitSearchManager {
 		let search_id_clone = search_id.clone();
 
 		thread::spawn(move || {
-			println!("Git Search - Starting search with OS session kind: {:?}", os_session_kind);
+			println!(
+				"Git Search - Starting search with OS session kind: {:?}",
+				os_session_kind
+			);
 			let root_dirs = Self::get_root_directories(&os_session_kind);
 			println!("Git Search - Root directories to search: {:?}", root_dirs);
 			let mut found_dirs = Vec::new();
@@ -412,7 +415,10 @@ impl GitSearchManager {
 				);
 			}
 
-			println!("Git Search - Search complete. Total found: {}", found_dirs.len());
+			println!(
+				"Git Search - Search complete. Total found: {}",
+				found_dirs.len()
+			);
 			// Mark search as complete
 			let mut searches = searches_clone.lock().unwrap();
 			if let Some(result) = searches.get_mut(&search_id_clone) {
@@ -446,18 +452,20 @@ impl GitSearchManager {
 				#[cfg(target_os = "linux")]
 				{
 					// Linux/WSL: search user home directory
-					let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+					let home_dir =
+						std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
 					vec![home_dir]
 				}
 				#[cfg(target_os = "macos")]
 				{
 					// macOS: search user-specific directories to avoid permission prompts
 					let mut roots = Vec::new();
-					let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
-					
+					let home_dir =
+						std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
+
 					// Add home directory first to catch projects in the root
 					roots.push(home_dir.clone());
-					
+
 					// Add Documents, Desktop, Downloads in priority order
 					let user_dirs = ["Documents", "Desktop", "Downloads"];
 					for dir in user_dirs {
@@ -466,7 +474,7 @@ impl GitSearchManager {
 							roots.push(path);
 						}
 					}
-					
+
 					roots
 				}
 			}
@@ -482,7 +490,7 @@ impl GitSearchManager {
 				roots
 			}
 		};
-		
+
 		println!("Git Search - Root directories determined: {:?}", roots);
 		roots
 	}
@@ -585,7 +593,10 @@ impl GitSearchManager {
 			}
 		};
 
-		println!("WSL Search - Root path: {}, Distribution: {}", root_path, distribution);
+		println!(
+			"WSL Search - Root path: {}, Distribution: {}",
+			root_path, distribution
+		);
 
 		// Skip path existence check - let find handle non-existent paths
 
@@ -596,7 +607,10 @@ impl GitSearchManager {
 			root_path.replace("'", "'\"'\"'")
 		);
 
-		println!("WSL Search - Executing command: wsl -d {} bash -c '{}'", distribution, find_command);
+		println!(
+			"WSL Search - Executing command: wsl -d {} bash -c '{}'",
+			distribution, find_command
+		);
 
 		let output = Command::new("wsl")
 			.arg("-d")
@@ -609,8 +623,14 @@ impl GitSearchManager {
 		match output {
 			Ok(output) => {
 				println!("WSL Search - Command exit status: {}", output.status);
-				println!("WSL Search - Stdout: {}", String::from_utf8_lossy(&output.stdout));
-				println!("WSL Search - Stderr: {}", String::from_utf8_lossy(&output.stderr));
+				println!(
+					"WSL Search - Stdout: {}",
+					String::from_utf8_lossy(&output.stdout)
+				);
+				println!(
+					"WSL Search - Stderr: {}",
+					String::from_utf8_lossy(&output.stderr)
+				);
 
 				if output.status.success() {
 					let output_str = String::from_utf8_lossy(&output.stdout);
@@ -636,7 +656,10 @@ impl GitSearchManager {
 						}
 					}
 				} else {
-					println!("WSL Search - Command failed with status: {}", output.status);
+					println!(
+						"WSL Search - Command failed with status: {}",
+						output.status
+					);
 				}
 			}
 			Err(e) => {

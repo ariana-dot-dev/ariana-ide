@@ -33,10 +33,13 @@ function App() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [interpreter, setInterpreter] = useState<Interpreter | null>(null);
 	const [showTitlebar, setShowTitlebar] = useState(false);
-	const [selectedGitProjectId, setSelectedGitProjectId] = useState<string | null>(null);
+	const [selectedGitProjectId, setSelectedGitProjectId] = useState<
+		string | null
+	>(null);
 	const [showDiffManagement, setShowDiffManagement] = useState(false);
 	const [diffManagementState, setDiffManagementState] = useState<any>(null);
-	const [showCommunicationPalette, setShowCommunicationPalette] = useState(false);
+	const [showCommunicationPalette, setShowCommunicationPalette] =
+		useState(false);
 	const { isLightTheme } = store;
 
 	const titleBarHoveredRef = useRef(false);
@@ -109,7 +112,7 @@ function App() {
 						currentDir,
 						1,
 					);
-					
+
 					selectedProject.addToCurrentCanvasElements(fileTreeElement);
 				} catch (error) {
 					console.error("Failed to get current directory:", error);
@@ -123,7 +126,7 @@ function App() {
 			const selectedProject = store.getGitProject(selectedGitProjectId);
 			if (selectedProject) {
 				const terminalElement = Terminal.canvasElement(selectedProject.root, 1);
-				selectedProject.addToCurrentCanvasElements(terminalElement)
+				selectedProject.addToCurrentCanvasElements(terminalElement);
 			}
 		}
 	};
@@ -135,9 +138,9 @@ function App() {
 
 	const handleResetStore = async () => {
 		const confirmed = window.confirm(
-			"⚠️ This will permanently delete all your projects, settings, and data. This action cannot be undone.\n\nAre you sure you want to reset the store?"
+			"⚠️ This will permanently delete all your projects, settings, and data. This action cannot be undone.\n\nAre you sure you want to reset the store?",
 		);
-		
+
 		if (confirmed) {
 			try {
 				await store.resetStore();
@@ -184,7 +187,6 @@ function App() {
 					style={{ background: 'url("assets/noise.png")' }}
 				></div>
 				<div className="w-full h-full max-h-full flex flex-col gap-1.5 p-2">
-
 					{/* Custom Titlebar */}
 					<div
 						onMouseEnter={() => {
@@ -333,18 +335,22 @@ function App() {
 								</h1>
 							</div>
 							<div className="h-fit max-h-[50%] w-full">
-								<ProjectSelector onProjectCreated={(projectId: string) => {
-								setSelectedGitProjectId(projectId);
-							}} />
+								<ProjectSelector
+									onProjectCreated={(projectId: string) => {
+										setSelectedGitProjectId(projectId);
+									}}
+								/>
 							</div>
 						</div>
 					) : (
-						<GitProjectProvider gitProject={store.getGitProject(selectedGitProjectId) || null}>
+						<GitProjectProvider
+							gitProject={store.getGitProject(selectedGitProjectId) || null}
+						>
 							{/* Diff Management Modal */}
 							{showDiffManagement && (
 								<div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
 									<div className="bg-[var(--base-100)] rounded-lg w-full h-full flex flex-col">
-										<DiffManagement 
+										<DiffManagement
 											onClose={() => setShowDiffManagement(false)}
 											initialState={diffManagementState}
 											onStateChange={setDiffManagementState}
@@ -353,8 +359,8 @@ function App() {
 									</div>
 								</div>
 							)}
-							
-							<GitProjectView/>
+
+							<GitProjectView />
 							<Repl />
 						</GitProjectProvider>
 					)}
@@ -383,7 +389,6 @@ function App() {
 							/>
 						))}
 					</div>
-
 				</div>
 			</div>
 		</InterpreterContext>

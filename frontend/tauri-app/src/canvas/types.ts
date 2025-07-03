@@ -48,7 +48,7 @@ export type RectangleKind = { rectangle: Rectangle };
 export type TerminalKind = { terminal: Terminal };
 export type FileTreeKind = { fileTree: FileTreeCanvas };
 export type TextAreaKind = { textArea: TextArea };
-export type CustomTerminalKind = { customTerminal: CustomTerminal }
+export type CustomTerminalKind = { customTerminal: CustomTerminal };
 
 export class CanvasElement {
 	public weight: number;

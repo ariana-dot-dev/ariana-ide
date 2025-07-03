@@ -6,12 +6,17 @@ import { cn } from "./utils";
 import { GitProject } from "./types/GitProject";
 import { useStore } from "./state";
 
-const GitProjectView: React.FC<{}> = ({ }) => {
-	const { selectedGitProject, currentCanvas, updateCanvasElements } = useGitProject();
+const GitProjectView: React.FC<{}> = ({}) => {
+	const { selectedGitProject, currentCanvas, updateCanvasElements } =
+		useGitProject();
 	const { updateGitProject, removeGitProject } = useStore();
 	const [showCanvases, setShowCanvases] = useState(true);
 	const [isCreatingCanvas, setIsCreatingCanvas] = useState(false);
-	const [contextMenu, setContextMenu] = useState<{x: number, y: number, canvasId: string} | null>(null);
+	const [contextMenu, setContextMenu] = useState<{
+		x: number;
+		y: number;
+		canvasId: string;
+	} | null>(null);
 
 	const canvasesHoveredRef = useRef(false);
 	const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -20,78 +25,86 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 	const getProjectDirectoryName = () => {
 		if (!selectedGitProject) return "";
 		const root = selectedGitProject.root;
-		if ('Local' in root) {
+		if ("Local" in root) {
 			const path = root.Local;
-			return path.split('/').pop() || path.split('\\').pop() || path;
-		} else if ('Wsl' in root) {
+			return path.split("/").pop() || path.split("\\").pop() || path;
+		} else if ("Wsl" in root) {
 			const path = root.Wsl.working_directory;
-			return path.split('/').pop() || path.split('\\').pop() || path;
+			return path.split("/").pop() || path.split("\\").pop() || path;
 		}
 		return "";
 	};
 
 	// Compute task progress for each canvas using TaskManager (persistent data)
 	const getCanvasTaskCounts = (canvasId: string) => {
-		if (!selectedGitProject) return { running: 0, finished: 0, error: 0, total: 0 };
-		
-		const canvas = selectedGitProject.canvases.find(c => c.id === canvasId);
-		if (!canvas?.taskManager) return { running: 0, finished: 0, error: 0, total: 0 };
-		
+		if (!selectedGitProject)
+			return { running: 0, finished: 0, error: 0, total: 0 };
+
+		const canvas = selectedGitProject.canvases.find((c) => c.id === canvasId);
+		if (!canvas?.taskManager)
+			return { running: 0, finished: 0, error: 0, total: 0 };
+
 		const taskManager = canvas.taskManager;
 		const allTasks = taskManager.getTasks();
 		const running = taskManager.getInProgressTasks().length;
 		const finished = taskManager.getCompletedTasks().length;
 		const total = allTasks.length;
-		
+
 		// For error count, we could check processes since tasks don't have error state yet
 		const processes = canvas.runningProcesses || [];
-		const error = processes.filter(p => p.status === 'error').length;
-		
+		const error = processes.filter((p) => p.status === "error").length;
+
 		return { running, finished, error, total };
 	};
 
 	// Handle workspace right-click context menu
-	const handleWorkspaceContextMenu = (e: React.MouseEvent, canvasId: string) => {
+	const handleWorkspaceContextMenu = (
+		e: React.MouseEvent,
+		canvasId: string,
+	) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setContextMenu({
 			x: e.clientX,
 			y: e.clientY,
-			canvasId
+			canvasId,
 		});
 	};
 
 	// Close context menu when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+			if (
+				contextMenuRef.current &&
+				!contextMenuRef.current.contains(event.target as Node)
+			) {
 				setContextMenu(null);
 			}
 		};
 
 		if (contextMenu) {
-			document.addEventListener('mousedown', handleClickOutside);
+			document.addEventListener("mousedown", handleClickOutside);
 		}
 
 		return () => {
-			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, [contextMenu]);
 
 	// Show workspace in explorer
 	const showWorkspaceInExplorer = async (canvasId: string) => {
 		if (!selectedGitProject) return;
-		
+
 		try {
-			const canvas = selectedGitProject.canvases.find(c => c.id === canvasId);
+			const canvas = selectedGitProject.canvases.find((c) => c.id === canvasId);
 			if (!canvas?.osSession) return;
 
 			let explorerPath = "";
-			if ('Local' in canvas.osSession) {
+			if ("Local" in canvas.osSession) {
 				explorerPath = canvas.osSession.Local;
-			} else if ('Wsl' in canvas.osSession) {
+			} else if ("Wsl" in canvas.osSession) {
 				// Convert WSL path to Windows explorer path
-				explorerPath = `\\\\wsl$\\${canvas.osSession.Wsl.distribution}${canvas.osSession.Wsl.working_directory.replace(/\//g, '\\')}`;
+				explorerPath = `\\\\wsl$\\${canvas.osSession.Wsl.distribution}${canvas.osSession.Wsl.working_directory.replace(/\//g, "\\")}`;
 			}
 
 			if (explorerPath) {
@@ -106,31 +119,35 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 	// Delete workspace
 	const deleteWorkspace = async (canvasId: string) => {
 		if (!selectedGitProject) return;
-		
+
 		try {
-			const canvas = selectedGitProject.canvases.find(c => c.id === canvasId);
+			const canvas = selectedGitProject.canvases.find((c) => c.id === canvasId);
 			if (!canvas?.osSession) return;
 
 			let deletePath = "";
-			if ('Local' in canvas.osSession) {
+			if ("Local" in canvas.osSession) {
 				deletePath = canvas.osSession.Local;
-			} else if ('Wsl' in canvas.osSession) {
+			} else if ("Wsl" in canvas.osSession) {
 				deletePath = canvas.osSession.Wsl.working_directory;
 			}
 
 			if (!deletePath) return;
 
-			const confirmed = window.confirm(`Are you sure you want to permanently delete this workspace and all its files? This action cannot be undone.\n\nPath: ${deletePath}`);
+			const confirmed = window.confirm(
+				`Are you sure you want to permanently delete this workspace and all its files? This action cannot be undone.\n\nPath: ${deletePath}`,
+			);
 			if (confirmed) {
 				// Delete from filesystem first using osSession-aware deletion
-				await invoke("delete_path_with_os_session", { 
-					path: deletePath, 
-					osSession: canvas.osSession 
+				await invoke("delete_path_with_os_session", {
+					path: deletePath,
+					osSession: canvas.osSession,
 				});
 				// Then remove from project
 				selectedGitProject.removeCanvas(canvasId);
 				updateGitProject(selectedGitProject.id);
-				console.log(`Deleted workspace from filesystem and project: ${canvasId}`);
+				console.log(
+					`Deleted workspace from filesystem and project: ${canvasId}`,
+				);
 			}
 		} catch (error) {
 			console.error("Failed to delete workspace:", error);
@@ -144,10 +161,11 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 		currentCanvas: currentCanvas?.name,
 		canvasCount: selectedGitProject?.canvases.length,
 		currentCanvasElements: currentCanvas?.elements.length || 0,
-		canvasTaskCounts: selectedGitProject?.canvases.map((c, index) => ({
-			index: index,
-			counts: getCanvasTaskCounts(c.id)
-		})) || []
+		canvasTaskCounts:
+			selectedGitProject?.canvases.map((c, index) => ({
+				index: index,
+				counts: getCanvasTaskCounts(c.id),
+			})) || [],
 	});
 
 	// Auto-create first canvas if none exist
@@ -169,7 +187,11 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 			};
 			createFirstCanvas();
 		}
-	}, [selectedGitProject?.id, selectedGitProject?.canvases.length, updateGitProject]);
+	}, [
+		selectedGitProject?.id,
+		selectedGitProject?.canvases.length,
+		updateGitProject,
+	]);
 
 	return selectedGitProject ? (
 		<div className="w-full h-full flex gap-1.5">
@@ -208,37 +230,48 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 								{getProjectDirectoryName()}
 							</div>
 						</div>
-						
+
 						<div className="flex flex-col h-full w-full overflow-y-auto">
 							{/* <div className="text-sm px-2 text-[var(--base-400)] mb-2">
 								Working Agents:
 							</div> */}
-							<button 
+							<button
 								className={cn(
 									"w-full px-4 py-2 border-2 border-dashed border-[var(--positive-500-50)] text-[var(--positive-500-70)] hover:border-[var(--positive-500)] text-sm text-center rounded-xl mb-2 transition-colors",
-									isCreatingCanvas 
-										? "opacity-50 cursor-not-allowed" 
-										: "cursor-pointer"
+									isCreatingCanvas
+										? "opacity-50 cursor-not-allowed"
+										: "cursor-pointer",
 								)}
 								disabled={isCreatingCanvas}
 								onClick={async () => {
 									setIsCreatingCanvas(true);
 									console.log("Creating new canvas copy...");
-									
+
 									try {
 										const result = await selectedGitProject.addCanvasCopy();
-										
+
 										if (result.success && result.canvasId) {
-											selectedGitProject.setCurrentCanvasIndex(selectedGitProject.canvases.length - 1);
-											console.log("New canvas copy created with ID:", result.canvasId);
+											selectedGitProject.setCurrentCanvasIndex(
+												selectedGitProject.canvases.length - 1,
+											);
+											console.log(
+												"New canvas copy created with ID:",
+												result.canvasId,
+											);
 											// Trigger state update to save to disk
 											updateGitProject(selectedGitProject.id);
 										} else {
-											console.error("Failed to create canvas copy:", result.error);
+											console.error(
+												"Failed to create canvas copy:",
+												result.error,
+											);
 											alert(`Failed to create canvas copy: ${result.error}`);
 										}
 									} catch (error) {
-										console.error("Unexpected error creating canvas copy:", error);
+										console.error(
+											"Unexpected error creating canvas copy:",
+											error,
+										);
 										alert(`Unexpected error: ${error}`);
 									} finally {
 										setIsCreatingCanvas(false);
@@ -256,7 +289,7 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 									}
 
 									return (
-										<button 
+										<button
 											key={index}
 											className={cn(
 												"w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors",
@@ -269,12 +302,20 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 												// Trigger state update to save to disk
 												updateGitProject(selectedGitProject.id);
 											}}
-											onContextMenu={(e) => handleWorkspaceContextMenu(e, canvas.id)}
+											onContextMenu={(e) =>
+												handleWorkspaceContextMenu(e, canvas.id)
+											}
 										>
 											<div className="flex items-center justify-between">
-												<span className={cn(
-													currentCanvas.id === canvas.id ? "opacity-100" : "opacity-50"
-												)}>Agent N°{index+1}</span>
+												<span
+													className={cn(
+														currentCanvas.id === canvas.id
+															? "opacity-100"
+															: "opacity-50",
+													)}
+												>
+													Agent N°{index + 1}
+												</span>
 												{taskCounts.total > 0 && (
 													<div className="flex items-center gap-1 text-xs">
 														{taskCounts.running > 0 && (
@@ -300,12 +341,14 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 								})}
 							</div>
 						</div>
-
 					</>
 				)}
 			</div>
 			{currentCanvas ? (
-				<div className="w-full h-full animate-fade-in opacity-100" key={currentCanvas.id}>
+				<div
+					className="w-full h-full animate-fade-in opacity-100"
+					key={currentCanvas.id}
+				>
 					<CanvasView
 						elements={currentCanvas.elements}
 						onElementsChange={updateCanvasElements}
@@ -315,11 +358,13 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 				<div className="w-full h-full flex items-center justify-center">
 					<div className="text-center text-[var(--base-600)]">
 						<div className="text-lg">Creating first version...</div>
-						<div className="text-sm mt-2">Please wait while we set up your project workspace</div>
+						<div className="text-sm mt-2">
+							Please wait while we set up your project workspace
+						</div>
 					</div>
 				</div>
 			)}
-			
+
 			{/* Context Menu */}
 			{contextMenu && (
 				<div
@@ -345,7 +390,9 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 				</div>
 			)}
 		</div>
-	) : (<></>);
+	) : (
+		<></>
+	);
 };
 
 export default GitProjectView;

@@ -12,7 +12,11 @@ export class ProcessManager {
 	 * This is for runtime tracking only, not for persistence
 	 */
 	static registerProcess(processId: string, processInstance: any): void {
-		console.log('[ProcessManager] Registering process:', processId, processInstance.constructor?.name);
+		console.log(
+			"[ProcessManager] Registering process:",
+			processId,
+			processInstance.constructor?.name,
+		);
 		this.activeProcesses.set(processId, processInstance);
 	}
 
@@ -28,7 +32,7 @@ export class ProcessManager {
 	 * Remove a process when it completes or stops
 	 */
 	static unregisterProcess(processId: string): void {
-		console.log('[ProcessManager] Unregistering process:', processId);
+		console.log("[ProcessManager] Unregistering process:", processId);
 		this.activeProcesses.delete(processId);
 	}
 
@@ -38,17 +42,17 @@ export class ProcessManager {
 	static isProcessRunning(processId: string): boolean {
 		const process = this.activeProcesses.get(processId);
 		if (!process) return false;
-		
+
 		// Check if it's a ClaudeCodeAgent with isTaskRunning method
-		if (typeof process.isTaskRunning === 'function') {
+		if (typeof process.isTaskRunning === "function") {
 			return process.isTaskRunning();
 		}
-		
+
 		// Check legacy isRunning property
 		if (process.isRunning !== undefined) {
 			return process.isRunning;
 		}
-		
+
 		// If registered but no status info, assume running
 		return true;
 	}
@@ -58,7 +62,12 @@ export class ProcessManager {
 	 * This helps restore terminal views when components remount
 	 */
 	static setTerminalConnection(elementId: string, terminalId: string): void {
-		console.log('[ProcessManager] Setting terminal connection:', elementId, '->', terminalId);
+		console.log(
+			"[ProcessManager] Setting terminal connection:",
+			elementId,
+			"->",
+			terminalId,
+		);
 		this.terminalConnections.set(elementId, terminalId);
 	}
 
@@ -73,7 +82,7 @@ export class ProcessManager {
 	 * Remove terminal connection when element is destroyed
 	 */
 	static removeTerminalConnection(elementId: string): void {
-		console.log('[ProcessManager] Removing terminal connection:', elementId);
+		console.log("[ProcessManager] Removing terminal connection:", elementId);
 		this.terminalConnections.delete(elementId);
 	}
 
@@ -90,28 +99,38 @@ export class ProcessManager {
 	 */
 	static cleanup(): void {
 		const toRemove: string[] = [];
-		
+
 		for (const [processId, process] of this.activeProcesses.entries()) {
 			if (!this.isProcessRunning(processId)) {
-				console.log('[ProcessManager] Marking dead process for cleanup:', processId);
+				console.log(
+					"[ProcessManager] Marking dead process for cleanup:",
+					processId,
+				);
 				toRemove.push(processId);
 			}
 		}
-		
-		toRemove.forEach(processId => {
+
+		toRemove.forEach((processId) => {
 			this.unregisterProcess(processId);
 		});
-		
-		console.log('[ProcessManager] Cleanup complete. Removed', toRemove.length, 'dead processes');
+
+		console.log(
+			"[ProcessManager] Cleanup complete. Removed",
+			toRemove.length,
+			"dead processes",
+		);
 	}
 
 	/**
 	 * Get debug info about current state
 	 */
-	static getDebugInfo(): { activeProcesses: number; terminalConnections: number } {
+	static getDebugInfo(): {
+		activeProcesses: number;
+		terminalConnections: number;
+	} {
 		return {
 			activeProcesses: this.activeProcesses.size,
-			terminalConnections: this.terminalConnections.size
+			terminalConnections: this.terminalConnections.size,
 		};
 	}
 }
