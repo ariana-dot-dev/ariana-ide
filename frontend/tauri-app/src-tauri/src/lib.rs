@@ -72,6 +72,8 @@ pub fn run() {
 			execute_command_in_dir,
 			// System integration commands
 			open_path_in_explorer,
+			delete_path,
+			delete_path_with_os_session,
 			// Git repository commands
 			check_git_repository,
 		])
@@ -219,9 +221,68 @@ async fn get_found_git_directories_so_far(
 	search_id: String,
 	git_search_manager: State<'_, Arc<GitSearchManager>>,
 ) -> Result<GitSearchResult, String> {
-	git_search_manager
+	let mut result = git_search_manager
 		.get_results(&search_id)
-		.ok_or_else(|| "Search ID not found".to_string())
+		.ok_or_else(|| "Search ID not found".to_string())?;
+	
+	println!("Backend - Raw search results before filtering: {} directories", result.directories.len());
+	
+	// Filter out deleted directories using appropriate method for each path type
+	let original_count = result.directories.len();
+	let mut filtered_dirs = Vec::new();
+	
+	for path in &result.directories {
+		let exists = if path.starts_with("/mnt/") || path.starts_with("/home") {
+			// WSL path - check existence using WSL command
+			check_wsl_path_exists(path)
+		} else {
+			// Local path - use standard filesystem check
+			let path_obj = Path::new(path);
+			path_obj.exists() && path_obj.is_dir()
+		};
+		
+		if exists {
+			filtered_dirs.push(path.clone());
+		} else {
+			println!("Backend - Filtering out non-existent directory: {}", path);
+		}
+	}
+	
+	result.directories = filtered_dirs;
+	println!("Backend - After existence filtering: {} directories (removed {})", result.directories.len(), original_count - result.directories.len());
+	
+	Ok(result)
+}
+
+#[cfg(target_os = "windows")]
+fn check_wsl_path_exists(path: &str) -> bool {
+	// Try to get first available WSL distribution
+	if let Ok(available) = crate::os::OsSessionKind::list_available() {
+		for session in available {
+			if let crate::os::OsSessionKind::Wsl(dist_name) = session {
+				// Use WSL test command to check if directory exists
+				let output = Command::new("wsl")
+					.arg("-d")
+					.arg(&dist_name)
+					.arg("test")
+					.arg("-d")
+					.arg(path)
+					.output();
+				
+				if let Ok(result) = output {
+					return result.status.success();
+				}
+				break; // Use first available distribution
+			}
+		}
+	}
+	false
+}
+
+#[cfg(not(target_os = "windows"))]
+fn check_wsl_path_exists(_path: &str) -> bool {
+	// On non-Windows, WSL paths don't make sense, so return false
+	false
 }
 
 #[tauri::command]
@@ -454,4 +515,98 @@ async fn open_path_in_explorer(path: String) -> Result<(), String> {
 	}
 	
 	Ok(())
+}
+
+#[tauri::command]
+async fn delete_path(path: String) -> Result<(), String> {
+	use std::fs;
+	
+	let path_obj = Path::new(&path);
+	
+	if !path_obj.exists() {
+		return Err(format!("Path does not exist: {}", path));
+	}
+	
+	println!("Deleting path: {}", path);
+	
+	if path_obj.is_dir() {
+		// Delete directory and all contents recursively
+		fs::remove_dir_all(&path)
+			.map_err(|e| format!("Failed to delete directory '{}': {}", path, e))?;
+		println!("Successfully deleted directory: {}", path);
+	} else {
+		// Delete file
+		fs::remove_file(&path)
+			.map_err(|e| format!("Failed to delete file '{}': {}", path, e))?;
+		println!("Successfully deleted file: {}", path);
+	}
+	
+	Ok(())
+}
+
+#[tauri::command]
+async fn delete_path_with_os_session(path: String, os_session: OsSession) -> Result<(), String> {
+	match os_session {
+		OsSession::Local(_) => {
+			delete_path_local(&path)
+		}
+		OsSession::Wsl(wsl_session) => {
+			delete_path_wsl(&path, &wsl_session.distribution)
+		}
+	}
+}
+
+fn delete_path_local(path: &str) -> Result<(), String> {
+	use std::fs;
+	
+	let path_obj = Path::new(path);
+	
+	if !path_obj.exists() {
+		return Err(format!("Path does not exist: {}", path));
+	}
+	
+	println!("Deleting local path: {}", path);
+	
+	if path_obj.is_dir() {
+		// Delete directory and all contents recursively
+		fs::remove_dir_all(&path)
+			.map_err(|e| format!("Failed to delete directory '{}': {}", path, e))?;
+		println!("Successfully deleted directory: {}", path);
+	} else {
+		// Delete file
+		fs::remove_file(&path)
+			.map_err(|e| format!("Failed to delete file '{}': {}", path, e))?;
+		println!("Successfully deleted file: {}", path);
+	}
+	
+	Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn delete_path_wsl(path: &str, distribution: &str) -> Result<(), String> {
+	println!("Deleting WSL path: {} using distribution: {}", path, distribution);
+	
+	// Use WSL rm command to delete the path
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("rm")
+		.arg("-rf")
+		.arg(path)
+		.output()
+		.map_err(|e| format!("Failed to execute WSL rm command: {}", e))?;
+	
+	if !output.status.success() {
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		let stdout = String::from_utf8_lossy(&output.stdout);
+		return Err(format!("WSL rm failed: stderr: {} stdout: {}", stderr, stdout));
+	}
+	
+	println!("Successfully deleted WSL path: {}", path);
+	Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn delete_path_wsl(_path: &str, _distribution: &str) -> Result<(), String> {
+	Err("WSL is only available on Windows".to_string())
 }

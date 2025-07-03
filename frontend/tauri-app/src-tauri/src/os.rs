@@ -396,10 +396,13 @@ impl GitSearchManager {
 		let search_id_clone = search_id.clone();
 
 		thread::spawn(move || {
+			println!("Git Search - Starting search with OS session kind: {:?}", os_session_kind);
 			let root_dirs = Self::get_root_directories(&os_session_kind);
+			println!("Git Search - Root directories to search: {:?}", root_dirs);
 			let mut found_dirs = Vec::new();
 
 			for root_dir in root_dirs {
+				println!("Git Search - Searching in root directory: {}", root_dir);
 				Self::search_git_directories(
 					&root_dir,
 					&mut found_dirs,
@@ -409,6 +412,7 @@ impl GitSearchManager {
 				);
 			}
 
+			println!("Git Search - Search complete. Total found: {}", found_dirs.len());
 			// Mark search as complete
 			let mut searches = searches_clone.lock().unwrap();
 			if let Some(result) = searches.get_mut(&search_id_clone) {
@@ -441,11 +445,31 @@ impl GitSearchManager {
 				}
 				#[cfg(target_os = "linux")]
 				{
-					vec!["/home".to_string()]
+					// Linux/WSL: search user home directory
+					let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+					vec![home_dir]
 				}
 				#[cfg(target_os = "macos")]
 				{
-					vec!["/Users".to_string()]
+					// macOS: search user-specific directories to avoid permission prompts
+					let mut roots = Vec::new();
+					let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
+					
+					// Add Documents, Desktop, Downloads in priority order
+					let user_dirs = ["Documents", "Desktop", "Downloads"];
+					for dir in user_dirs {
+						let path = format!("{}/{}", home_dir, dir);
+						if Path::new(&path).exists() {
+							roots.push(path);
+						}
+					}
+					
+					// Fallback to home directory if no user dirs found
+					if roots.is_empty() {
+						roots.push(home_dir);
+					}
+					
+					roots
 				}
 			}
 			OsSessionKind::Wsl(_) => {
@@ -493,6 +517,7 @@ impl GitSearchManager {
 	) {
 		let walker = WalkDir::new(root_path)
 			.follow_links(false)
+			.max_depth(3) // Limit search depth to 3 levels
 			.into_iter()
 			.filter_entry(|e| {
 				// Skip hidden directories except .git
@@ -558,14 +583,18 @@ impl GitSearchManager {
 			}
 		};
 
+		println!("WSL Search - Root path: {}, Distribution: {}", root_path, distribution);
+
 		// Skip path existence check - let find handle non-existent paths
 
 		// Use WSL find command to search for .git directories
-		// Limit depth to avoid very deep searches and improve performance
+		// Limit depth to 3 levels
 		let find_command = format!(
-			"find '{}' -maxdepth 6 -name '.git' -type d 2>/dev/null",
+			"find '{}' -maxdepth 3 -name '.git' -type d 2>/dev/null",
 			root_path.replace("'", "'\"'\"'")
 		);
+
+		println!("WSL Search - Executing command: wsl -d {} bash -c '{}'", distribution, find_command);
 
 		let output = Command::new("wsl")
 			.arg("-d")
@@ -575,26 +604,41 @@ impl GitSearchManager {
 			.arg(&find_command)
 			.output();
 
-		if let Ok(output) = output {
-			if output.status.success() {
-				let output_str = String::from_utf8_lossy(&output.stdout);
+		match output {
+			Ok(output) => {
+				println!("WSL Search - Command exit status: {}", output.status);
+				println!("WSL Search - Stdout: {}", String::from_utf8_lossy(&output.stdout));
+				println!("WSL Search - Stderr: {}", String::from_utf8_lossy(&output.stderr));
 
-				for line in output_str.lines() {
-					let git_path = line.trim();
-					if !git_path.is_empty() && git_path.ends_with("/.git") {
-						// Get the parent directory (remove /.git)
-						let repo_path = &git_path[..git_path.len() - 5];
-						let normalized_path = repo_path.replace('\\', "/");
+				if output.status.success() {
+					let output_str = String::from_utf8_lossy(&output.stdout);
+					let lines: Vec<&str> = output_str.lines().collect();
+					println!("WSL Search - Found {} lines of output", lines.len());
 
-						found_dirs.push(normalized_path.clone());
+					for line in lines {
+						let git_path = line.trim();
+						println!("WSL Search - Processing line: '{}'", git_path);
+						if !git_path.is_empty() && git_path.ends_with("/.git") {
+							// Get the parent directory (remove /.git)
+							let repo_path = &git_path[..git_path.len() - 5];
+							let normalized_path = repo_path.replace('\\', "/");
+							println!("WSL Search - Found git repo: {}", normalized_path);
 
-						// Update the search results
-						let mut searches_lock = searches.lock().unwrap();
-						if let Some(result) = searches_lock.get_mut(search_id) {
-							result.directories.push(normalized_path);
+							found_dirs.push(normalized_path.clone());
+
+							// Update the search results
+							let mut searches_lock = searches.lock().unwrap();
+							if let Some(result) = searches_lock.get_mut(search_id) {
+								result.directories.push(normalized_path);
+							}
 						}
 					}
+				} else {
+					println!("WSL Search - Command failed with status: {}", output.status);
 				}
+			}
+			Err(e) => {
+				println!("WSL Search - Failed to execute command: {}", e);
 			}
 		}
 	}

@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { OsSessionKind } from "../bindings/os";
 import { cn } from "../utils";
 import { GitProject } from "../types/GitProject";
+import { useStore } from "../state";
 
 interface GitSearchResult {
 	directories: string[];
@@ -32,6 +33,7 @@ export function ProjectDirectoryList({
 		path: string;
 	} | null>(null);
 	const contextMenuRef = useRef<HTMLDivElement>(null);
+	const { removeGitProject } = useStore();
 
 	useEffect(() => {
 		const startSearch = async () => {
@@ -59,12 +61,14 @@ export function ProjectDirectoryList({
 
 		const pollResults = async () => {
 			try {
+				console.log("Frontend - Polling for results with searchId:", searchId);
 				const result = await invoke<GitSearchResult>(
 					"get_found_git_directories_so_far",
 					{
 						searchId,
 					},
 				);
+				console.log("Frontend - Received result from backend:", result);
 				setDirectories(result.directories);
 				setIsComplete(result.is_complete);
 				setLoading(false);
@@ -177,6 +181,78 @@ export function ProjectDirectoryList({
 		setContextMenu(null);
 	};
 
+	// Delete project functionality
+	const deleteProject = async (path: string) => {
+		console.log('deleteProject called with path:', path);
+		console.log('existingProjects:', existingProjects);
+		try {
+			// Find project with matching path
+			const projectToDelete = existingProjects.find(project => {
+				const projectPath = 'Local' in project.root ? project.root.Local : 
+									 'Wsl' in project.root ? project.root.Wsl.working_directory : null;
+				return projectPath === path;
+			});
+
+			if (projectToDelete) {
+				const confirmed = window.confirm(`Are you sure you want to permanently delete the project "${projectToDelete.name}" and all its files? This action cannot be undone.`);
+				if (confirmed) {
+					// Create an osSession based on the osSessionKind
+					let projectOsSession;
+					if (typeof osSessionKind === "object" && "Wsl" in osSessionKind) {
+						projectOsSession = {
+							Wsl: {
+								distribution: osSessionKind.Wsl,
+								working_directory: path
+							}
+						};
+					} else {
+						projectOsSession = { Local: path };
+					}
+
+					// Delete from filesystem first using osSession-aware deletion
+					await invoke("delete_path_with_os_session", { 
+						path, 
+						osSession: projectOsSession 
+					});
+					// Then remove from workspace
+					removeGitProject(projectToDelete.id);
+					console.log(`Deleted project from filesystem and workspace: ${projectToDelete.name}`);
+
+					setDirectories(prev => prev.filter(dir => dir !== path));
+				}
+			} else {
+				// just delete the path if no project found
+				const confirmed = window.confirm(`Are you sure you want to permanently delete the directory "${path}" and all its files? This action cannot be undone.`);
+				if (!confirmed) return;
+
+				// Create an osSession based on the osSessionKind
+				let projectOsSession;
+				if (typeof osSessionKind === "object" && "Wsl" in osSessionKind) {
+					projectOsSession = {
+						Wsl: {
+							distribution: osSessionKind.Wsl,
+							working_directory: path
+						}
+					};
+				} else {
+					projectOsSession = { Local: path };
+				}
+
+				// Delete from filesystem first using osSession-aware deletion
+				await invoke("delete_path_with_os_session", {
+					path, 
+					osSession: projectOsSession 
+				});
+
+				setDirectories(prev => prev.filter(dir => dir !== path));
+			}
+		} catch (error) {
+			console.error("Failed to delete project:", error);
+			alert(`Failed to delete project: ${error}`);
+		}
+		setContextMenu(null);
+	};
+
 	return (
 		<div className="flex flex-col gap-2 p-4 h-fit max-h-full">
 			<div className="flex items-center gap-2">
@@ -246,6 +322,15 @@ export function ProjectDirectoryList({
 						className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--base-200)] text-[var(--blackest)] transition-colors"
 					>
 						📁 Show in Explorer
+					</button>
+					<button
+						onClick={async () => {
+							console.log('Delete button clicked');
+							await deleteProject(contextMenu.path);
+						}}
+						className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--negative-200)] text-[var(--negative-800)] transition-colors"
+					>
+						🗑️ Delete Project
 					</button>
 				</div>
 			)}
