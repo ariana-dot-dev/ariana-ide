@@ -43,11 +43,11 @@ const MicrophoneButton: React.FC<{
         "w-12 h-12 relative rounded-full transition-all duration-300 focus:outline-none",
         "flex items-center justify-center p-2",
         "bg-black border-2 border-gray-400",
-        "hover:border-gray-300 hover:shadow-lg",
-        "shadow-md",
+        "hover:border-gray-300 hover:shadow-md",
+        "shadow-sm",
         "disabled:opacity-50 disabled:cursor-not-allowed",
-        isRecording ? "border-red-400 shadow-red-400/50" : "",
-        isAudioEnabled ? "shadow-lg" : "shadow-md opacity-75"
+        isRecording ? "border-red-400 shadow-red-400/25" : "",
+        isAudioEnabled ? "shadow-md" : "shadow-sm opacity-75"
       )}
       title={disabled ? 'Speech recognition not available' : 
         isAudioEnabled ? 'Audio ON - Click to turn off' : 'Audio OFF - Click to turn on and start recording'
@@ -205,11 +205,8 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
   }, [message, audioEnabledState, audioAutoSendDelay, isLoading, isStreaming]);
 
   const startRecording = useCallback(async () => {
-    console.log('🎤 Starting recording...');
-    
     // Prevent multiple simultaneous starts
     if (isRecording) {
-      console.warn('⚠️ Already recording, ignoring start request');
       return;
     }
     
@@ -474,32 +471,28 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
   }, []);
 
   const handleToggleRecording = useCallback(() => {
-    try {
-      // Simple 2-state logic: OFF -> ON (with recording) -> OFF
-      if (audioEnabledState) {
-        // Audio is ON, turn it OFF (stop recording and disable audio)
-        if (isRecording) {
-          stopRecording();
-        }
-        setAudioEnabledState(false);
-        if (audioTimeout) {
-          clearTimeout(audioTimeout);
-          setAudioTimeout(null);
-        }
-      } else {
-        // Audio is OFF, turn it ON (enable audio and start recording)
-        setAudioEnabledState(true);
-        if (audioTimeout) {
-          clearTimeout(audioTimeout);
-          setAudioTimeout(null);
-        }
-        // Start recording immediately after enabling audio
-        setTimeout(() => {
-          startRecording();
-        }, 100);
+    // Simple 2-state logic: OFF -> ON (with recording) -> OFF
+    if (audioEnabledState) {
+      // Audio is ON, turn it OFF (stop recording and disable audio)
+      if (isRecording) {
+        stopRecording();
       }
-    } catch (error) {
-      setSpeechError(`Button error: ${error}`);
+      setAudioEnabledState(false);
+      if (audioTimeout) {
+        clearTimeout(audioTimeout);
+        setAudioTimeout(null);
+      }
+    } else {
+      // Audio is OFF, turn it ON (enable audio and start recording)
+      setAudioEnabledState(true);
+      if (audioTimeout) {
+        clearTimeout(audioTimeout);
+        setAudioTimeout(null);
+      }
+      // Start recording immediately after enabling audio
+      setTimeout(() => {
+        startRecording();
+      }, 100);
     }
   }, [audioEnabledState, isRecording, audioTimeout, stopRecording, startRecording]);
 
@@ -554,14 +547,6 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
     }
     setIsStreaming(false);
     setIsLoading(false);
-  };
-
-  const toggleAudio = () => {
-    setAudioEnabledState(!audioEnabledState);
-    if (audioTimeout) {
-      clearTimeout(audioTimeout);
-      setAudioTimeout(null);
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
