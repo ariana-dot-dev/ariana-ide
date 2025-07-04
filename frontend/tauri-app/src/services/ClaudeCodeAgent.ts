@@ -250,14 +250,31 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	// Private methods
 
 	private setupTerminalListeners(): void {
-		if (!this.terminalId) return;
+		if (!this.terminalId) {
+			console.error(this.logPrefix, "No terminalId available for setting up listeners");
+			return;
+		}
 
-		this.onTerminalEvent(this.terminalId, (events: TerminalEvent[]) => {
-			this.queueEventBatch(events);
-		});
+		console.log(this.logPrefix, "Setting up terminal event listener for terminal:", this.terminalId);
+		
+		// Add a test to see if onTerminalEvent method exists and works
+		console.log(this.logPrefix, "onTerminalEvent method type:", typeof this.onTerminalEvent);
+		console.log(this.logPrefix, "this object keys:", Object.getOwnPropertyNames(this));
+		
+		try {
+			this.onTerminalEvent(this.terminalId, (events: TerminalEvent[]) => {
+				console.log(this.logPrefix, "🎉 Raw terminal event callback received:", events.length, "events");
+				console.log(this.logPrefix, "🎉 Event types:", events.map(e => e.type));
+				this.queueEventBatch(events);
+			});
+			console.log(this.logPrefix, "✅ Terminal event listener setup complete");
+		} catch (error) {
+			console.error(this.logPrefix, "❌ Error setting up terminal event listener:", error);
+		}
 	}
 
 	private queueEventBatch(events: TerminalEvent[]): void {
+		console.log(this.logPrefix, "Queueing event batch with", events.length, "events");
 		this.eventQueue.push(events);
 		this.processEventQueue();
 	}
@@ -282,53 +299,53 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	}
 
 	private async handleTerminalEvents(events: TerminalEvent[]): Promise<void> {
-		// console.log(this.logPrefix, "Received", events.length, "terminal events");
+		console.log(this.logPrefix, "Received", events.length, "terminal events");
 
 		for (const event of events) {
-			// console.log(this.logPrefix, "Processing event:", event.type);
+			console.log(this.logPrefix, "Processing event:", event.type);
 
 			switch (event.type) {
 				case "screenUpdate":
 					if (event.screen) {
-						// console.log(
-						// 	this.logPrefix,
-						// 	"Screen update - new screen has",
-						// 	event.screen.length,
-						// 	"lines",
-						// );
+						console.log(
+							this.logPrefix,
+							"Screen update - new screen has",
+							event.screen.length,
+							"lines",
+						);
 						this.screenLines = [...event.screen];
 
 						// Log current screen content for debugging
-						// const screenText = event.screen.map((line) =>
-						// 	line.map((item) => item.lexeme).join(""),
-						// );
-						// console.log(this.logPrefix, "Current screen content:");
-						// screenText.forEach((line, i) => {
-						// 	if (line.trim()) {
-						// 		console.log(
-						// 			this.logPrefix,
-						// 			`  Line ${i}:`,
-						// 			JSON.stringify(line),
-						// 		);
-						// 	}
-						// });
+						const screenText = event.screen.map((line) =>
+							line.map((item) => item.lexeme).join(""),
+						);
+						console.log(this.logPrefix, "Current screen content:");
+						screenText.forEach((line, i) => {
+							if (line.trim()) {
+								console.log(
+									this.logPrefix,
+									`  Line ${i}:`,
+									JSON.stringify(line),
+								);
+							}
+						});
 					}
 					break;
 
 				case "newLines":
 					if (event.lines) {
-						// console.log(this.logPrefix, "New lines added:", event.lines.length);
+						console.log(this.logPrefix, "New lines added:", event.lines.length);
 						this.screenLines.push(...event.lines);
 
 						// Log new lines content
 						event.lines.forEach((line, i) => {
 							const lineText = line.map((item) => item.lexeme).join("");
 							if (lineText.trim()) {
-								// console.log(
-								// 	this.logPrefix,
-								// 	`  New line ${i}:`,
-								// 	JSON.stringify(lineText),
-								// );
+								console.log(
+									this.logPrefix,
+									`  New line ${i}:`,
+									JSON.stringify(lineText),
+								);
 							}
 						});
 					}
@@ -336,14 +353,14 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 				case "patch":
 					if (event.line !== undefined && event.items) {
-						// console.log(
-						// 	this.logPrefix,
-						// 	"Patching line",
-						// 	event.line,
-						// 	"with",
-						// 	event.items.length,
-						// 	"items",
-						// );
+						console.log(
+							this.logPrefix,
+							"Patching line",
+							event.line,
+							"with",
+							event.items.length,
+							"items",
+						);
 						// Ensure we have enough lines
 						while (this.screenLines.length <= event.line) {
 							this.screenLines.push([]);
@@ -352,11 +369,11 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 						// Log patched line content
 						const lineText = event.items.map((item) => item.lexeme).join("");
-						// console.log(
-						// 	this.logPrefix,
-						// 	`  Patched line ${event.line}:`,
-						// 	JSON.stringify(lineText),
-						// );
+						console.log(
+							this.logPrefix,
+							`  Patched line ${event.line}:`,
+							JSON.stringify(lineText),
+						);
 					}
 					break;
 			}
@@ -376,6 +393,8 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	}
 
 	private async initializeClaudeCode(): Promise<void> {
+		console.log(this.logPrefix, "initializeClaudeCode() method called");
+		
 		if (!this.terminalId) {
 			console.error(
 				this.logPrefix,
@@ -384,30 +403,130 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			return;
 		}
 
-		console.log(this.logPrefix, "Checking if Claude Code is available...");
-		// Check if claude is available
-		await this.sendInputLines(this.terminalId, ["which claude"]);
-		await this.delay(1000);
+		console.log(this.logPrefix, "Terminal ID confirmed:", this.terminalId);
 
-		console.log(this.logPrefix, "Getting current working directory...");
-		// Get the current working directory
-		await this.sendInputLines(this.terminalId, ["pwd"]);
-		await this.delay(500);
+		try {
+			console.log(this.logPrefix, "Checking if Claude Code is available...");
+			// Check if claude is available
+			await this.sendInputLines(this.terminalId, ["which claude"]);
+			console.log(this.logPrefix, "Successfully sent 'which claude', waiting 1000ms...");
+			await this.delay(1000);
 
-		// Start Claude Code without prompt initially
-		const claudeCommand = "claude";
-		console.log(
-			this.logPrefix,
-			"Starting Claude Code with command:",
-			claudeCommand,
-		);
-		await this.sendInputLines(this.terminalId, [claudeCommand]);
+			console.log(this.logPrefix, "Getting current working directory...");
+			// Get the current working directory
+			await this.sendInputLines(this.terminalId, ["pwd"]);
+			console.log(this.logPrefix, "Successfully sent 'pwd', waiting 500ms...");
+			await this.delay(500);
 
-		console.log(this.logPrefix, "Claude Code command sent");
-		this.emit("taskStarted", {
-			prompt: this.currentPrompt,
-			terminalId: this.terminalId,
-		});
+			// Start Claude Code without prompt initially
+			const claudeCommand = "claude";
+			console.log(
+				this.logPrefix,
+				"Starting Claude Code with command:",
+				claudeCommand,
+			);
+			await this.sendInputLines(this.terminalId, [claudeCommand]);
+			console.log(this.logPrefix, "Successfully sent claude command, waiting for terminal events...");
+			
+			console.log(this.logPrefix, "Emitting taskStarted event...");
+			this.emit("taskStarted", {
+				prompt: this.currentPrompt,
+				terminalId: this.terminalId,
+			});
+			console.log(this.logPrefix, "taskStarted event emitted successfully");
+			
+			// Start a periodic check to see if we're getting ANY terminal events
+			this.startPeriodicEventCheck();
+		} catch (error) {
+			console.error(this.logPrefix, "Error during Claude Code initialization:", error);
+			throw error;
+		}
+	}
+
+	private startPeriodicEventCheck(): void {
+		console.log(this.logPrefix, "Starting periodic event check...");
+		let checkCount = 0;
+		const maxChecks = 20; // Check for 20 seconds
+		
+		const checkInterval = setInterval(async () => {
+			checkCount++;
+			console.log(this.logPrefix, `Event check ${checkCount}/${maxChecks}: screenLines length = ${this.screenLines.length}`);
+			
+			if (this.screenLines.length > 0) {
+				console.log(this.logPrefix, "📺 Current screen content:");
+				this.screenLines.slice(-5).forEach((line, i) => {
+					const lineText = line.map(item => item.lexeme).join("");
+					if (lineText.trim()) {
+						console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(lineText));
+					}
+				});
+				// Events are working, stop checking
+				clearInterval(checkInterval);
+				return;
+			} else {
+				console.log(this.logPrefix, "📺 No screen content yet");
+				
+				// Mac workaround: Try multiple approaches to force terminal activity
+				if (checkCount === 3 && this.terminalId) {
+					console.log(this.logPrefix, "🔧 Mac workaround: Sending multiple commands to wake up terminal...");
+					try {
+						// Try multiple approaches
+						await this.sendRawInput(this.terminalId, " ");
+						await this.delay(100);
+						await this.sendRawInput(this.terminalId, "\b");
+						await this.delay(100);
+						await this.sendRawInput(this.terminalId, "\r"); // Enter for security prompt
+						await this.delay(500);
+						await this.sendRawInput(this.terminalId, "\r"); // Another Enter
+					} catch (error) {
+						console.log(this.logPrefix, "Failed to send wake-up commands:", error);
+					}
+				}
+				
+				// Aggressive prompt injection after 7 seconds - bypass pattern detection entirely
+				if (checkCount === 7 && this.terminalId && !this.hasSeenTryPrompt) {
+					console.log(this.logPrefix, "🚨 EMERGENCY: No events after 7s, bypassing pattern detection and injecting prompt directly...");
+					try {
+						this.hasSeenTryPrompt = true; // Prevent duplicate injection
+						
+						// Send the prompt directly - Claude should be at Try prompt by now
+						for (const char of this.currentPrompt || "help") {
+							if (char === "\n") {
+								await this.sendRawInput(this.terminalId, "\\");
+								await this.delay(50);
+								await this.sendRawInput(this.terminalId, "\r");
+							} else {
+								await this.sendRawInput(this.terminalId, char);
+							}
+							await this.delay(50);
+						}
+						await this.delay(300);
+						await this.sendRawInput(this.terminalId, "\r");
+						
+						console.log(this.logPrefix, "🚨 Emergency prompt injection completed");
+					} catch (error) {
+						console.log(this.logPrefix, "Failed emergency prompt injection:", error);
+					}
+				}
+				
+				// Mac workaround: Handle auto-edits prompts that might be waiting
+				if (checkCount === 10 && this.terminalId) {
+					console.log(this.logPrefix, "🔧 Mac workaround: Checking for auto-edits prompts, sending Shift+Tab to select 'don't ask again'...");
+					try {
+						await this.sendRawInput(this.terminalId, "\x1b[Z"); // Shift+Tab sequence
+						await this.delay(200);
+					} catch (error) {
+						console.log(this.logPrefix, "Failed to send Shift+Tab for auto-edits:", error);
+					}
+				}
+			}
+			
+			if (checkCount >= maxChecks) {
+				console.log(this.logPrefix, "❌ Event check timeout - no terminal events received after 20 seconds");
+				console.log(this.logPrefix, "This appears to be a Mac-specific terminal event system issue");
+				clearInterval(checkInterval);
+			}
+		}, 1000);
 	}
 
 	private async sendSingleKey(key: KeyboardKey): Promise<void> {
@@ -516,12 +635,12 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 		newLines = newLines.map((line) => line.replaceAll(" ", " "));
 
-		// console.log(this.logPrefix, "Analyzing new lines for TUI interactions:");
-		// newLines.forEach((line, i) => {
-		// 	if (line.trim()) {
-		// 		console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(line));
-		// 	}
-		// });
+		console.log(this.logPrefix, "Analyzing new lines for TUI interactions:");
+		newLines.forEach((line, i) => {
+			if (line.trim()) {
+				console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(line));
+			}
+		});
 
 		// Check for trust folder confirmation
 		const hasEnterToConfirm = newLines.some((line) =>
@@ -542,6 +661,48 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			return;
 		}
 
+		// Check for Claude Code security menu with "Yes, proceed" option
+		const hasClaudeSecurityMenu = newLines.some((line) => {
+			return (
+				line.includes("❯ 1. Yes, proceed") ||
+				line.includes("1. Yes, proceed") ||
+				(line.includes("Claude Code may read files") || line.includes("Claude Code may execute files")) ||
+				line.includes("https://docs.anthropic.com/s/claude-code-security")
+			);
+		});
+		
+		if (hasClaudeSecurityMenu) {
+			console.log(
+				this.logPrefix,
+				"Found Claude Code security menu, sending Enter to select 'Yes, proceed'...",
+			);
+			await this.delay(Math.random() * 500 + 500);
+			await this.sendRawInput(this.terminalId, "\r");
+			return;
+		}
+
+		// Check for other general "Yes, proceed" type prompts (fallback)
+		const hasProceedPrompt = newLines.some((line) => {
+			const normalizedLine = line.toLowerCase();
+			return (
+				(normalizedLine.includes("y") && normalizedLine.includes("n")) ||
+				normalizedLine.includes("[y/n]") ||
+				normalizedLine.includes("(y/n)")
+			);
+		});
+		
+		if (hasProceedPrompt) {
+			console.log(
+				this.logPrefix,
+				"Found y/n confirmation prompt, sending 'y' and Enter...",
+			);
+			await this.delay(Math.random() * 500 + 500);
+			await this.sendRawInput(this.terminalId, "y");
+			await this.delay(Math.random() * 200 + 200);
+			await this.sendRawInput(this.terminalId, "\r");
+			return;
+		}
+
 		// Check for "Yes, and don't ask again this session (shift+tab)"
 		const hasShiftTabOption = newLines.some((line) =>
 			line.includes("Yes, and don't ask again this session (shift+tab)"),
@@ -555,8 +716,24 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			return;
 		}
 
-		// Check for "│ > Try" prompt (first time only)
-		const hasTryPrompt = newLines.some((line) => line.includes("│ > Try"));
+		// Check for "Try" prompt (first time only) - handle various Mac/Windows rendering differences
+		const hasTryPrompt = newLines.some((line) => {
+			const normalizedLine = line.toLowerCase().trim();
+			return (
+				normalizedLine.includes("try") || 
+				line.includes("│ > Try") ||
+				line.includes("> Try") ||
+				line.includes("Try") ||
+				normalizedLine.includes("> try") ||
+				/[│|]\s*>\s*try/i.test(line) ||
+				/try.*prompt/i.test(line) ||
+				line.includes("What can I help you with?") ||
+				line.includes("What would you like me to help with?")
+			);
+		});
+		
+		console.log(this.logPrefix, "Try prompt detection:", hasTryPrompt, "hasSeenTryPrompt:", this.hasSeenTryPrompt);
+		
 		if (hasTryPrompt && !this.hasSeenTryPrompt && this.currentPrompt) {
 			console.log(
 				this.logPrefix,
@@ -585,7 +762,50 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			line.includes("esc to interrupt"),
 		);
 		if (hasEscToInterrupt) {
-			// console.log(this.logPrefix, "Found 'esc to interrupt', waiting...");
+			console.log(this.logPrefix, "Found 'esc to interrupt', waiting...");
+			return;
+		}
+
+		// Backup mechanism: If Claude seems ready but we haven't sent prompt yet
+		// Look for any signs that Claude is waiting for input
+		const hasClaudeWaitingSignals = newLines.some((line) => {
+			const normalizedLine = line.toLowerCase();
+			return (
+				normalizedLine.includes("claude") ||
+				normalizedLine.includes("help") ||
+				normalizedLine.includes("what") ||
+				normalizedLine.includes("?") ||
+				line.includes(">") ||
+				line.includes("│") ||
+				line.includes("prompt") ||
+				line.includes("ask")
+			);
+		});
+
+		// If we see waiting signals and haven't sent prompt yet, and enough time has passed
+		const timeSinceStart = Date.now() - this.startTime;
+		if (hasClaudeWaitingSignals && !this.hasSeenTryPrompt && this.currentPrompt && timeSinceStart > 3000) {
+			console.log(
+				this.logPrefix,
+				"Backup mechanism: Detected Claude waiting signals, sending prompt anyway after",
+				timeSinceStart,
+				"ms"
+			);
+			this.hasSeenTryPrompt = true;
+			
+			// Send the prompt
+			for (const char of this.currentPrompt) {
+				if (char === "\n") {
+					await this.sendRawInput(this.terminalId, "\\");
+					await this.delay(Math.random() * 50 + 50);
+					await this.sendRawInput(this.terminalId, "\r");
+				} else {
+					await this.sendRawInput(this.terminalId, char);
+				}
+				await this.delay(Math.random() * 50 + 50);
+			}
+			await this.delay(Math.random() * 500 + 500);
+			await this.sendRawInput(this.terminalId, "\r");
 			return;
 		}
 	}
