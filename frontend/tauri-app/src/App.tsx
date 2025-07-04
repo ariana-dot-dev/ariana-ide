@@ -180,7 +180,7 @@ function App() {
 				)}
 			>
 				<div
-					className="fixed w-full h-full opacity-40 z-0"
+					className="fixed w-full h-full opacity-40 -z-10"
 					style={{ background: 'url("assets/noise.png")' }}
 				></div>
 				<div className="w-full h-full max-h-full flex flex-col gap-1.5 p-2">

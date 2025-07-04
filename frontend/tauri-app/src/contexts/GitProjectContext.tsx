@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { GitProject, GitProjectCanvas, ProcessState } from '../types/GitProject';
+import { GitProject, GitProjectCanvas, ProcessState, CanvasLockState } from '../types/GitProject';
 import { CanvasElement } from '../canvas/types';
 import { ProcessManager } from '../services/ProcessManager';
 import { useStore } from '../state';
 import { TaskManager } from '../types/Task';
+import { BackgroundAgent, MergeResult } from '../types/BackgroundAgent';
+import { BackgroundAgentManager } from '../services/BackgroundAgentManager';
 
 interface GitProjectContextValue {
 	selectedGitProject: GitProject | null;
@@ -27,6 +29,17 @@ interface GitProjectContextValue {
 	revertTask: (taskId: string) => boolean;
 	restoreTask: (taskId: string) => boolean;
 	getCurrentTaskManager: () => TaskManager | null;
+	// Background agent management
+	mergeCanvasToRoot: (canvasId: string) => Promise<MergeResult>;
+	getBackgroundAgents: () => BackgroundAgent[];
+	removeBackgroundAgent: (agentId: string) => void;
+	forceRemoveBackgroundAgent: (agentId: string) => Promise<void>;
+	// Canvas locking management
+	lockCanvas: (canvasId: string, lockState: CanvasLockState, agentId: string) => boolean;
+	unlockCanvas: (canvasId: string, agentId?: string) => boolean;
+	isCanvasLocked: (canvasId: string) => boolean;
+	getCanvasLockState: (canvasId: string) => CanvasLockState | null;
+	canEditCanvas: (canvasId: string) => boolean;
 }
 
 const GitProjectContext = createContext<GitProjectContextValue | null>(null);
@@ -54,11 +67,25 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			forceUpdate(prev => prev + 1);
 		});
 
+		const unsubscribeBackgroundAgents = gitProject.subscribe('backgroundAgents', () => {
+			forceUpdate(prev => prev + 1);
+		});
+
+		// Periodic update for background agents to ensure UI stays current
+		const backgroundAgentUpdateInterval = setInterval(() => {
+			if (gitProject.backgroundAgents.length > 0) {
+				// Trigger update to persist any background agent changes and refresh UI
+				updateGitProject(gitProject.id);
+			}
+		}, 500); // Update every 500ms when there are active agents
+
 		return () => {
 			unsubscribeCanvases();
 			unsubscribeCurrentCanvas();
+			unsubscribeBackgroundAgents();
+			clearInterval(backgroundAgentUpdateInterval);
 		};
-	}, [gitProject]);
+	}, [gitProject, updateGitProject]);
 
 	const currentCanvas = gitProject?.getCurrentCanvas() || null;
 	
@@ -77,7 +104,7 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 		updateCanvasElements: (elements: any[]) => {
 			if (!gitProject) return;
 			const currentCanvas = gitProject.getCurrentCanvas();
-			if (currentCanvas) {
+			if (currentCanvas && gitProject.canEditCanvas(currentCanvas.id)) {
 				gitProject.updateCanvasElements(currentCanvas.id, elements);
 				// Trigger state update to save to disk
 				updateGitProject(gitProject.id);
@@ -219,6 +246,65 @@ export function GitProjectProvider({ children, gitProject }: GitProjectProviderP
 			const currentCanvas = gitProject.getCurrentCanvas();
 			if (!currentCanvas) return null;
 			return currentCanvas.taskManager;
+		},
+
+		// Background agent management
+		mergeCanvasToRoot: async (canvasId: string) => {
+			if (!gitProject) return { success: false, error: "No git project" };
+			const result = await gitProject.mergeCanvasToRoot(canvasId);
+			if (result.success) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		getBackgroundAgents: () => {
+			if (!gitProject) return [];
+			return gitProject.backgroundAgents;
+		},
+
+		removeBackgroundAgent: (agentId: string) => {
+			if (!gitProject) return;
+			gitProject.removeBackgroundAgent(agentId);
+			updateGitProject(gitProject.id);
+		},
+
+		forceRemoveBackgroundAgent: async (agentId: string) => {
+			if (!gitProject) return;
+			
+			// Remove from BackgroundAgentManager and cleanup filesystem
+			await BackgroundAgentManager.forceRemoveAgent(agentId, gitProject);
+			
+			// Agent is already removed from GitProject by BackgroundAgentManager
+			updateGitProject(gitProject.id);
+		},
+
+		// Canvas locking management
+		lockCanvas: (canvasId: string, lockState: CanvasLockState, agentId: string) => {
+			if (!gitProject) return false;
+			const result = gitProject.lockCanvas(canvasId, lockState, agentId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		unlockCanvas: (canvasId: string, agentId?: string) => {
+			if (!gitProject) return false;
+			const result = gitProject.unlockCanvas(canvasId, agentId);
+			if (result) updateGitProject(gitProject.id);
+			return result;
+		},
+
+		isCanvasLocked: (canvasId: string) => {
+			if (!gitProject) return false;
+			return gitProject.isCanvasLocked(canvasId);
+		},
+
+		getCanvasLockState: (canvasId: string) => {
+			if (!gitProject) return null;
+			return gitProject.getCanvasLockState(canvasId);
+		},
+
+		canEditCanvas: (canvasId: string) => {
+			if (!gitProject) return false;
+			return gitProject.canEditCanvas(canvasId);
 		},
 	};
 

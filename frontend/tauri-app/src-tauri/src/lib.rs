@@ -70,6 +70,8 @@ pub fn run() {
 			create_git_branch,
 			execute_command,
 			execute_command_in_dir,
+			execute_command_with_os_session,
+			copy_files_with_os_session,
 			// System integration commands
 			open_path_in_explorer,
 			delete_path,
@@ -78,6 +80,10 @@ pub fn run() {
 			check_git_repository,
 			git_commit,
 			git_revert_to_commit,
+			git_check_merge_conflicts,
+			git_get_conflict_files,
+			git_merge_branch,
+			git_get_current_branch,
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
@@ -216,6 +222,205 @@ async fn execute_command_in_dir(command: String, args: Vec<String>, directory: S
 	} else {
 		Err(String::from_utf8_lossy(&output.stderr).to_string())
 	}
+}
+
+#[tauri::command]
+async fn execute_command_with_os_session(
+	command: String, 
+	args: Vec<String>, 
+	directory: String, 
+	os_session: OsSession
+) -> Result<String, String> {
+	match os_session {
+		OsSession::Local(_) => {
+			execute_command_in_dir(command, args, directory).await
+		}
+		OsSession::Wsl(wsl_session) => {
+			execute_command_wsl(command, args, directory, &wsl_session.distribution)
+		}
+	}
+}
+
+fn execute_command_wsl(command: String, args: Vec<String>, directory: String, distribution: &str) -> Result<String, String> {
+	#[cfg(target_os = "windows")]
+	{
+		let mut wsl_args = vec!["-d".to_string(), distribution.to_string(), "--cd".to_string(), directory];
+		wsl_args.push(command);
+		wsl_args.extend(args);
+		
+		let output = Command::new("wsl")
+			.args(&wsl_args)
+			.output()
+			.map_err(|e| format!("Failed to execute WSL command: {}", e))?;
+		
+		if output.status.success() {
+			Ok(String::from_utf8_lossy(&output.stdout).to_string())
+		} else {
+			Err(String::from_utf8_lossy(&output.stderr).to_string())
+		}
+	}
+	#[cfg(not(target_os = "windows"))]
+	{
+		Err("WSL is only supported on Windows".to_string())
+	}
+}
+
+#[tauri::command]
+async fn copy_files_with_os_session(
+	source: String, 
+	destination: String, 
+	os_session: OsSession,
+	exclude_git: bool
+) -> Result<(), String> {
+	match os_session {
+		OsSession::Local(_) => {
+			copy_files_local(&source, &destination, exclude_git)
+		}
+		OsSession::Wsl(wsl_session) => {
+			copy_files_wsl(&source, &destination, &wsl_session.distribution, exclude_git)
+		}
+	}
+}
+
+fn copy_files_local(source: &str, destination: &str, exclude_git: bool) -> Result<(), String> {
+	use std::fs;
+	use std::path::Path;
+	
+	let src_path = Path::new(source);
+	if !src_path.exists() {
+		return Err("Source path does not exist".to_string());
+	}
+	
+	// Use different commands based on OS
+	#[cfg(target_os = "windows")]
+	{
+		// Use robocopy on Windows for better handling
+		// Robocopy syntax: robocopy source destination [files] [options]
+		let mut args = vec![
+			source.replace("/", "\\"),
+			destination.replace("/", "\\"),
+			"*".to_string(),  // Copy all files
+			"/E".to_string(),  // Copy subdirectories, including empty ones
+		];
+		
+		if exclude_git {
+			args.push("/XD".to_string());
+			args.push(".git".to_string());
+		}
+		
+		// Create destination directory if it doesn't exist
+		if let Some(parent) = Path::new(&destination).parent() {
+			fs::create_dir_all(parent)
+				.map_err(|e| format!("Failed to create destination directory: {}", e))?;
+		}
+		
+		let output = Command::new("robocopy")
+			.args(&args)
+			.output()
+			.map_err(|e| format!("Failed to execute robocopy: {}", e))?;
+		
+		// Robocopy exit codes: 0-7 are success, >7 are errors
+		let exit_code = output.status.code().unwrap_or(1);
+		if exit_code > 7 {
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			let stdout = String::from_utf8_lossy(&output.stdout);
+			return Err(format!("Robocopy failed with exit code {}: stderr: {} stdout: {}", exit_code, stderr, stdout));
+		}
+	}
+	
+	#[cfg(any(target_os = "linux", target_os = "macos"))]
+	{
+		let mut args = vec!["-r".to_string()];
+		
+		if exclude_git {
+			args.push("--exclude=.git".to_string());
+		}
+		
+		args.push(format!("{}/*", source));
+		args.push(destination.to_string());
+		
+		let output = Command::new("cp")
+			.args(&args)
+			.output()
+			.map_err(|e| format!("Failed to execute cp: {}", e))?;
+		
+		if !output.status.success() {
+			return Err(format!("cp failed: {}", String::from_utf8_lossy(&output.stderr)));
+		}
+	}
+	
+	Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn copy_files_wsl(source: &str, destination: &str, distribution: &str, exclude_git: bool) -> Result<(), String> {
+	if exclude_git {
+		// Use rsync to exclude .git directories (more reliable than find/cpio)
+		let rsync_cmd = format!(
+			"rsync -av --exclude='.git' '{}/' '{}'",
+			source.replace("'", "'\"'\"'"),
+			destination.replace("'", "'\"'\"'")
+		);
+		
+		let output = Command::new("wsl")
+			.arg("-d")
+			.arg(distribution)
+			.arg("bash")
+			.arg("-c")
+			.arg(&rsync_cmd)
+			.output()
+			.map_err(|e| format!("Failed to execute WSL rsync: {}", e))?;
+		
+		if !output.status.success() {
+			// Fall back to cp with manual exclusion if rsync is not available
+			let cp_cmd = format!(
+				"mkdir -p '{}' && cd '{}' && find . -name '.git' -prune -o -type f -exec cp --parents {{}} '{}' \\;",
+				destination.replace("'", "'\"'\"'"),
+				source.replace("'", "'\"'\"'"),
+				destination.replace("'", "'\"'\"'")
+			);
+			
+			let output2 = Command::new("wsl")
+				.arg("-d")
+				.arg(distribution)
+				.arg("bash")
+				.arg("-c")
+				.arg(&cp_cmd)
+				.output()
+				.map_err(|e| format!("Failed to execute WSL cp fallback: {}", e))?;
+			
+			if !output2.status.success() {
+				return Err(format!("WSL copy failed: {}", String::from_utf8_lossy(&output2.stderr)));
+			}
+		}
+	} else {
+		// Simple recursive copy
+		let cp_cmd = format!(
+			"cp -r '{}/'* '{}'",
+			source.replace("'", "'\"'\"'"),
+			destination.replace("'", "'\"'\"'")
+		);
+		
+		let output = Command::new("wsl")
+			.arg("-d")
+			.arg(distribution)
+			.arg("bash")
+			.arg("-c")
+			.arg(&cp_cmd)
+			.output()
+			.map_err(|e| format!("Failed to execute WSL cp: {}", e))?;
+		
+		if !output.status.success() {
+			return Err(format!("WSL cp failed: {}", String::from_utf8_lossy(&output.stderr)));
+		}
+	}
+	
+	Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn copy_files_wsl(_source: &str, _destination: &str, _distribution: &str, _exclude_git: bool) -> Result<(), String> {
+	Err("WSL is only supported on Windows".to_string())
 }
 
 #[tauri::command]
@@ -793,4 +998,350 @@ fn delete_path_wsl(path: &str, distribution: &str) -> Result<(), String> {
 #[cfg(not(target_os = "windows"))]
 fn delete_path_wsl(_path: &str, _distribution: &str) -> Result<(), String> {
 	Err("WSL is only available on Windows".to_string())
+}
+
+#[tauri::command]
+async fn git_check_merge_conflicts(
+	directory: String,
+	source_branch: String,
+	target_branch: String,
+	os_session: OsSession
+) -> Result<bool, String> {
+	match os_session {
+		OsSession::Local(_) => {
+			git_check_merge_conflicts_local(&directory, &source_branch, &target_branch)
+		}
+		OsSession::Wsl(wsl_session) => {
+			git_check_merge_conflicts_wsl(&directory, &source_branch, &target_branch, &wsl_session.distribution)
+		}
+	}
+}
+
+fn git_check_merge_conflicts_local(directory: &str, source_branch: &str, target_branch: &str) -> Result<bool, String> {
+	// Use git merge-tree to check for conflicts without actually merging
+	let merge_base_output = Command::new("git")
+		.arg("merge-base")
+		.arg(target_branch)
+		.arg(source_branch)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to find merge base: {}", e))?;
+	
+	if !merge_base_output.status.success() {
+		return Err(format!("Git merge-base failed: {}", String::from_utf8_lossy(&merge_base_output.stderr)));
+	}
+	
+	let merge_base = String::from_utf8_lossy(&merge_base_output.stdout).trim().to_string();
+	
+	// Check for conflicts using merge-tree
+	let output = Command::new("git")
+		.arg("merge-tree")
+		.arg(&merge_base)
+		.arg(target_branch)
+		.arg(source_branch)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git merge-tree: {}", e))?;
+	
+	// If merge-tree output contains conflict markers, there are conflicts
+	let merge_result = String::from_utf8_lossy(&output.stdout);
+	let has_conflicts = merge_result.contains("<<<<<<<") || merge_result.contains(">>>>>>>");
+	
+	Ok(has_conflicts)
+}
+
+#[cfg(target_os = "windows")]
+fn git_check_merge_conflicts_wsl(directory: &str, source_branch: &str, target_branch: &str, distribution: &str) -> Result<bool, String> {
+	// Use git merge-tree to check for conflicts without actually merging
+	let merge_base_output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("merge-base")
+		.arg(target_branch)
+		.arg(source_branch)
+		.output()
+		.map_err(|e| format!("Failed to find WSL merge base: {}", e))?;
+	
+	if !merge_base_output.status.success() {
+		return Err(format!("WSL git merge-base failed: {}", String::from_utf8_lossy(&merge_base_output.stderr)));
+	}
+	
+	let merge_base = String::from_utf8_lossy(&merge_base_output.stdout).trim().to_string();
+	
+	// Check for conflicts using merge-tree
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("merge-tree")
+		.arg(&merge_base)
+		.arg(target_branch)
+		.arg(source_branch)
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git merge-tree: {}", e))?;
+	
+	// If merge-tree output contains conflict markers, there are conflicts
+	let merge_result = String::from_utf8_lossy(&output.stdout);
+	let has_conflicts = merge_result.contains("<<<<<<<") || merge_result.contains(">>>>>>>");
+	
+	Ok(has_conflicts)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn git_check_merge_conflicts_wsl(_directory: &str, _source_branch: &str, _target_branch: &str, _distribution: &str) -> Result<bool, String> {
+	Err("WSL is only supported on Windows".to_string())
+}
+
+#[tauri::command]
+async fn git_get_conflict_files(directory: String, os_session: OsSession) -> Result<Vec<String>, String> {
+	match os_session {
+		OsSession::Local(_) => {
+			git_get_conflict_files_local(&directory)
+		}
+		OsSession::Wsl(wsl_session) => {
+			git_get_conflict_files_wsl(&directory, &wsl_session.distribution)
+		}
+	}
+}
+
+fn git_get_conflict_files_local(directory: &str) -> Result<Vec<String>, String> {
+	let output = Command::new("git")
+		.arg("diff")
+		.arg("--name-only")
+		.arg("--diff-filter=U")
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git diff: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("Git diff failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	let files = String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.filter(|line| !line.trim().is_empty())
+		.map(|line| line.trim().to_string())
+		.collect();
+	
+	Ok(files)
+}
+
+#[cfg(target_os = "windows")]
+fn git_get_conflict_files_wsl(directory: &str, distribution: &str) -> Result<Vec<String>, String> {
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("diff")
+		.arg("--name-only")
+		.arg("--diff-filter=U")
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git diff: {}", e))?;
+	
+	if !output.status.success() {
+		return Err(format!("WSL git diff failed: {}", String::from_utf8_lossy(&output.stderr)));
+	}
+	
+	let files = String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.filter(|line| !line.trim().is_empty())
+		.map(|line| line.trim().to_string())
+		.collect();
+	
+	Ok(files)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn git_get_conflict_files_wsl(_directory: &str, _distribution: &str) -> Result<Vec<String>, String> {
+	Err("WSL is only supported on Windows".to_string())
+}
+
+#[tauri::command]
+async fn git_merge_branch(
+	directory: String,
+	source_branch: String,
+	target_branch: String,
+	os_session: OsSession
+) -> Result<String, String> {
+	match os_session {
+		OsSession::Local(_) => {
+			git_merge_branch_local(&directory, &source_branch, &target_branch)
+		}
+		OsSession::Wsl(wsl_session) => {
+			git_merge_branch_wsl(&directory, &source_branch, &target_branch, &wsl_session.distribution)
+		}
+	}
+}
+
+fn git_merge_branch_local(directory: &str, source_branch: &str, target_branch: &str) -> Result<String, String> {
+	// First checkout target branch
+	let checkout_output = Command::new("git")
+		.arg("checkout")
+		.arg(target_branch)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to checkout target branch: {}", e))?;
+	
+	if !checkout_output.status.success() {
+		return Err(format!("Git checkout failed: {}", String::from_utf8_lossy(&checkout_output.stderr)));
+	}
+	
+	// Then merge source branch
+	let merge_output = Command::new("git")
+		.arg("merge")
+		.arg(source_branch)
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to merge branch: {}", e))?;
+	
+	let stdout = String::from_utf8_lossy(&merge_output.stdout);
+	let stderr = String::from_utf8_lossy(&merge_output.stderr);
+	
+	if !merge_output.status.success() {
+		// Check if it's a conflict (which is expected sometimes)
+		if stderr.contains("CONFLICT") || stdout.contains("CONFLICT") {
+			return Ok("MERGE_CONFLICTS".to_string());
+		}
+		return Err(format!("Git merge failed: {}", stderr));
+	}
+	
+	Ok("MERGE_SUCCESS".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn git_merge_branch_wsl(directory: &str, source_branch: &str, target_branch: &str, distribution: &str) -> Result<String, String> {
+	// First checkout target branch
+	let checkout_output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("checkout")
+		.arg(target_branch)
+		.output()
+		.map_err(|e| format!("Failed to checkout WSL target branch: {}", e))?;
+	
+	if !checkout_output.status.success() {
+		return Err(format!("WSL git checkout failed: {}", String::from_utf8_lossy(&checkout_output.stderr)));
+	}
+	
+	// Then merge source branch
+	let merge_output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("merge")
+		.arg(source_branch)
+		.output()
+		.map_err(|e| format!("Failed to merge WSL branch: {}", e))?;
+	
+	let stdout = String::from_utf8_lossy(&merge_output.stdout);
+	let stderr = String::from_utf8_lossy(&merge_output.stderr);
+	
+	if !merge_output.status.success() {
+		// Check if it's a conflict (which is expected sometimes)
+		if stderr.contains("CONFLICT") || stdout.contains("CONFLICT") {
+			return Ok("MERGE_CONFLICTS".to_string());
+		}
+		return Err(format!("WSL git merge failed: {}", stderr));
+	}
+	
+	Ok("MERGE_SUCCESS".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn git_merge_branch_wsl(_directory: &str, _source_branch: &str, _target_branch: &str, _distribution: &str) -> Result<String, String> {
+	Err("WSL is only supported on Windows".to_string())
+}
+
+#[tauri::command]
+async fn git_get_current_branch(directory: String, os_session: OsSession) -> Result<String, String> {
+	match os_session {
+		OsSession::Local(_) => {
+			git_get_current_branch_local(&directory)
+		}
+		OsSession::Wsl(wsl_session) => {
+			git_get_current_branch_wsl(&directory, &wsl_session.distribution)
+		}
+	}
+}
+
+fn git_get_current_branch_local(directory: &str) -> Result<String, String> {
+	let output = Command::new("git")
+		.arg("branch")
+		.arg("--show-current")
+		.current_dir(directory)
+		.output()
+		.map_err(|e| format!("Failed to execute git branch command: {}", e))?;
+	
+	if !output.status.success() {
+		// Try alternative method for older git versions
+		let output2 = Command::new("git")
+			.arg("rev-parse")
+			.arg("--abbrev-ref")
+			.arg("HEAD")
+			.current_dir(directory)
+			.output()
+			.map_err(|e| format!("Failed to execute git rev-parse command: {}", e))?;
+		
+		if !output2.status.success() {
+			return Err(format!("Git branch detection failed: {}", String::from_utf8_lossy(&output2.stderr)));
+		}
+		
+		Ok(String::from_utf8_lossy(&output2.stdout).trim().to_string())
+	} else {
+		Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+	}
+}
+
+#[cfg(target_os = "windows")]
+fn git_get_current_branch_wsl(directory: &str, distribution: &str) -> Result<String, String> {
+	let output = Command::new("wsl")
+		.arg("-d")
+		.arg(distribution)
+		.arg("--cd")
+		.arg(directory)
+		.arg("git")
+		.arg("branch")
+		.arg("--show-current")
+		.output()
+		.map_err(|e| format!("Failed to execute WSL git branch command: {}", e))?;
+	
+	if !output.status.success() {
+		// Try alternative method for older git versions
+		let output2 = Command::new("wsl")
+			.arg("-d")
+			.arg(distribution)
+			.arg("--cd")
+			.arg(directory)
+			.arg("git")
+			.arg("rev-parse")
+			.arg("--abbrev-ref")
+			.arg("HEAD")
+			.output()
+			.map_err(|e| format!("Failed to execute WSL git rev-parse command: {}", e))?;
+		
+		if !output2.status.success() {
+			return Err(format!("WSL git branch detection failed: {}", String::from_utf8_lossy(&output2.stderr)));
+		}
+		
+		Ok(String::from_utf8_lossy(&output2.stdout).trim().to_string())
+	} else {
+		Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+	}
+}
+
+#[cfg(not(target_os = "windows"))]
+fn git_get_current_branch_wsl(_directory: &str, _distribution: &str) -> Result<String, String> {
+	Err("WSL is only supported on Windows".to_string())
 }

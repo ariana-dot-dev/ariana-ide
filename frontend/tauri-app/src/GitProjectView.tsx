@@ -5,16 +5,55 @@ import { useGitProject } from "./contexts/GitProjectContext";
 import { cn } from "./utils";
 import { GitProject } from "./types/GitProject";
 import { useStore } from "./state";
+import { BackgroundAgentsList } from "./components/BackgroundAgentsList";
+import { BackgroundAgentTerminalView } from "./components/BackgroundAgentTerminalView";
 
 const GitProjectView: React.FC<{}> = ({ }) => {
-	const { selectedGitProject, currentCanvas, updateCanvasElements } = useGitProject();
+	const { 
+		selectedGitProject, 
+		currentCanvas, 
+		updateCanvasElements, 
+		mergeCanvasToRoot,
+		getBackgroundAgents,
+		removeBackgroundAgent,
+		forceRemoveBackgroundAgent,
+		getCanvasLockState,
+		canEditCanvas
+	} = useGitProject();
 	const { updateGitProject, removeGitProject } = useStore();
 	const [showCanvases, setShowCanvases] = useState(true);
 	const [isCreatingCanvas, setIsCreatingCanvas] = useState(false);
+	const [mergingCanvases, setMergingCanvases] = useState<Set<string>>(new Set());
+	const [viewingAgent, setViewingAgent] = useState<string | null>(null);
 	const [contextMenu, setContextMenu] = useState<{x: number, y: number, canvasId: string} | null>(null);
 
 	const canvasesHoveredRef = useRef(false);
 	const contextMenuRef = useRef<HTMLDivElement>(null);
+
+	// Handle canvas merge to root
+	const handleMergeCanvas = async (canvasId: string) => {
+		setMergingCanvases(prev => new Set(prev).add(canvasId));
+		
+		try {
+			const result = await mergeCanvasToRoot(canvasId);
+			
+			if (result.success) {
+				console.log('Merge initiated successfully, agent ID:', result.agentId);
+			} else {
+				console.error('Failed to start merge:', result.error);
+				alert(`Failed to start merge: ${result.error}`);
+			}
+		} catch (error) {
+			console.error('Unexpected error during merge:', error);
+			alert(`Unexpected error: ${error}`);
+		} finally {
+			setMergingCanvases(prev => {
+				const newSet = new Set(prev);
+				newSet.delete(canvasId);
+				return newSet;
+			});
+		}
+	};
 
 	// Get the directory name from the project root
 	const getProjectDirectoryName = () => {
@@ -196,7 +235,7 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 				className={cn(
 					"group flex flex-col gap-1.5 transition-all outline-0 rounded-md select-none relative z-50 border-[var(--acc-400-50)]",
 					showCanvases
-						? "w-52"
+						? "w-64"
 						: "w-1 my-0 hover:w-3 not-hover:bg-[var(--base-400-20)] hover:border-2",
 				)}
 			>
@@ -213,6 +252,8 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 							<div className="flex flex-col">
 								{selectedGitProject.canvases.map((canvas, index) => {
 									const taskCounts = getCanvasTaskCounts(canvas.id);
+									const lockState = getCanvasLockState(canvas.id);
+									const isLocked = lockState !== 'normal';
 
 									if (!currentCanvas) {
 										return null;
@@ -225,7 +266,9 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 												"group w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors border-[var(--base-300)] border-2 not-last:border-b-transparent not-first:border-t-transparent",
 												currentCanvas.id === canvas.id
 													? "bg-[var(--acc-200-20)] opacity-100"
-													: "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-pointer hover:border-solid border-dashed opacity-50 hover:opacity-100 hover:bg-[var(--acc-200-50)]",
+													: isLocked
+														? "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-default border-dashed opacity-60"
+														: "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-pointer hover:border-solid border-dashed opacity-50 hover:opacity-100 hover:bg-[var(--acc-200-50)]",
 											)}
 											onClick={() => {
 												selectedGitProject.setCurrentCanvasIndex(index);
@@ -234,30 +277,65 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 											}}
 											onContextMenu={(e) => handleWorkspaceContextMenu(e, canvas.id)}
 										>
-											<div className="flex items-center justify-between">
+											<div className="flex w-full items-center justify-between">
 												<span className="text-[var(--base-600)]">Agent N°{index+1}</span>
-												{taskCounts.total > 0 && (
-													<div className="flex items-center gap-1 text-xs">
-														{taskCounts.running > 0 && (
-															<span className="w-5 aspect-square flex items-center justify-center relative text-[var(--whitest)] rounded-md">
-																<div className="absolute top-0 left-0 w-full h-full bg-[var(--acc-400)] animate-spin rounded-lg"></div>
-																<div className="z-10">
-																	{taskCounts.running}
-																</div>
-															</span>
-														)}
-														{taskCounts.finished > 0 && (
-															<span className="w-5 aspect-square flex items-center justify-center bg-[var(--positive-400)] text-[var(--whitest)] rounded-full">
-																{taskCounts.finished}
-															</span>
-														)}
-														{taskCounts.error > 0 && (
-															<span className="w-5 aspect-square flex items-center justify-center bg-[var(--negative-600)] text-[var(--whitest)] rounded-sm">
-																{taskCounts.error}
-															</span>
-														)}
-													</div>
-												)}
+												<div className="flex items-center gap-2">
+													{taskCounts.total > 0 && (
+														<div className="flex items-center gap-1 text-xs">
+															{taskCounts.running > 0 && (
+																<span className="w-5 aspect-square flex items-center justify-center relative text-[var(--whitest)] rounded-md">
+																	<div className="absolute top-0 left-0 w-full h-full bg-[var(--acc-400)] animate-spin rounded-lg"></div>
+																	<div className="z-10">
+																		{taskCounts.running}
+																	</div>
+																</span>
+															)}
+															{taskCounts.finished > 0 && (
+																<span className="w-5 aspect-square flex items-center justify-center bg-[var(--positive-400)] text-[var(--whitest)] rounded-full">
+																	{taskCounts.finished}
+																</span>
+															)}
+															{taskCounts.error > 0 && (
+																<span className="w-5 aspect-square flex items-center justify-center bg-[var(--negative-600)] text-[var(--whitest)] rounded-sm">
+																	{taskCounts.error}
+																</span>
+															)}
+														</div>
+													)}
+													
+													{/* Lock State Indicator */}
+													{lockState === 'merging' && (
+														<span className="w-5 aspect-square flex items-center justify-center relative text-[var(--whitest)] rounded-md">
+															<div className="absolute top-0 left-0 w-full h-full bg-[var(--acc-400)] animate-spin rounded-lg"></div>
+															<div className="z-10 text-xs">⏳</div>
+														</span>
+													)}
+													{lockState === 'merged' && (
+														<span className="w-5 aspect-square flex items-center justify-center bg-[var(--positive-400)] text-[var(--whitest)] rounded-full text-xs" title="Canvas merged - create new canvas to continue">
+															✅
+														</span>
+													)}
+
+													{/* Merge Button - only show for normal state and if there are completed tasks */}
+													{lockState === 'normal' && taskCounts.finished > 0 && (
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																handleMergeCanvas(canvas.id);
+															}}
+															disabled={mergingCanvases.has(canvas.id)}
+															className={cn(
+																"w-5 aspect-square flex items-center justify-center text-xs rounded transition-colors",
+																mergingCanvases.has(canvas.id)
+																	? "bg-[var(--base-300)] text-[var(--base-500)] cursor-not-allowed"
+																	: "bg-[var(--acc-300-20)] text-[var(--acc-600)] hover:bg-[var(--acc-300-40)] cursor-pointer"
+															)}
+															title="Merge canvas to root"
+														>
+															{mergingCanvases.has(canvas.id) ? "⏳" : "🔀"}
+														</button>
+													)}
+												</div>
 											</div>
 										</button>
 									);
@@ -297,12 +375,52 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 							>
 								{isCreatingCanvas ? "Creating..." : "+ New Agent"}
 							</button>
+
+							{/* Background Agents List */}
+							<BackgroundAgentsList 
+								agents={getBackgroundAgents()} 
+								onRemoveAgent={removeBackgroundAgent}
+								onForceRemoveAgent={forceRemoveBackgroundAgent}
+								onSelectAgent={setViewingAgent}
+								selectedAgentId={viewingAgent}
+							/>
 						</div>
 
 					</>
 				)}
 			</div>
-			{currentCanvas ? (
+			{viewingAgent ? (
+				// Show background agent terminal view
+				(() => {
+					const agent = getBackgroundAgents().find(a => a.id === viewingAgent);
+					return agent ? (
+						<div className="w-full h-full animate-fade-in opacity-100" key={`agent-${agent.id}`}>
+							<BackgroundAgentTerminalView 
+								agent={agent}
+								onClose={() => setViewingAgent(null)}
+							/>
+						</div>
+					) : (
+						<div className="w-full h-full flex items-center justify-center relative z-10">
+							<div className="text-center text-[var(--base-600)]">
+								<div className="text-lg">Agent not found</div>
+								<button 
+									onClick={(e) => {
+										console.log('Back to Canvases clicked');
+										e.preventDefault();
+										e.stopPropagation();
+										setViewingAgent(null);
+									}}
+									className="mt-2 px-3 py-1 bg-[var(--base-200)] rounded hover:bg-[var(--base-300)] cursor-pointer transition-colors border border-[var(--base-400)] text-[var(--base-700)] hover:text-[var(--base-800)] active:bg-[var(--base-400)] select-none"
+									style={{ pointerEvents: 'auto' }}
+								>
+									Back to Canvases
+								</button>
+							</div>
+						</div>
+					);
+				})()
+			) : currentCanvas ? (
 				<div className="w-full h-full animate-fade-in opacity-100" key={currentCanvas.id}>
 					<CanvasView
 						elements={currentCanvas.elements}
