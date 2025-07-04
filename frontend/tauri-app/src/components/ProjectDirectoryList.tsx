@@ -110,6 +110,17 @@ export function ProjectDirectoryList({
 					return true; // Filter out derived directories
 				}
 			}
+			
+			// Filter out any path that's a background agent working directory
+			// Background agent directories follow the pattern: {rootName}-merge-{randomId}
+			if (rootPath) {
+				const rootDirName = rootPath.split('/').pop() || rootPath.split('\\').pop();
+				const pathDirName = path.split('/').pop() || path.split('\\').pop();
+				
+				if (pathDirName && rootDirName && pathDirName.startsWith(`${rootDirName}-merge-`)) {
+					return true; // Filter out background agent directories
+				}
+			}
 		}
 		return false; // Keep paths that aren't in any project
 	};

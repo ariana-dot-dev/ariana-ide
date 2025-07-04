@@ -544,14 +544,15 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 
 		// Check for "Yes, and don't ask again this session (shift+tab)"
 		const hasShiftTabOption = newLines.some((line) =>
-			line.includes("Yes, and don't ask again this session (shift+tab)"),
+			line.includes("1. Yes"),
 		);
 		if (hasShiftTabOption) {
 			console.log(
 				this.logPrefix,
-				"Found 'don't ask again' option, sending Shift+Tab...",
+				"Found '1. Yes'",
 			);
-			await this.sendRawInput(this.terminalId, "\x1b[Z"); // Shift+Tab sequence
+			await this.delay(Math.random() * 500 + 500);
+			await this.sendRawInput(this.terminalId, "\r");
 			return;
 		}
 

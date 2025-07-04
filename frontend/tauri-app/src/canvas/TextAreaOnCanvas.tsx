@@ -35,6 +35,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 	const { cell, element } = layout;
 	const { isLightTheme } = useStore();
 	const { 
+		selectedGitProject,
 		getProcessByElementId, 
 		addProcess, 
 		updateProcess, 
@@ -45,11 +46,28 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		completeTask,
 		updateTaskPrompt,
 		revertTask,
-		restoreTask
+		restoreTask,
+		currentCanvas,
+		getCanvasLockState,
+		canEditCanvas
 	} = useGitProject();
 	
 	// Get task manager
 	const taskManager = getCurrentTaskManager();
+	
+	// Canvas lock state
+	const canvasLockState = currentCanvas ? getCanvasLockState(currentCanvas.id) : 'normal';
+	const isCanvasLocked = canvasLockState !== 'normal';
+	const canEdit = currentCanvas ? canEditCanvas(currentCanvas.id) : false;
+	
+	// Log lock state for debugging
+	console.log("[TextAreaOnCanvas] Canvas lock state:", {
+		canvasId: currentCanvas?.id,
+		lockState: canvasLockState,
+		isLocked: isCanvasLocked,
+		canEdit,
+		timestamp: Date.now()
+	});
 	
 	// Text area state - simplified to just current prompt
 	const [text, setText] = useState((layout.element.kind as TextAreaKind).textArea.content);
@@ -101,6 +119,12 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			"Go button clicked with text:",
 			currentPrompt.trim(),
 		);
+
+		// Block task creation if canvas is locked
+		if (!canEdit) {
+			console.log("[TextAreaOnCanvas] Canvas is locked, cannot create tasks");
+			return;
+		}
 
 		if (currentInProgressTask || !currentPrompt.trim()) {
 			console.log(
@@ -469,6 +493,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			className={cn(
 				"absolute select-none overflow-hidden p-1",
 				isDragging ? "z-30" : "z-10",
+				isCanvasLocked && "opacity-60" // Dim locked canvases
 			)}
 			initial={{
 				x: cell.x,
@@ -494,6 +519,8 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		>
 			{/* <div className="fixed w-full h-full opacity-30" style={{ background: 'url("assets/noise.png")' }}>
 			</div> */}
+			
+			
 			<div className={cn("w-full h-full flex flex-col p-3")}>
 				{/* Text Area Section */}
 				<div
@@ -551,9 +578,13 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 										{task.commitHash && task.commitHash !== "NO_CHANGES" && (
 											<button
 												onClick={() => task.isReverted ? handleRestoreTask(task.id) : handleRevertTask(task.id)}
+												disabled={!canEdit}
 												className={cn(
-													"px-2 py-0.5 text-xs rounded transition-all cursor-pointer",
+													"px-2 py-0.5 text-xs rounded transition-all",
 													"opacity-0 group-hover:opacity-100",
+													!canEdit 
+														? "cursor-not-allowed opacity-30"
+														: "cursor-pointer",
 													task.isReverted
 														? "bg-[var(--positive-600)] text-white hover:bg-[var(--positive-700)]"
 														: "bg-[var(--base-600)] text-white hover:bg-[var(--base-700)]"
@@ -591,7 +622,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 								ref={textAreaRef}
 								value={currentInProgressTask ? "" : currentPrompt}
 								onChange={(e) => {
-									if (!currentInProgressTask) {
+									if (!currentInProgressTask && canEdit) {
 										setCurrentPrompt(e.target.value);
 										setText(e.target.value);
 										
@@ -601,11 +632,13 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 										}
 									}
 								}}
-								disabled={!!currentInProgressTask}
+								disabled={!canEdit || !!currentInProgressTask}
 								placeholder={
-									currentInProgressTask 
-										? "Task in progress..." 
-										: completedTasks.length === 0 
+									!canEdit 
+										? `Agent's work is ${canvasLockState} - cannot edit`
+										: currentInProgressTask 
+											? "Task in progress..." 
+											: completedTasks.length === 0 
 											? "Describe to the agent what to do..." 
 											: "Describe to the agent another thing to do..."
 								}
@@ -615,11 +648,30 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 									"text-[var(--base-500)]",
 									"focus:text-[var(--base-500)]",
 									"placeholder:text-[var(--base-600-50)]",
-									currentInProgressTask && "opacity-60 cursor-not-allowed",
+									(currentInProgressTask || !canEdit) && "opacity-60 cursor-not-allowed",
+									!canEdit && "bg-[var(--base-200-20)]", // Show locked background
 									"scrollbar-thin scrollbar-thumb-[var(--base-400)] scrollbar-track-transparent",
 								)}
 								rows={Math.max(1, currentPrompt.split("\n").length)}
 							/>
+
+							{/* Canvas Lock Status Indicator */}
+							{isCanvasLocked && (
+								<div className="absolute right-2 top-2 flex items-center gap-1 text-xs text-[var(--base-600)] bg-[var(--base-100)] px-2 py-1 rounded border border-[var(--base-300)]">
+									{canvasLockState === 'merging' && (
+										<>
+											<div className="w-3 h-3 border border-[var(--acc-400)] border-t-transparent rounded-full animate-spin"></div>
+											<span>Merging</span>
+										</>
+									)}
+									{canvasLockState === 'merged' && (
+										<>
+											<span className="text-green-600">✓</span>
+											<span>Merged</span>
+										</>
+									)}
+								</div>
+							)}
 
 							{/* Action Button */}
 							{!currentInProgressTask && (
@@ -633,10 +685,10 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 								>
 									<button
 										onClick={handleGoClick}
-										disabled={!currentPrompt.trim()}
+										disabled={!currentPrompt.trim() || !canEdit}
 										className={cn(
 											"group rounded-lg rounded-br-2xl transition-all p-0.5 bg-[var(--base-200)]",
-											currentPrompt.trim()
+											currentPrompt.trim() && canEdit
 												? "cursor-pointer hover:rounded-3xl hover:bg-[var(--acc-200)] opacity-50 hover:opacity-100"
 												: "opacity-0 pointer-events-none",
 										)}
