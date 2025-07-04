@@ -2,6 +2,15 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "../utils";
 import { communicationService } from "../services/CommunicationService";
 
+// Extend Window interface for Speech Recognition
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+    __TAURI__: any;
+  }
+}
+
 interface CommunicationPaletteProps {
   isOpen: boolean;
   onClose: () => void;
@@ -13,6 +22,65 @@ interface CommunicationPaletteProps {
   apiKey?: string;
   systemPrompt?: string;
 }
+
+// Check if we're running in Tauri
+const isTauri = () => {
+  return typeof window !== 'undefined' && window.__TAURI__;
+};
+
+// Microphone/Audio button component that handles both recording and audio toggle
+const MicrophoneButton: React.FC<{
+  isRecording: boolean;
+  isAudioEnabled: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}> = ({ isRecording, isAudioEnabled, onToggle, disabled = false }) => {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      className={cn(
+        "w-12 h-12 relative rounded-full transition-all duration-300 focus:outline-none",
+        "flex items-center justify-center p-2",
+        "bg-black border-2 border-gray-400",
+        "hover:border-gray-300 hover:shadow-lg",
+        "shadow-md",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
+        isRecording ? "border-red-400 shadow-red-400/50" : "",
+        isAudioEnabled ? "shadow-lg" : "shadow-md opacity-75"
+      )}
+      title={disabled ? 'Speech recognition not available' : 
+        isAudioEnabled ? 'Audio ON - Click to turn off' : 'Audio OFF - Click to turn on and start recording'
+      }
+    >
+      {isRecording ? (
+        <svg
+          className="w-5 h-5 text-red-400"
+          fill="currentColor"
+          viewBox="0 0 16 16"
+        >
+          <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h2a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 9 14H7a1.5 1.5 0 0 1-1.5-1.5z"/>
+        </svg>
+      ) : (
+        <svg
+          className={cn(
+            "w-5 h-5 transition-colors",
+            isAudioEnabled ? "text-white" : "text-gray-500"
+          )}
+          fill="currentColor"
+          viewBox="0 0 16 16"
+        >
+          <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
+          <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
+        </svg>
+      )}
+
+      {isRecording && (
+        <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-pulse" />
+      )}
+    </button>
+  );
+};
 
 export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
   isOpen,
@@ -31,8 +99,84 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [audioEnabledState, setAudioEnabledState] = useState(isAudioEnabled);
+  
+  // Speech recognition state
+  const [isRecording, setIsRecording] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [isSupported, setIsSupported] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
+  const [isTauriEnv, setIsTauriEnv] = useState(false);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSpeechTimeRef = useRef<number>(0);
+
+  // Check browser support and permissions on mount
+  useEffect(() => {
+    const tauriDetected = isTauri();
+    setIsTauriEnv(tauriDetected);
+    
+    console.log('Environment detection:', {
+      isTauri: tauriDetected,
+      hasMediaDevices: !!navigator.mediaDevices,
+      hasGetUserMedia: !!(navigator.mediaDevices?.getUserMedia),
+      hasSpeechRecognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    });
+
+    const checkSupport = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setIsSupported(false);
+        setSpeechError('Speech recognition is not supported in this browser. Try Chrome, Edge, or Safari.');
+        return;
+      }
+
+      // In Tauri, we can still use Speech Recognition even without mediaDevices
+      if (tauriDetected) {
+        console.log('✅ Tauri environment detected - Speech recognition available without mediaDevices');
+        setIsSupported(true);
+        setPermissionStatus('granted'); // Assume granted in Tauri
+        return;
+      }
+
+      // Check if we're in a secure context (HTTPS or localhost) for web browsers
+      if (!window.isSecureContext) {
+        setSpeechError('Speech recognition requires a secure context (HTTPS or localhost)');
+        return;
+      }
+
+      console.log('Speech recognition is supported');
+    };
+
+    const checkPermissions = async () => {
+      // Skip permission check in Tauri environment
+      if (tauriDetected) {
+        setPermissionStatus('granted');
+        return;
+      }
+
+      try {
+        if (navigator.permissions) {
+          const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          setPermissionStatus(permission.state);
+          console.log('Microphone permission status:', permission.state);
+          
+          permission.addEventListener('change', () => {
+            setPermissionStatus(permission.state);
+            console.log('Microphone permission changed to:', permission.state);
+          });
+        }
+      } catch (error) {
+        console.log('Could not check microphone permissions:', error);
+      }
+    };
+
+    checkSupport();
+    checkPermissions();
+  }, []);
 
   useEffect(() => {
     if (isOpen && textareaRef.current) {
@@ -59,6 +203,305 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
       }
     };
   }, [message, audioEnabledState, audioAutoSendDelay, isLoading, isStreaming]);
+
+  const startRecording = useCallback(async () => {
+    console.log('🎤 Starting recording...');
+    
+    // Prevent multiple simultaneous starts
+    if (isRecording) {
+      console.warn('⚠️ Already recording, ignoring start request');
+      return;
+    }
+    
+    setSpeechError(null);
+    
+    try {
+      // Always request microphone permission to trigger macOS dialog
+      console.log('Requesting microphone access...');
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 44100,
+              channelCount: 1
+            } 
+          });
+          console.log('✅ Microphone access granted');
+          console.log('Stream details:', {
+            active: stream.active,
+            tracks: stream.getTracks().length,
+            trackSettings: stream.getTracks()[0]?.getSettings()
+          });
+          
+          // Stop the stream immediately as we only needed it for permission
+          stream.getTracks().forEach(track => track.stop());
+        } catch (mediaError: any) {
+          console.warn('⚠️ MediaDevices permission failed:', mediaError);
+          console.warn('Error name:', mediaError.name);
+          console.warn('Error message:', mediaError.message);
+          
+          if (!isTauriEnv) {
+            // In web browsers, this is a hard error
+            throw mediaError;
+          }
+          // In Tauri, we can continue without mediaDevices
+          console.log('🏗️ Continuing in Tauri environment without mediaDevices');
+        }
+      } else {
+        console.log('📱 MediaDevices API not available');
+        if (!isTauriEnv) {
+          throw new Error('MediaDevices API not available');
+        }
+      }
+      
+      // Initialize Speech Recognition
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        throw new Error('Speech recognition not supported');
+      }
+
+      console.log('🎯 Creating speech recognition instance...');
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      console.log('🎯 Speech recognition configured with:', {
+        continuous: recognition.continuous,
+        interimResults: recognition.interimResults,
+        lang: recognition.lang,
+        maxAlternatives: recognition.maxAlternatives
+      });
+
+      recognition.onstart = () => {
+        console.log('🎤 Speech recognition started successfully');
+        setIsRecording(true);
+        setSpeechError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        console.log('📝 Speech recognition result event:', {
+          resultIndex: event.resultIndex,
+          resultsLength: event.results.length
+        });
+        
+        // Update last speech time
+        lastSpeechTimeRef.current = Date.now();
+        
+        // Clear existing silence timeout
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        
+        let finalTranscript = '';
+        let interimText = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          const confidence = event.results[i][0].confidence;
+          
+          console.log(`Result ${i}: "${transcript}" (confidence: ${confidence}, final: ${event.results[i].isFinal})`);
+          
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimText += transcript;
+          }
+        }
+        
+        if (finalTranscript) {
+          console.log('✅ Final transcript:', finalTranscript);
+          setMessage(prev => prev + finalTranscript);
+          setInterimTranscript('');
+        } else if (interimText) {
+          console.log('⏳ Interim transcript:', interimText);
+          setInterimTranscript(interimText);
+        }
+        
+        // Set timeout for auto-send after 2 seconds of silence
+        silenceTimeoutRef.current = setTimeout(async () => {
+          // Get the current message state at the time of timeout
+          setMessage(currentMessage => {
+            if (currentMessage.trim()) {
+              console.log('🔄 Auto-sending after 2 seconds of silence:', currentMessage);
+              // Auto-send the message
+              setTimeout(() => handleSend(), 100);
+            }
+            return currentMessage; // Return unchanged for this setter
+          });
+        }, 2000);
+      };
+
+      recognition.onend = () => {
+        console.log('🛑 Speech recognition ended');
+        setIsRecording(false);
+        setInterimTranscript('');
+        
+        // Auto-restart if we were recording and it ended unexpectedly
+        if (recognitionRef.current === recognition && isRecording) {
+          console.log('🔄 Speech recognition ended unexpectedly, restarting...');
+          setTimeout(() => {
+            if (recognitionRef.current === recognition) {
+              try {
+                recognition.start();
+                console.log('✅ Speech recognition restarted');
+              } catch (restartError) {
+                console.error('❌ Failed to restart recognition:', restartError);
+                setSpeechError('Speech recognition stopped unexpectedly and could not restart');
+              }
+            }
+          }, 100);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('❌ Speech recognition error:', event.error, event);
+        console.error('Full error event:', {
+          error: event.error,
+          message: event.message,
+          timeStamp: event.timeStamp
+        });
+        
+        let errorMessage = 'Speech recognition error: ';
+        
+        switch (event.error) {
+          case 'no-speech':
+            errorMessage += 'No speech detected. The microphone is working but no speech was heard. Try speaking louder or closer to the microphone.';
+            // Don't stop recording for no-speech, it will auto-restart
+            return;
+          case 'audio-capture':
+            errorMessage += 'Audio capture failed. Please check:\n';
+            errorMessage += '• Microphone permissions in System Settings → Privacy & Security → Microphone\n';
+            errorMessage += '• Microphone is not being used by another app\n';
+            errorMessage += '• Microphone hardware is working properly';
+            break;
+          case 'not-allowed':
+            errorMessage += 'Speech recognition access denied. This might be due to:\n';
+            errorMessage += '1. Microphone permissions not granted\n';
+            errorMessage += '2. Speech recognition blocked by browser/system\n';
+            errorMessage += '3. App not trusted by macOS\n\n';
+            errorMessage += 'Try: System Settings → Privacy & Security → Microphone → Enable "ariana IDE"';
+            break;
+          case 'network':
+            errorMessage += 'Network error. Speech recognition requires an internet connection. Please check your connection and try again.';
+            break;
+          case 'service-not-allowed':
+            errorMessage += 'Speech service not allowed. This might be due to:\n';
+            errorMessage += '• Speech recognition disabled in browser settings\n';
+            errorMessage += '• System-level speech recognition permissions\n';
+            errorMessage += '• Try: System Settings → Privacy & Security → Speech Recognition';
+            break;
+          case 'aborted':
+            errorMessage += 'Speech recognition was aborted. This usually means no speech was detected for a while. The microphone is working, but try:\n';
+            errorMessage += '• Speaking more clearly and loudly\n';
+            errorMessage += '• Moving closer to the microphone\n';
+            errorMessage += '• Checking microphone volume in system settings';
+            break;
+          default:
+            errorMessage += `${event.error} (see console for details)`;
+        }
+        
+        setSpeechError(errorMessage);
+        setIsRecording(false);
+        setInterimTranscript('');
+      };
+
+      recognitionRef.current = recognition;
+      console.log('🚀 Starting speech recognition...');
+      
+      // Add a small delay to ensure everything is ready
+      setTimeout(() => {
+        try {
+          recognition.start();
+          console.log('✅ Speech recognition start() called');
+        } catch (startError: any) {
+          console.error('❌ Failed to start recognition:', startError);
+          setSpeechError(`Failed to start speech recognition: ${startError.message}`);
+          setIsRecording(false);
+        }
+      }, 100);
+      
+    } catch (error: any) {
+      console.error('❌ Failed to start recording:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      let errorMessage = 'Failed to start recording: ';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Microphone access denied. Please:\n';
+        errorMessage += '1. Go to System Settings → Privacy & Security → Microphone\n';
+        errorMessage += '2. Enable "ariana IDE"\n';
+        errorMessage += '3. Restart the app';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No microphone found. Please connect a microphone and try again.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage += 'Your browser does not support microphone access.';
+      } else if (error.message === 'MediaDevices API not available') {
+        errorMessage += 'MediaDevices API not available in this browser.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred.';
+      }
+      
+      setSpeechError(errorMessage);
+      setIsRecording(false);
+    }
+  }, [isTauriEnv, isRecording]);
+
+  const stopRecording = useCallback(() => {
+    console.log('🛑 Stopping recording...');
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    
+    // Clear silence timeout when stopping
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    
+    setIsRecording(false);
+    setInterimTranscript('');
+  }, []);
+
+  const handleToggleRecording = useCallback(() => {
+    try {
+      // Simple 2-state logic: OFF -> ON (with recording) -> OFF
+      if (audioEnabledState) {
+        // Audio is ON, turn it OFF (stop recording and disable audio)
+        if (isRecording) {
+          stopRecording();
+        }
+        setAudioEnabledState(false);
+        if (audioTimeout) {
+          clearTimeout(audioTimeout);
+          setAudioTimeout(null);
+        }
+      } else {
+        // Audio is OFF, turn it ON (enable audio and start recording)
+        setAudioEnabledState(true);
+        if (audioTimeout) {
+          clearTimeout(audioTimeout);
+          setAudioTimeout(null);
+        }
+        // Start recording immediately after enabling audio
+        setTimeout(() => {
+          startRecording();
+        }, 100);
+      }
+    } catch (error) {
+      setSpeechError(`Button error: ${error}`);
+    }
+  }, [audioEnabledState, isRecording, audioTimeout, stopRecording, startRecording]);
 
   const handleApiSend = useCallback(async (messageText: string) => {
     if (!apiKey.trim()) {
@@ -97,6 +540,7 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
         await handleApiSend(message.trim());
       }
       setMessage("");
+      setInterimTranscript("");
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
@@ -130,10 +574,28 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    // Only allow editing if not currently recording
+    if (!isRecording) {
+      setMessage(e.target.value);
+      setInterimTranscript('');
+    }
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   if (!isOpen) return null;
+
+  const displayText = message + (interimTranscript ? ` ${interimTranscript}` : '');
 
   return (
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -151,18 +613,34 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+          {/* Speech Error Display */}
+          {speechError && (
+            <div className="p-3 bg-red-500/20 border border-red-300/40 rounded text-sm text-red-700">
+              <pre className="whitespace-pre-wrap">{speechError}</pre>
+            </div>
+          )}
+
+          {/* Permission Status */}
+          {!isTauriEnv && permissionStatus === 'denied' && (
+            <div className="p-3 bg-yellow-500/20 border border-yellow-300/40 rounded text-sm text-yellow-700">
+              Microphone access denied. Please enable it in your browser settings.
+            </div>
+          )}
+
           <div className="relative">
             <textarea
               ref={textareaRef}
-              value={message}
+              value={displayText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
+              placeholder="Type your message or use voice input..."
               className={cn(
                 "w-full h-32 p-3 rounded-md border border-[var(--acc-400)] bg-[var(--base-200)] text-[var(--blackest)] placeholder-[var(--base-500)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--acc-500)]",
-                "font-mono text-sm"
+                "font-mono text-sm",
+                isRecording && "cursor-not-allowed"
               )}
               disabled={isLoading || isStreaming}
+              readOnly={isRecording}
             />
             {audioEnabledState && message.trim() && !isLoading && !isStreaming && (
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
@@ -187,18 +665,21 @@ export const CommunicationPalette: React.FC<CommunicationPaletteProps> = ({
           )}
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleAudio}
-                className={cn(
-                  "px-3 py-1 rounded text-xs transition-colors",
-                  audioEnabledState
-                    ? "bg-[var(--acc-500)] text-white"
-                    : "bg-[var(--base-400)] text-[var(--base-600)]"
-                )}
-              >
-                🎤 Audio {audioEnabledState ? "ON" : "OFF"}
-              </button>
+            <div className="flex items-center gap-2 p-2">
+              {/* Merged Audio/Recording Button */}
+              <MicrophoneButton
+                isRecording={isRecording}
+                isAudioEnabled={audioEnabledState}
+                onToggle={handleToggleRecording}
+                disabled={!isSupported || (!isTauriEnv && permissionStatus === 'denied')}
+              />
+              
+              {isRecording && (
+                <span className="text-xs text-red-500 animate-pulse">
+                  Recording...
+                </span>
+              )}
+              
               {!apiKey && (
                 <span className="text-xs text-red-500">
                   API key required
