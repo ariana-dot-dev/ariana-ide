@@ -131,8 +131,46 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		}
 
 		try {
-			// Create Claude Code agent
-			console.log("[TextAreaOnCanvas]", "Creating Claude Code agent...");
+			// Check if we can reuse existing Claude agent
+			if (claudeAgent && claudeAgent.isSessionReady()) {
+				console.log("[TextAreaOnCanvas]", "🔄 Reusing existing Claude session");
+				
+				// Register new process for this task
+				const processId = crypto.randomUUID();
+				const processState: ProcessState = {
+					processId,
+					terminalId: terminalId!, // Reuse existing terminal
+					type: 'claude-code',
+					status: 'running',
+					startTime: Date.now(),
+					elementId,
+					prompt: currentPrompt.trim()
+				};
+				
+				// Register with global ProcessManager
+				ProcessManager.registerProcess(processId, claudeAgent);
+				
+				// Register with canvas process state
+				addProcess(processState);
+				
+				// Start the task in TaskManager
+				startTask(taskId, processId);
+				
+				// Submit task to existing session
+				await claudeAgent.startTask(
+					textAreaOsSession || { Local: "." },
+					currentPrompt.trim(),
+					(reusedTerminalId: string) => {
+						console.log("[TextAreaOnCanvas]", "Reusing terminal ID:", reusedTerminalId);
+					}
+				);
+				
+				console.log("[TextAreaOnCanvas]", "Task submitted to existing session");
+				return;
+			}
+
+			// Create new Claude Code agent if no reusable session exists
+			console.log("[TextAreaOnCanvas]", "Creating new Claude Code agent...");
 			const agent = new ClaudeCodeAgent();
 			setClaudeAgent(agent);
 
@@ -208,7 +246,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		}
 	}, [text, currentPrompt, currentPromptingTask]);
 
-	// Hide terminal when no tasks are in progress
+	// Hide terminal when no tasks are in progress and no reusable session
 	useEffect(() => {
 		if (!currentInProgressTask && !claudeAgent) {
 			console.log("[TextAreaOnCanvas] Scheduling terminal hide in 1s", {
@@ -226,6 +264,9 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 				console.log("[TextAreaOnCanvas] Cancelling terminal hide");
 				clearTimeout(timeoutId);
 			};
+		} else if (claudeAgent && claudeAgent.isSessionReady()) {
+			// Keep terminal visible for reusable sessions
+			console.log("[TextAreaOnCanvas] Keeping terminal visible for reusable Claude session");
 		}
 	}, [currentInProgressTask, claudeAgent]);
 
@@ -309,21 +350,23 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			completeTask(inProgressTask.id, commitHash);
 			
 			// Reset states for new prompt
-			// Don't immediately hide terminal - let it stay for potential next task
 			setCurrentPrompt("");
 			setText("");
 			
-			// Update process state and clean up agent
+			// Update process state but keep Claude agent for reuse
 			const existingProcess = getProcessByElementId(elementId);
 			if (existingProcess) {
 				updateProcess(existingProcess.processId, { status: 'finished' });
-				ProcessManager.unregisterProcess(existingProcess.processId);
+				// Don't unregister process - keep it for session reuse
+				// ProcessManager.unregisterProcess(existingProcess.processId);
 			}
 			
-			// Clean up the claude agent after a short delay to let any final operations complete
-			setTimeout(() => {
-				setClaudeAgent(null);
-			}, 500);
+			// Don't destroy Claude agent - keep it for session reuse
+			// setTimeout(() => {
+			// 	setClaudeAgent(null);
+			// }, 500);
+			
+			console.log("[TextAreaOnCanvas]", "Task completed, Claude session ready for reuse");
 		};
 
 		const handleTaskError = (error: string) => {
@@ -361,10 +404,18 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			// );
 		};
 
+		const handleSessionReady = () => {
+			console.log("[TextAreaOnCanvas]", "🔄 Claude session is ready for next task");
+			// Session is ready - user can now submit another task
+			// The UI will automatically enable the Go button since claudeAgent still exists
+			// and isSessionReady() will return true
+		};
+
 		claudeAgent.on("taskCompleted", handleTaskComplete);
 		claudeAgent.on("taskError", handleTaskError);
 		claudeAgent.on("taskStarted", handleTaskStarted);
 		claudeAgent.on("screenUpdate", handleScreenUpdate);
+		claudeAgent.on("sessionReady", handleSessionReady);
 
 		return () => {
 			console.log("[TextAreaOnCanvas]", "🧹 Cleaning up event listeners");
@@ -372,16 +423,46 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			claudeAgent.off("taskError", handleTaskError);
 			claudeAgent.off("taskStarted", handleTaskStarted);
 			claudeAgent.off("screenUpdate", handleScreenUpdate);
+			claudeAgent.off("sessionReady", handleSessionReady);
 		};
 	}, [claudeAgent]);
 
 	const handleStopClick = async () => {
 		if (claudeAgent) {
+			// Stop the current task but keep session alive
 			await claudeAgent.stopTask();
+			
+			// Don't destroy the agent - let it be reused
+			// setClaudeAgent(null);
+		}
+		
+		// Clean up current process state but keep session for reuse
+		const existingProcess = getProcessByElementId(elementId);
+		if (existingProcess) {
+			updateProcess(existingProcess.processId, { status: 'finished' });
+			// Don't unregister process completely - keep for potential reuse
+			// ProcessManager.unregisterProcess(existingProcess.processId);
+			// ProcessManager.removeTerminalConnection(elementId);
+		}
+		
+		// Don't hide terminal - keep it visible for session reuse
+		// setShowTerminal(false);
+		// setTerminalId(null);
+		
+		console.log("[TextAreaOnCanvas]", "Task stopped, Claude session kept alive for reuse");
+		
+		// Revert task back to prompting state (if we had this functionality)
+		// For now, the in-progress task will remain in that state
+	};
+
+	const handleFullCleanup = async () => {
+		if (claudeAgent) {
+			// Force cleanup of Claude session
+			await claudeAgent.cleanup(true);
 			setClaudeAgent(null);
 		}
 		
-		// Clean up process state
+		// Clean up all process state
 		const existingProcess = getProcessByElementId(elementId);
 		if (existingProcess) {
 			removeProcess(existingProcess.processId);
@@ -391,10 +472,8 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 		
 		setShowTerminal(false);
 		setTerminalId(null);
-		// Keep the current prompt so user can try again
 		
-		// Revert task back to prompting state (if we had this functionality)
-		// For now, the in-progress task will remain in that state
+		console.log("[TextAreaOnCanvas]", "Claude session fully cleaned up");
 	};
 
 	const handleRevertTask = async (taskId: string) => {

@@ -50,6 +50,11 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	private eventQueue: TerminalEvent[][] = [];
 	private lastActivityTime: number = 0;
 	private completionTimeoutId: NodeJS.Timeout | null = null;
+	
+	// New state variables for session reuse
+	private isClaudeRunning = false;
+	private isWaitingForPrompt = false;
+	private sessionStartTime: number = 0;
 
 	constructor() {
 		super();
@@ -107,6 +112,12 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			throw new Error(error);
 		}
 
+		// Check if Claude session is already running and waiting for prompt
+		if (this.isClaudeRunning && this.isWaitingForPrompt && this.terminalId) {
+			console.log(this.logPrefix, "🔄 Reusing existing Claude session");
+			return this.submitNewTaskToExistingSession(prompt, onTerminalReady);
+		}
+
 		this.isRunning = true;
 		this.currentTask = prompt;
 		this.currentPrompt = prompt;
@@ -151,25 +162,75 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	}
 
 	/**
+	 * Submit a new task to an existing Claude session
+	 */
+	private async submitNewTaskToExistingSession(
+		prompt: string,
+		onTerminalReady?: (terminalId: string) => void,
+	): Promise<void> {
+		console.log(this.logPrefix, "Submitting new task to existing Claude session");
+		
+		this.isRunning = true;
+		this.currentTask = prompt;
+		this.currentPrompt = prompt;
+		this.startTime = Date.now();
+		this.isWaitingForPrompt = false;
+		this.hasSeenTryPrompt = false; // Reset for new task
+
+		// Notify that terminal is ready (reusing existing terminal)
+		onTerminalReady?.(this.terminalId!);
+
+		// Send the prompt directly since Claude is already at Try prompt
+		console.log(this.logPrefix, "Sending new prompt to existing session:", prompt);
+		
+		// Send the prompt key by key, simulating typing
+		for (const char of prompt) {
+			if (char === "\n") {
+				await this.sendRawInput(this.terminalId!, "\\");
+				await this.delay(Math.random() * 50 + 50);
+				await this.sendRawInput(this.terminalId!, "\r");
+			} else {
+				await this.sendRawInput(this.terminalId!, char);
+			}
+			await this.delay(Math.random() * 50 + 50);
+		}
+		await this.delay(Math.random() * 500 + 500);
+		await this.sendRawInput(this.terminalId!, "\r");
+
+		this.emit("taskStarted", {
+			prompt: this.currentPrompt,
+			terminalId: this.terminalId,
+		});
+	}
+
+	/**
 	 * Stop the current Claude Code task
 	 */
 	async stopTask(): Promise<void> {
 		if (!this.isRunning || !this.terminalId) return;
 
 		try {
-			// Send Ctrl+C to interrupt
+			// Send Ctrl+C to interrupt the current task
 			await this.sendCtrlC(this.terminalId);
 
-			// Wait a bit then clean up
+			// Wait a bit for the interruption to take effect
 			await this.delay(500);
 
-			await this.killTerminal(this.terminalId);
+			// Don't kill the terminal - keep Claude session alive
+			// await this.killTerminal(this.terminalId);
 		} catch (error) {
 			console.error("Error stopping Claude Code task:", error);
 		} finally {
+			// Mark current task as finished but keep session alive
 			this.isRunning = false;
 			this.currentTask = null;
-			this.screenLines = [];
+			this.currentPrompt = null;
+			// Don't reset screenLines - keep terminal display
+			// this.screenLines = [];
+			
+			// Session is still running, just waiting for next prompt
+			this.isWaitingForPrompt = true;
+			
 			this.emit("taskStopped");
 		}
 	}
@@ -219,22 +280,48 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	}
 
 	/**
+	 * Check if Claude session is ready for reuse
+	 */
+	isSessionReady(): boolean {
+		return this.isClaudeRunning && this.isWaitingForPrompt && !this.isRunning;
+	}
+
+	/**
+	 * Get session information
+	 */
+	getSessionInfo(): { isRunning: boolean; isWaitingForPrompt: boolean; sessionElapsed: number } | null {
+		if (!this.isClaudeRunning) return null;
+
+		return {
+			isRunning: this.isClaudeRunning,
+			isWaitingForPrompt: this.isWaitingForPrompt,
+			sessionElapsed: this.sessionStartTime ? Date.now() - this.sessionStartTime : 0,
+		};
+	}
+
+	/**
 	 * Clean up resources
 	 */
-	async cleanup(): Promise<void> {
-		if (this.terminalId) {
-			try {
-				await this.killTerminal(this.terminalId);
-			} catch (error) {
-				console.error("Error killing terminal:", error);
+	async cleanup(forceTerminalKill: boolean = false): Promise<void> {
+		// Only kill terminal if explicitly requested or if session is not reusable
+		if (forceTerminalKill || !this.isClaudeRunning) {
+			if (this.terminalId) {
+				try {
+					await this.killTerminal(this.terminalId);
+				} catch (error) {
+					console.error("Error killing terminal:", error);
+				}
 			}
+			super.cleanup();
+			this.isClaudeRunning = false;
+			this.isWaitingForPrompt = false;
+			this.sessionStartTime = 0;
 		}
 
-		super.cleanup();
+		// Always clean up task-specific state
 		this.isRunning = false;
 		this.currentTask = null;
 		this.currentPrompt = null;
-		this.screenLines = [];
 		this.hasSeenTryPrompt = false;
 		this.hasSeenTrustPrompt = false;
 		this.isProcessingEvents = false;
@@ -244,7 +331,11 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			clearTimeout(this.completionTimeoutId);
 			this.completionTimeoutId = null;
 		}
-		this.removeAllListeners();
+		
+		// Only remove all listeners if we're doing a full cleanup
+		if (forceTerminalKill) {
+			this.removeAllListeners();
+		}
 	}
 
 	// Private methods
@@ -376,6 +467,8 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 	}
 
 	private async initializeClaudeCode(): Promise<void> {
+		console.log(this.logPrefix, "initializeClaudeCode() method called");
+		
 		if (!this.terminalId) {
 			console.error(
 				this.logPrefix,
@@ -384,30 +477,102 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			return;
 		}
 
-		console.log(this.logPrefix, "Checking if Claude Code is available...");
-		// Check if claude is available
-		await this.sendInputLines(this.terminalId, ["which claude"]);
-		await this.delay(1000);
+		console.log(this.logPrefix, "Terminal ID confirmed:", this.terminalId);
 
-		console.log(this.logPrefix, "Getting current working directory...");
-		// Get the current working directory
-		await this.sendInputLines(this.terminalId, ["pwd"]);
-		await this.delay(500);
+		try {
+			console.log(this.logPrefix, "Checking if Claude Code is available...");
+			// Check if claude is available
+			await this.sendInputLines(this.terminalId, ["which claude"]);
+			console.log(this.logPrefix, "Successfully sent 'which claude', waiting 1000ms...");
+			await this.delay(1000);
 
-		// Start Claude Code without prompt initially
-		const claudeCommand = "claude";
-		console.log(
-			this.logPrefix,
-			"Starting Claude Code with command:",
-			claudeCommand,
-		);
-		await this.sendInputLines(this.terminalId, [claudeCommand]);
+			console.log(this.logPrefix, "Getting current working directory...");
+			// Get the current working directory
+			await this.sendInputLines(this.terminalId, ["pwd"]);
+			console.log(this.logPrefix, "Successfully sent 'pwd', waiting 500ms...");
+			await this.delay(500);
 
-		console.log(this.logPrefix, "Claude Code command sent");
-		this.emit("taskStarted", {
-			prompt: this.currentPrompt,
-			terminalId: this.terminalId,
-		});
+			// Start Claude Code without prompt initially
+			const claudeCommand = "claude";
+			console.log(
+				this.logPrefix,
+				"Starting Claude Code with command:",
+				claudeCommand,
+			);
+			await this.sendInputLines(this.terminalId, [claudeCommand]);
+			console.log(this.logPrefix, "Successfully sent claude command, waiting for terminal events...");
+			
+			// Mark Claude session as started
+			this.isClaudeRunning = true;
+			this.sessionStartTime = Date.now();
+			
+			console.log(this.logPrefix, "Emitting taskStarted event...");
+			this.emit("taskStarted", {
+				prompt: this.currentPrompt,
+				terminalId: this.terminalId,
+			});
+			console.log(this.logPrefix, "taskStarted event emitted successfully");
+			
+			// Start a periodic check to see if we're getting ANY terminal events
+			this.startPeriodicEventCheck();
+		} catch (error) {
+			console.error(this.logPrefix, "Error during Claude Code initialization:", error);
+			throw error;
+		}
+	}
+
+	private startPeriodicEventCheck(): void {
+		console.log(this.logPrefix, "Starting periodic event check...");
+		let checkCount = 0;
+		const maxChecks = 20; // Check for 20 seconds
+		
+		const checkInterval = setInterval(async () => {
+			checkCount++;
+			console.log(this.logPrefix, `Event check ${checkCount}/${maxChecks}: screenLines length = ${this.screenLines.length}`);
+			
+			if (this.screenLines.length > 0) {
+				console.log(this.logPrefix, "📺 Current screen content:");
+				this.screenLines.slice(-5).forEach((line, i) => {
+					const lineText = line.map(item => item.lexeme).join("");
+					if (lineText.trim()) {
+						console.log(this.logPrefix, `  Line ${i}:`, JSON.stringify(lineText));
+					}
+				});
+				// Events are working, stop checking
+				clearInterval(checkInterval);
+				return;
+			} else {
+				console.log(this.logPrefix, "📺 No screen content yet");
+				
+				// Mac workaround: Try sending a harmless command to force terminal activity
+				if (checkCount === 3 && this.terminalId) {
+					console.log(this.logPrefix, "🔧 Mac workaround: Sending harmless command to wake up terminal...");
+					try {
+						await this.sendRawInput(this.terminalId, " "); // Just a space
+						await this.delay(100);
+						await this.sendRawInput(this.terminalId, "\b"); // Backspace to remove it
+					} catch (error) {
+						console.log(this.logPrefix, "Failed to send wake-up command:", error);
+					}
+				}
+				
+				// Try pressing Enter after 5 seconds to trigger any waiting prompts
+				if (checkCount === 5 && this.terminalId) {
+					console.log(this.logPrefix, "🔧 Mac workaround: Sending Enter to trigger any waiting prompts...");
+					try {
+						await this.sendRawInput(this.terminalId, "\r");
+					} catch (error) {
+						console.log(this.logPrefix, "Failed to send Enter:", error);
+					}
+				}
+			}
+			
+			if (checkCount >= maxChecks) {
+				console.log(this.logPrefix, "❌ Event check timeout - no terminal events received after 20 seconds");
+				console.log(this.logPrefix, "This appears to be a Mac-specific terminal event system issue");
+				clearInterval(checkInterval);
+			}
+		}, 1000);
 	}
 
 	private async sendSingleKey(key: KeyboardKey): Promise<void> {
@@ -499,6 +664,15 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 				prompt: this.currentPrompt,
 				elapsed,
 			});
+			
+			// Mark task as finished but keep session alive
+			this.isRunning = false;
+			this.currentTask = null;
+			this.currentPrompt = null;
+			this.hasSeenTryPrompt = false;
+			
+			// Session is now waiting for next prompt
+			this.isWaitingForPrompt = true;
 		} catch (error) {
 			console.error(
 				this.logPrefix,
@@ -577,6 +751,16 @@ export class ClaudeCodeAgent extends CustomTerminalAPI {
 			}
 			await this.delay(Math.random() * 500 + 500);
 			await this.sendRawInput(this.terminalId, "\r");
+			return;
+		}
+
+		// Check if Claude has returned to Try prompt after task completion (session reuse)
+		if (hasTryPrompt && this.isWaitingForPrompt && !this.isRunning) {
+			console.log(
+				this.logPrefix,
+				"Claude has returned to Try prompt - session ready for next task",
+			);
+			this.emit("sessionReady");
 			return;
 		}
 
