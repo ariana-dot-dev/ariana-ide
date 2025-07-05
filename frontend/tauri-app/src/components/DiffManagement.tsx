@@ -79,6 +79,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<{ changeId: string, fileIndex: number, hunkIndex: number, hunk: GitDiffHunk, context: string }[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize diff service with current git project directory
   useEffect(() => {
@@ -157,6 +158,19 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     selectedTargetCommit,
     onStateChange
   ]);
+
+  // Add keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const loadBranches = async () => {
     console.log("[COMPONENT] loadBranches method entry");
@@ -394,6 +408,81 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
     } catch (error) {
       console.error("Failed to validate all changes:", error);
       setError(`Failed to validate all changes: ${error}`);
+    }
+  };
+
+  const discardFileChanges = async (filePaths: string[]) => {
+    try {
+      setLoading(true);
+      await diffService.discardFileChanges(filePaths);
+      
+      // Reload diff data to reflect the discarded changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to discard file changes:", error);
+      setError(`Failed to discard file changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const discardHunkChanges = async (filePath: string, hunk: GitDiffHunk) => {
+    try {
+      setLoading(true);
+      await diffService.discardHunkChanges(filePath, hunk);
+      
+      // Reload diff data to reflect the discarded changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to discard hunk changes:", error);
+      setError(`Failed to discard hunk changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateHunkChanges = async (filePath: string, hunk: GitDiffHunk) => {
+    try {
+      setLoading(true);
+      await diffService.validateHunkChanges(filePath, hunk);
+      
+      // Reload diff data to reflect the validated changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to validate hunk changes:", error);
+      setError(`Failed to validate hunk changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateSingleFileChanges = async (filePath: string) => {
+    try {
+      setLoading(true);
+      await diffService.validateFileChanges(filePath);
+      
+      // Reload diff data to reflect the validated changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to validate file changes:", error);
+      setError(`Failed to validate file changes: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const discardSingleFileChanges = async (filePath: string) => {
+    try {
+      setLoading(true);
+      await diffService.discardFileChanges([filePath]);
+      
+      // Reload diff data to reflect the discarded changes
+      await loadDiffData(selectedBaseBranch, selectedTargetBranch, selectedBaseCommit, selectedTargetCommit);
+    } catch (error) {
+      console.error("Failed to discard file changes:", error);
+      setError(`Failed to discard file changes: ${error}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -773,23 +862,14 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[var(--base-100)] relative">
-      {/* Header */}
+      {/* Header - Always Visible */}
       <div 
         className={cn(
-          "flex items-center justify-between border-b border-[var(--base-300)] transition-all duration-300 relative",
-          (showHeader || mainTitlebarVisible) ? "p-4 h-auto opacity-100" : "p-1 h-8 opacity-0",
+          "flex items-center justify-between border-b border-[var(--base-300)] p-4 h-auto opacity-100 relative",
           mainTitlebarVisible && "mt-12"
         )}
-        onMouseEnter={() => setShowHeader(true)}
-        onMouseLeave={() => setShowHeader(false)}
       >
-        {/* Invisible hover trigger area extending 20px below header */}
-        <div 
-          className="absolute -bottom-5 left-0 right-0 h-9 bg-transparent cursor-pointer"
-          onMouseEnter={() => setShowHeader(true)}
-        />
-        {(showHeader || mainTitlebarVisible) && (
-          <>
+        <>
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-black text-[var(--acc-600)]">Diff Management</h1>
               <div className="flex items-center space-x-2 text-sm text-[var(--base-600)]">
@@ -797,6 +877,56 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
                 <span className="text-green-500">+{diffSummary.totalAdditions}</span>
                 <span className="text-red-500">-{diffSummary.totalDeletions}</span>
               </div>
+              
+              {/* Search Bar */}
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search files and content..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    searchHunks(e.target.value);
+                  }}
+                  className="px-3 py-2 border border-[var(--base-300)] rounded text-sm w-64 focus:outline-none focus:border-[var(--acc-500)]"
+                />
+                {searchResults.length > 0 && (
+                  <div className="absolute right-8 top-1/2 transform -translate-y-1/2 text-xs text-[var(--base-600)]">
+                    {currentSearchIndex + 1}/{searchResults.length}
+                  </div>
+                )}
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchResults([]);
+                      setCurrentSearchIndex(-1);
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[var(--base-500)] hover:text-[var(--base-700)]"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              
+              {/* Search Navigation */}
+              {searchResults.length > 0 && (
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={previousSearchResult}
+                    className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={nextSearchResult}
+                    className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
+                  >
+                    ↓
+                  </button>
+                </div>
+              )}
             </div>
 
             
@@ -835,8 +965,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
                 {diffSummary.validationState.allValidated ? "✓ All Validated" : "Validate All"}
               </button>
             </div>
-          </>
-        )}
+        </>
       </div>
 
       {/* Unified Diff Modal */}
@@ -861,6 +990,7 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
           selectedSubLogic={selectedSubLogic}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          onDiscardFileChanges={discardFileChanges}
         />
       ) : (
         <DetailedMode
@@ -884,6 +1014,11 @@ export default function DiffManagement({ onClose, initialState, onStateChange, m
           searchHunks={searchHunks}
           nextSearchResult={nextSearchResult}
           previousSearchResult={previousSearchResult}
+          onDiscardFileChanges={discardFileChanges}
+          onDiscardHunkChanges={discardHunkChanges}
+          onValidateHunkChanges={validateHunkChanges}
+          onDiscardSingleFile={discardSingleFileChanges}
+          onValidateSingleFile={validateSingleFileChanges}
         />
       )}
     </div>
@@ -899,6 +1034,7 @@ interface OverviewModeProps {
   selectedSubLogic: string | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
 }
 
 function OverviewMode({ 
@@ -908,7 +1044,8 @@ function OverviewMode({
   onSelectSubLogic, 
   selectedSubLogic,
   searchQuery,
-  setSearchQuery
+  setSearchQuery,
+  onDiscardFileChanges
 }: OverviewModeProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -1003,6 +1140,7 @@ function OverviewMode({
                 onSelectSubLogic={onSelectSubLogic}
                 selectedSubLogic={selectedSubLogic}
                 searchQuery={searchQuery}
+                onDiscardFileChanges={onDiscardFileChanges}
               />
             ))}
           </div>
@@ -1028,6 +1166,7 @@ function OverviewMode({
                 onSelectSubLogic={onSelectSubLogic}
                 selectedSubLogic={selectedSubLogic}
                 searchQuery={searchQuery}
+                onDiscardFileChanges={onDiscardFileChanges}
               />
             ))}
           </div>
@@ -1056,6 +1195,7 @@ interface MainLogicChangeCardProps {
   onSelectSubLogic: (subLogicId: string) => void;
   selectedSubLogic: string | null;
   searchQuery?: string;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
 }
 
 function MainLogicChangeCard({ 
@@ -1064,7 +1204,8 @@ function MainLogicChangeCard({
   onEnterDetailed, 
   onSelectSubLogic, 
   selectedSubLogic,
-  searchQuery = ""
+  searchQuery = "",
+  onDiscardFileChanges
 }: MainLogicChangeCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -1097,6 +1238,17 @@ function MainLogicChangeCard({
             className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors text-sm"
           >
             Detailed View
+          </button>
+          
+          <button
+            onClick={() => {
+              const filePaths = change.files.map(file => file.filePath);
+              onDiscardFileChanges(filePaths);
+            }}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+            title="Discard all changes in this change set"
+          >
+            Discard
           </button>
           
           <button
@@ -1180,9 +1332,10 @@ interface SmallChangeCardProps {
   onSelectSubLogic?: (subLogicId: string) => void;
   selectedSubLogic?: string | null;
   searchQuery?: string;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
 }
 
-function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic, selectedSubLogic, searchQuery = "" }: SmallChangeCardProps) {
+function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic, selectedSubLogic, searchQuery = "", onDiscardFileChanges }: SmallChangeCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -1214,6 +1367,17 @@ function SmallChangeCard({ change, onValidate, onEnterDetailed, onSelectSubLogic
             className="px-3 py-1 bg-[var(--acc-500)] text-white rounded hover:bg-[var(--acc-600)] transition-colors text-sm"
           >
             View
+          </button>
+          
+          <button
+            onClick={() => {
+              const filePaths = change.files.map(file => file.filePath);
+              onDiscardFileChanges(filePaths);
+            }}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+            title="Discard all changes in this change set"
+          >
+            Discard
           </button>
           
           <button
@@ -1273,6 +1437,11 @@ interface DetailedModeProps {
   searchHunks: (query: string) => void;
   nextSearchResult: () => void;
   previousSearchResult: () => void;
+  onDiscardFileChanges: (filePaths: string[]) => Promise<void>;
+  onDiscardHunkChanges: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onValidateHunkChanges: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onDiscardSingleFile: (filePath: string) => Promise<void>;
+  onValidateSingleFile: (filePath: string) => Promise<void>;
 }
 
 function DetailedMode({
@@ -1295,7 +1464,12 @@ function DetailedMode({
   currentSearchIndex,
   searchHunks,
   nextSearchResult,
-  previousSearchResult
+  previousSearchResult,
+  onDiscardFileChanges,
+  onDiscardHunkChanges,
+  onValidateHunkChanges,
+  onDiscardSingleFile,
+  onValidateSingleFile
 }: DetailedModeProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Keyboard navigation
@@ -1373,14 +1547,6 @@ function DetailedMode({
             event.preventDefault();
             onPreviousChange();
             break;
-          case 'j':
-            event.preventDefault();
-            onNextHunk();
-            break;
-          case 'k':
-            event.preventDefault();
-            onPreviousHunk();
-            break;
         }
       }
       
@@ -1409,122 +1575,59 @@ function DetailedMode({
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Navigation Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[var(--base-300)] bg-[var(--base-150)]">
-        <div className="flex items-center space-x-4">
-          <div>
-            <h3 className=" text-[var(--base-700)]">{change.title}</h3>
-            <p className="text-sm text-[var(--base-600)]">
-              File {currentFileIndex + 1} of {change.files.length}: {currentFile.filePath}
-            </p>
-            <p className="text-xs text-[var(--base-500)]">
-              Block {currentLineIndex + 1} of {currentFile.hunks.length}
-              {currentFile.hunks[currentLineIndex] && (
-                <span className="ml-2">
-                  (Lines -{currentFile.hunks[currentLineIndex].oldStart},{currentFile.hunks[currentLineIndex].oldCount} 
-                  +{currentFile.hunks[currentLineIndex].newStart},{currentFile.hunks[currentLineIndex].newCount})
-                </span>
-              )}
-            </p>
-          </div>
+
+      {/* File Diff Content */}
+      <div className="flex-1 relative">
+        <FileDiffViewer 
+          file={currentFile} 
+          currentHunkIndex={currentLineIndex} 
+          searchQuery={searchQuery}
+          onDiscardHunk={onDiscardHunkChanges}
+          onValidateHunk={onValidateHunkChanges}
+          onDiscardFile={onDiscardSingleFile}
+          onValidateFile={onValidateSingleFile}
+        />
+        
+        {/* Navigation Controls - Bottom Right */}
+        <div className="fixed bottom-4 right-4 flex items-center space-x-1 z-50">
+          {/* Previous File */}
+          <button
+            onClick={onPreviousFile}
+            className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors shadow-lg text-sm"
+            title="Previous File (←)"
+          >
+            ◀
+          </button>
           
-          {/* Search Bar */}
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  searchHunks(e.target.value);
-                }}
-                className="px-3 py-1 border border-[var(--base-300)] rounded text-sm w-48 focus:outline-none focus:border-[var(--acc-500)]"
-              />
-              {searchResults.length > 0 && (
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-[var(--base-600)]">
-                  {currentSearchIndex + 1}/{searchResults.length}
-                </div>
-              )}
-            </div>
-            {searchResults.length > 0 && (
-              <>
-                <button
-                  onClick={previousSearchResult}
-                  className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={nextSearchResult}
-                  className="px-2 py-1 bg-[var(--base-200)] text-[var(--base-700)] rounded hover:bg-[var(--base-300)] transition-colors text-sm"
-                >
-                  ↓
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation Controls */}
-        <div className="flex items-center space-x-1">
-          {/* Change Navigation */}
-          <div className="flex items-center space-x-1 mr-2">
-            <button
-              onClick={onPreviousChange}
-              className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
-              title="Previous Change (P)"
-            >
-              ←
-            </button>
-            <button
-              onClick={onNextChange}
-              className="px-2 py-1 bg-[var(--base-400)] text-[var(--base-700)] rounded hover:bg-[var(--base-500)] transition-colors text-sm"
-              title="Next Change"
-            >
-              →
-            </button>
-          </div>
-
-          {/* Block Navigation */}
-          <div className="flex items-center space-x-1 mr-2">
+          {/* Hunk Navigation */}
+          <div className="flex flex-col items-center space-y-1">
             <button
               onClick={onPreviousHunk}
               disabled={currentLineIndex <= 0}
-              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Previous Block (K or Ctrl+↑)"
+              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+              title="Previous Block (Ctrl+↑)"
             >
-              ◀
+              ▲
             </button>
             <button
               onClick={onNextHunk}
               disabled={currentLineIndex >= currentFile.hunks.length - 1}
-              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              title="Next Block (J or Ctrl+↓)"
+              className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+              title="Next Block (Ctrl+↓)"
             >
-              ▶
+              ▼
             </button>
           </div>
           
+          {/* Next File */}
           <button
-            onClick={() => onValidateChange(selectedChange)}
-            disabled={change.validated}
-            className={cn(
-              "px-4 py-1 rounded  transition-colors",
-              change.validated
-                ? "bg-green-500 text-white"
-                : "bg-[var(--acc-600)] text-white hover:bg-[var(--acc-700)]"
-            )}
+            onClick={onNextFile}
+            className="px-2 py-1 bg-[var(--base-300)] text-[var(--base-700)] rounded-full hover:bg-[var(--base-400)] transition-colors shadow-lg text-sm"
+            title="Next File (→)"
           >
-            {change.validated ? "✓ Validated" : "Validate Change"}
+            ▶
           </button>
         </div>
-      </div>
-
-      {/* File Diff Content */}
-      <div className="flex-1 relative">
-        <FileDiffViewer file={currentFile} currentHunkIndex={currentLineIndex} searchQuery={searchQuery} />
       </div>
     </div>
   );
@@ -1559,9 +1662,13 @@ interface FileDiffViewerProps {
   file: GitDiffFile;
   currentHunkIndex?: number;
   searchQuery?: string;
+  onDiscardHunk?: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onValidateHunk?: (filePath: string, hunk: GitDiffHunk) => Promise<void>;
+  onDiscardFile?: (filePath: string) => Promise<void>;
+  onValidateFile?: (filePath: string) => Promise<void>;
 }
 
-function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDiffViewerProps) {
+function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "", onDiscardHunk, onValidateHunk, onDiscardFile, onValidateFile }: FileDiffViewerProps) {
   const currentHunkRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -1586,16 +1693,19 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
       const scrollContainer = scrollContainerRef.current;
       const hunkElement = currentHunkRef.current;
       
-      // Calculate the position to scroll to (exactly at the top of the hunk)
+      // Calculate the position to scroll to (hunk top just below the fixed file header)
       const hunkTop = hunkElement.offsetTop;
+      // Account for the fixed file header height (approximately 60px: text height + py-2 padding + border)
+      const fileHeaderHeight = 60;
+      const targetScrollTop = Math.max(0, hunkTop - fileHeaderHeight);
       
       console.log(`[SCROLL] Scrolling to hunk ${currentHunkIndex}`);
-      console.log(`[SCROLL] Hunk top: ${hunkTop}, Target scroll: ${hunkTop}`);
+      console.log(`[SCROLL] Hunk top: ${hunkTop}, File header height: ${fileHeaderHeight}, Target scroll: ${targetScrollTop}`);
       console.log(`[SCROLL] Container scrollable: ${scrollContainer.scrollHeight > scrollContainer.clientHeight}`);
       
       if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
         scrollContainer.scrollTo({
-          top: Math.max(0, hunkTop),
+          top: targetScrollTop,
           behavior: 'smooth'
         });
       } else {
@@ -1633,22 +1743,53 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
   }, []);
 
   return (
-    <div ref={scrollContainerRef} className="absolute inset-0 overflow-auto">
-      <div className="relative min-h-full">
+    <div className="absolute inset-0 flex flex-col">
+      {/* Fixed File Header */}
+      <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] z-30 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
+          <div className="flex items-center space-x-4 text-sm">
+            <span className="text-green-600">+{file.additions}</span>
+            <span className="text-red-600">-{file.deletions}</span>
+            <span className="text-[var(--base-600)]">
+              Block {currentHunkIndex + 1}/{file.hunks.length}
+            </span>
+            
+            {/* File Action Buttons */}
+            <div className="flex items-center space-x-1">
+              {onDiscardFile && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDiscardFile(file.filePath);
+                  }}
+                  className="px-1 py-0.5 hover:bg-red-100 hover:bg-opacity-50 rounded transition-colors"
+                  title="Discard entire file"
+                >
+                  ❌
+                </button>
+              )}
+              {onValidateFile && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onValidateFile(file.filePath);
+                  }}
+                  className="px-1 py-0.5 hover:bg-green-100 hover:bg-opacity-50 rounded transition-colors"
+                  title="Validate entire file"
+                >
+                  ✅
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable Content Area */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <div className="p-4">
           <div className="bg-[var(--base-200)] rounded-lg overflow-hidden">
-            <div className="bg-[var(--base-300)] px-4 py-2 border-b border-[var(--base-400)] sticky top-0 z-10">
-              <div className="flex items-center justify-between">
-                <h4 className="font-mono text-sm text-[var(--base-700)]">{file.filePath}</h4>
-                <div className="flex items-center space-x-4 text-sm">
-                  <span className="text-green-600">+{file.additions}</span>
-                  <span className="text-red-600">-{file.deletions}</span>
-                  <span className="text-[var(--base-600)]">
-                    Block {currentHunkIndex + 1}/{file.hunks.length}
-                  </span>
-                </div>
-              </div>
-            </div>
 
             {file.hunks.map((hunk, hunkIndex) => (
               <div 
@@ -1663,7 +1804,7 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
                 )}
               >
                 <div className={cn(
-                  "px-4 py-2 text-xs font-mono sticky top-12 z-5 transition-colors duration-300",
+                  "px-4 py-2 text-xs font-mono transition-colors duration-300",
                   hunkIndex === currentHunkIndex 
                     ? "bg-[var(--acc-200)] text-[var(--acc-800)] border-l-4 border-[var(--acc-500)]" 
                     : "bg-[var(--base-250)] text-[var(--base-600)]"
@@ -1672,14 +1813,37 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
                     <span>
                       @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
                     </span>
-                    {hunkIndex === currentHunkIndex && (
-                      <span className="text-[var(--acc-600)]  text-xs">← Current</span>
-                    )}
+                    
+                    {/* Hunk Action Buttons */}
+                    <div className="flex items-center space-x-1">
+                      {onDiscardHunk && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDiscardHunk(file.filePath, hunk);
+                          }}
+                          className="px-1 py-0.5 hover:bg-red-100 hover:bg-opacity-50 rounded transition-colors"
+                          title="Discard this hunk"
+                        >
+                          ❌
+                        </button>
+                      )}
+                      {onValidateHunk && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onValidateHunk(file.filePath, hunk);
+                          }}
+                          className="px-1 py-0.5 hover:bg-green-100 hover:bg-opacity-50 rounded transition-colors"
+                          title="Validate this hunk"
+                        >
+                          ✅
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                <div>
-                  {hunk.lines.map((line, lineIndex) => (
+                {hunk.lines.map((line, lineIndex) => (
                     <DiffLine 
                       key={lineIndex} 
                       line={line} 
@@ -1689,7 +1853,6 @@ function FileDiffViewer({ file, currentHunkIndex = 0, searchQuery = "" }: FileDi
                       searchQuery={searchQuery}
                     />
                   ))}
-                </div>
               </div>
             ))}
           </div>
