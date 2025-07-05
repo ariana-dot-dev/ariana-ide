@@ -1,14 +1,14 @@
 # Build ariana IDE for Windows
 Write-Host "Building ariana IDE for Windows..."
 
-Set-Location tauri-app
+Set-Location "..\tauri-app\"
 
-# Build for Windows x64
-Write-Host "Building for Windows x64..."
+# Then bundle installers
+Write-Host "Packaging Tauri bundles..."
 npm run tauri build -- --target x86_64-pc-windows-msvc
 
 # Copy binary to bin directory
-$sourcePath = "src-tauri\target\x86_64-pc-windows-msvc\release\ariana-ide.exe
+$sourcePath = "src-tauri\target\x86_64-pc-windows-msvc\release\ariana IDE.exe"
 $destPath = "..\bin\ariana-ide-windows-x64.exe"
 
 if (Test-Path $sourcePath) {

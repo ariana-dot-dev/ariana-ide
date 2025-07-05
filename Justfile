@@ -31,10 +31,10 @@ dev-cli:
     @echo "Starting CLI (will prompt for login)..."
     cd frontend && node dist/cli.js
 
-# Build for Windows
+# Build for windows
 build-windows:
     @echo "Building for Windows..."
-    cd frontend/tauri-app && npm run tauri build -- --target x86_64-pc-windows-msvc
+    cd frontend/scripts && powershell -ExecutionPolicy Bypass -File ./build_windows.ps1
 
 # Build for macOS  
 build-macos:

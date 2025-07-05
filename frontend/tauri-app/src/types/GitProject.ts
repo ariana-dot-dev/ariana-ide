@@ -38,6 +38,7 @@ export class GitProject {
 	public name: string;
 	public root: OsSession; // The OsSession that led to this GitProject's creation
 	public canvases: GitProjectCanvas[];
+	public mergedCanvases: GitProjectCanvas[]; // Canvases that have been merged
 	public currentCanvasIndex: number;
 	public backgroundAgents: BackgroundAgent[];
 	public createdAt: number;

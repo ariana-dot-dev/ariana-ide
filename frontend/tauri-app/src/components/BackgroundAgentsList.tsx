@@ -5,7 +5,7 @@ interface BackgroundAgentsListProps {
 	agents: BackgroundAgent[];
 	onRemoveAgent?: (agentId: string) => void;
 	onForceRemoveAgent?: (agentId: string) => Promise<void>;
-	onSelectAgent?: (agentId: string) => void;
+	onSelectAgent?: (agentId: string | null) => void;
 	selectedAgentId?: string | null;
 }
 
@@ -26,7 +26,7 @@ const StatusIndicator: React.FC<{ status: BackgroundAgentStatus }> = ({ status }
 			case 'initializing': return 'text-[var(--acc-600)]';
 			case 'checking': return 'text-[var(--acc-600)]';
 			case 'running': return 'text-[var(--positive-600)]';
-			case 'completed': return 'text-[var(--positive-700)]';
+			case 'completed': return 'text-[var(--positive-600)]';
 			case 'failed': return 'text-[var(--negative-600)]';
 			default: return 'text-[var(--base-500)]';
 		}
@@ -91,7 +91,7 @@ export const BackgroundAgentsList: React.FC<BackgroundAgentsListProps> = ({
 	}
 
 	return (
-		<div className="border-t border-[var(--base-300)] pt-3 mt-3">
+		<div className="mt-10">
 			<div className="px-3 mb-2">
 				<span className="text-sm text-[var(--base-500-50)]">Background Agents</span>
 			</div>
@@ -101,56 +101,46 @@ export const BackgroundAgentsList: React.FC<BackgroundAgentsListProps> = ({
 						key={agent.id}
 						onClick={() => onSelectAgent?.(agent.id)}
 						onContextMenu={(e) => handleContextMenu(e, agent.id)}
-						className={`group w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors border-[var(--base-300)] border-2 not-last:border-b-transparent not-first:border-t-transparent ${
+						className={`group relative w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors border-[var(--base-300)] border-2 not-last:border-b-transparent not-first:border-t-transparent ${
 							selectedAgentId === agent.id
 								? "bg-[var(--acc-200-20)] opacity-100"
 								: "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-pointer hover:border-solid border-dashed opacity-50 hover:opacity-100 hover:bg-[var(--acc-200-50)]"
 						}`}
 					>
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<span className="text-[var(--base-600)] capitalize">
-									{agent.type} Agent
-								</span>
-								<StatusIndicator status={agent.status} />
+						{/* Remove button */}
+						{(agent.status === 'completed' || agent.status === 'failed') && onRemoveAgent && (
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									onRemoveAgent(agent.id);
+								}}
+								className="w-5 absolute top-0 right-0 aspect-square group-hover:flex hidden items-center justify-center text-xs rounded-tr-lg rounded-bl-lg transition-colors bg-[var(--base-300-20)] text-[var(--base-500)] hover:bg-[var(--negative-300-40)] hover:text-[var(--negative-600)] cursor-pointer"
+								title="Remove agent"
+							>
+								✕
+							</button>
+						)}
+						<div className="flex flex-col gap-1">
+							<div className="text-[var(--base-600)]">
+								{agent.type} Agent
 							</div>
-							
-							<div className="flex items-center gap-1">
+							<div className="flex items-center gap-2">
+								<StatusIndicator status={agent.status} />
 								{/* Progress indicator as badge */}
-								{agent.status === 'running' && (
-									<span className="w-5 aspect-square flex items-center justify-center relative text-[var(--whitest)] rounded-md">
-										<div className="absolute top-0 left-0 w-full h-full bg-[var(--acc-400)] animate-spin rounded-lg"></div>
-										<div className="z-10 text-xs">⚙️</div>
-									</span>
-								)}
 								{agent.status === 'completed' && (
-									<span className="w-5 aspect-square flex items-center justify-center bg-[var(--positive-400)] text-[var(--whitest)] rounded-full text-xs">
+									<span className="text-[var(--positive-600)] rounded-full text-xs">
 										✓
 									</span>
 								)}
 								{agent.status === 'failed' && (
-									<span className="w-5 aspect-square flex items-center justify-center bg-[var(--negative-600)] text-[var(--whitest)] rounded-sm text-xs">
+									<span className="text-[var(--negative-600)] rounded-sm text-xs">
 										✗
 									</span>
-								)}
-
-								{/* Remove button */}
-								{(agent.status === 'completed' || agent.status === 'failed') && onRemoveAgent && (
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											onRemoveAgent(agent.id);
-										}}
-										className="w-5 aspect-square flex items-center justify-center text-xs rounded transition-colors bg-[var(--base-300-20)] text-[var(--base-500)] hover:bg-[var(--negative-300-40)] hover:text-[var(--negative-600)]"
-										title="Remove agent"
-									>
-										✕
-									</button>
 								)}
 							</div>
 						</div>
 
-						{agent.progress && (
+						{agent.progress && !(agent.status === 'completed' || agent.status === 'failed') && (
 							<div className="mt-1 text-xs text-[var(--base-500-70)]">
 								{agent.progress}
 							</div>

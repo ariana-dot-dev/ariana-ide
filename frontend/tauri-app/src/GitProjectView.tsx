@@ -7,6 +7,7 @@ import { GitProject } from "./types/GitProject";
 import { useStore } from "./state";
 import { BackgroundAgentsList } from "./components/BackgroundAgentsList";
 import { BackgroundAgentTerminalView } from "./components/BackgroundAgentTerminalView";
+import { div } from "framer-motion/client";
 
 const GitProjectView: React.FC<{}> = ({ }) => {
 	const { 
@@ -266,9 +267,10 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 												"group w-full flex flex-col text-left px-4 py-3 text-sm first:rounded-t-xl last:rounded-b-xl transition-colors border-[var(--base-300)] border-2 not-last:border-b-transparent not-first:border-t-transparent",
 												currentCanvas.id === canvas.id
 													? "bg-[var(--acc-200-20)] opacity-100"
-													: isLocked
-														? "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-default border-dashed opacity-60"
-														: "even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-pointer hover:border-solid border-dashed opacity-50 hover:opacity-100 hover:bg-[var(--acc-200-50)]",
+													: " even:bg-[var(--base-100-40)] odd:bg-[var(--base-100-80)] cursor-pointer hover:border-solid border-dashed opacity-50 hover:opacity-100 hover:bg-[var(--acc-200-50)]",
+												isLocked
+													? ""
+													: ""
 											)}
 											onClick={() => {
 												selectedGitProject.setCurrentCanvasIndex(index);
@@ -310,11 +312,6 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 															<div className="z-10 text-xs">⏳</div>
 														</span>
 													)}
-													{lockState === 'merged' && (
-														<span className="w-5 aspect-square flex items-center justify-center bg-[var(--positive-400)] text-[var(--whitest)] rounded-full text-xs" title="Canvas merged - create new canvas to continue">
-															✅
-														</span>
-													)}
 
 													{/* Merge Button - only show for normal state and if there are completed tasks */}
 													{lockState === 'normal' && taskCounts.finished > 0 && (
@@ -337,6 +334,11 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 													)}
 												</div>
 											</div>
+											{lockState === 'merged' && (
+												<div className="text-xs text-[var(--base-500-50)] mt-0.5">
+													merged
+												</div>
+											)}
 										</button>
 									);
 								})}
@@ -414,7 +416,7 @@ const GitProjectView: React.FC<{}> = ({ }) => {
 									className="mt-2 px-3 py-1 bg-[var(--base-200)] rounded hover:bg-[var(--base-300)] cursor-pointer transition-colors border border-[var(--base-400)] text-[var(--base-700)] hover:text-[var(--base-800)] active:bg-[var(--base-400)] select-none"
 									style={{ pointerEvents: 'auto' }}
 								>
-									Back to Canvases
+									Close
 								</button>
 							</div>
 						</div>

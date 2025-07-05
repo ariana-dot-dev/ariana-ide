@@ -493,7 +493,6 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 			className={cn(
 				"absolute select-none overflow-hidden p-1",
 				isDragging ? "z-30" : "z-10",
-				isCanvasLocked && "opacity-60" // Dim locked canvases
 			)}
 			initial={{
 				x: cell.x,
@@ -583,11 +582,11 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 													"px-2 py-0.5 text-xs rounded transition-all",
 													"opacity-0 group-hover:opacity-100",
 													!canEdit 
-														? "cursor-not-allowed opacity-30"
+														? "cursor-not-allowed opacity-10"
 														: "cursor-pointer",
 													task.isReverted
-														? "bg-[var(--positive-600)] text-white hover:bg-[var(--positive-700)]"
-														: "bg-[var(--base-600)] text-white hover:bg-[var(--base-700)]"
+														? "bg-[var(--positive-400)] text-[var(--blackest)] hover:bg-[var(--positive-300)]"
+														: "bg-[var(--base-400)] text-[var(--blackest)] hover:bg-[var(--base-300)]"
 												)}
 											>
 												{task.isReverted ? 'Restore' : 'Revert'}
@@ -657,7 +656,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 
 							{/* Canvas Lock Status Indicator */}
 							{isCanvasLocked && (
-								<div className="absolute right-2 top-2 flex items-center gap-1 text-xs text-[var(--base-600)] bg-[var(--base-100)] px-2 py-1 rounded border border-[var(--base-300)]">
+								<div className="absolute right-5 top-5 flex items-center gap-1 text-base text-[var(--base-600)] bg-[var(--base-100)] px-3 py-1.5 rounded-lg">
 									{canvasLockState === 'merging' && (
 										<>
 											<div className="w-3 h-3 border border-[var(--acc-400)] border-t-transparent rounded-full animate-spin"></div>
@@ -666,7 +665,7 @@ const TextAreaOnCanvas: React.FC<TextAreaOnCanvasProps> = ({
 									)}
 									{canvasLockState === 'merged' && (
 										<>
-											<span className="text-green-600">✓</span>
+											<span className="">✓</span>
 											<span>Merged</span>
 										</>
 									)}
